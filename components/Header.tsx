@@ -1,18 +1,34 @@
+
 import React, { useState } from 'react';
-import { Search, ShoppingCart, Heart, User, CircleHelp, Menu, X, ChevronRight } from 'lucide-react';
+import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, Menu, X, ChevronRight } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
 
 interface HeaderProps {
   onLoginClick?: () => void;
   cartItemCount?: number;
   onCartClick?: () => void;
+  onHelpClick?: () => void;
+  onWishlistClick?: () => void;
+  wishlistCount?: number;
+  user?: User | null;
 }
 
-const Header: React.FC<HeaderProps> = ({ onLoginClick, cartItemCount = 0, onCartClick }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  onLoginClick, 
+  cartItemCount = 0, 
+  onCartClick, 
+  onHelpClick,
+  onWishlistClick,
+  wishlistCount = 0,
+  user
+}) => {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Embedded SVG logo to satisfy "image-based" requirement reliably
   const logoSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 50'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 45 L30 45 L40 5 Z'/%3E%3Ctext x='50' y='38' font-family='sans-serif' font-weight='900' font-size='34' fill='%23111827' letter-spacing='-1'%3ENOKLITY%3C/text%3E%3C/svg%3E";
+
+  const isLoggedIn = !!user;
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 h-[80px] font-sans transition-all duration-300">
@@ -55,15 +71,26 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick, cartItemCount = 0, onCart
             
             {/* Desktop Navigation Icons */}
             <div className="hidden md:flex items-center gap-6 lg:gap-8">
-              <NavIcon icon={Heart} label="Wishlist" />
+              <NavIcon 
+                icon={Heart} 
+                label="Wishlist" 
+                badge={wishlistCount}
+                onClick={onWishlistClick} 
+              />
               <NavIcon 
                 icon={ShoppingCart} 
                 label="Cart" 
                 badge={cartItemCount} 
                 onClick={onCartClick}
               />
-              <NavIcon icon={CircleHelp} label="Help" />
-              <NavIcon icon={User} label="Login" onClick={onLoginClick} />
+              <NavIcon icon={CircleHelp} label="Help" onClick={onHelpClick} />
+              
+              <NavIcon 
+                icon={UserIcon} 
+                label={isLoggedIn ? "Account" : "Login"} 
+                onClick={onLoginClick} 
+                active={isLoggedIn}
+              />
             </div>
 
             {/* Mobile Actions */}
@@ -116,9 +143,18 @@ const Header: React.FC<HeaderProps> = ({ onLoginClick, cartItemCount = 0, onCart
       {isMobileMenuOpen && (
         <div className="fixed inset-0 top-[80px] bg-white z-40 md:hidden animate-in slide-in-from-right duration-300 flex flex-col">
             <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-                <MobileNavItem label="Wishlist" icon={Heart} />
-                <MobileNavItem label="Account" icon={User} onClick={() => { onLoginClick?.(); setIsMobileMenuOpen(false); }} />
-                <MobileNavItem label="Help Center" icon={CircleHelp} />
+                <MobileNavItem 
+                    label="Wishlist" 
+                    icon={Heart} 
+                    count={wishlistCount}
+                    onClick={() => { onWishlistClick?.(); setIsMobileMenuOpen(false); }} 
+                />
+                <MobileNavItem 
+                    label={isLoggedIn ? "Account" : "Login / Signup"}
+                    icon={UserIcon} 
+                    onClick={() => { onLoginClick?.(); setIsMobileMenuOpen(false); }} 
+                />
+                <MobileNavItem label="Help Center" icon={CircleHelp} onClick={() => { onHelpClick?.(); setIsMobileMenuOpen(false); }} />
                 
                 <div className="h-px bg-gray-100 my-4" />
                 
@@ -149,28 +185,29 @@ interface NavIconProps {
   label: string;
   badge?: number;
   onClick?: () => void;
+  active?: boolean;
 }
 
-const NavIcon: React.FC<NavIconProps> = ({ icon: Icon, label, badge, onClick }) => (
+const NavIcon: React.FC<NavIconProps> = ({ icon: Icon, label, badge, onClick, active }) => (
   <button 
     onClick={onClick}
     className="group flex flex-col items-center justify-center gap-1 min-w-[3rem] cursor-pointer bg-transparent border-none p-0 outline-none"
   >
     <div className="relative p-0.5">
-      <Icon className="h-6 w-6 text-gray-600 group-hover:text-primary transition-colors duration-200 stroke-[1.5px]" />
+      <Icon className={`h-6 w-6 transition-colors duration-200 stroke-[1.5px] ${active ? 'text-gray-900 fill-gray-100' : 'text-gray-600 group-hover:text-primary'}`} />
       {badge !== undefined && badge > 0 && (
         <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center ring-2 ring-white group-hover:scale-110 transition-transform shadow-sm">
           {badge}
         </span>
       )}
     </div>
-    <span className="text-[11px] font-medium text-gray-500 group-hover:text-primary transition-colors duration-200 tracking-wide">
+    <span className={`text-[11px] font-medium transition-colors duration-200 tracking-wide ${active ? 'text-gray-900 font-bold' : 'text-gray-500 group-hover:text-primary'}`}>
       {label}
     </span>
   </button>
 );
 
-const MobileNavItem = ({ label, icon: Icon, onClick }: any) => (
+const MobileNavItem = ({ label, icon: Icon, count, onClick }: any) => (
     <button 
         onClick={onClick}
         className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl active:scale-[0.98] transition-transform"
@@ -178,6 +215,11 @@ const MobileNavItem = ({ label, icon: Icon, onClick }: any) => (
         <div className="flex items-center gap-3">
             <Icon className="w-5 h-5 text-gray-700" />
             <span className="font-bold text-gray-900">{label}</span>
+            {count !== undefined && count > 0 && (
+                <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {count}
+                </span>
+            )}
         </div>
         <ChevronRight className="w-4 h-4 text-gray-400" />
     </button>

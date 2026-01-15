@@ -1,20 +1,36 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Package, ShoppingBag, Users, Layers, Zap, LogOut, ChevronLeft } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Package, 
+  ShoppingBag, 
+  Users, 
+  Layers, 
+  Zap, 
+  LogOut, 
+  ChevronLeft, 
+  LifeBuoy, 
+  Settings, 
+  Languages 
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ToastType } from '../components/Toast';
 import DashboardOverview from '../components/admin/DashboardOverview';
 import ProductManager from '../components/admin/ProductManager';
-import OrderManager from '../components/admin/OrderManager';
+import AdminOrders from './admin/AdminOrders';
 import CategoryManager from '../components/admin/CategoryManager';
+import SupportManager from '../components/admin/SupportManager';
+import AdminSettings from './admin/AdminSettings';
+import AdminLanguage from './admin/AdminLanguage';
+import AdminCustomers from './admin/AdminCustomers';
 
 interface AdminDashboardProps {
   onLogout: () => void;
   showToast: (message: string, type?: ToastType) => void;
 }
 
-type View = 'overview' | 'products' | 'orders' | 'categories' | 'flash';
+type View = 'overview' | 'products' | 'orders' | 'categories' | 'flash' | 'support' | 'settings' | 'language' | 'customers';
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast }) => {
+const AdminDashboard: React.FC<AdminDashboardProps & { onNavigate?: (view: any, param?: any) => void }> = ({ onLogout, showToast, onNavigate }) => {
   const [activeView, setActiveView] = useState<View>('overview');
 
   const handleLogout = async () => {
@@ -25,8 +41,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast }) 
   const renderView = () => {
     switch(activeView) {
       case 'products': return <ProductManager showToast={showToast} />;
-      case 'orders': return <OrderManager />;
+      case 'orders': return <AdminOrders onNavigate={onNavigate} />;
       case 'categories': return <CategoryManager />;
+      case 'support': return <SupportManager />;
+      case 'settings': return <AdminSettings />;
+      case 'language': return <AdminLanguage />;
+      case 'customers': return <AdminCustomers />;
       case 'flash': return (
         <div className="flex flex-col items-center justify-center h-96 text-gray-400">
             <Zap className="w-12 h-12 mb-4 text-gray-300" />
@@ -48,7 +68,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast }) 
             <span className="font-extrabold text-xl text-gray-900">NOKLITY</span>
         </div>
         
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
           <NavItem 
             icon={LayoutDashboard} 
             label="Overview" 
@@ -80,11 +100,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast }) 
             active={activeView === 'flash'} 
             onClick={() => setActiveView('flash')} 
           />
-          <div className="pt-4 pb-1 pl-4 text-xs font-bold text-gray-400 uppercase tracking-wider">User Management</div>
+          <div className="pt-4 pb-1 pl-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Platform</div>
           <NavItem 
             icon={Users} 
             label="Customers" 
-            onClick={() => {}} 
+            active={activeView === 'customers'}
+            onClick={() => setActiveView('customers')} 
+          />
+          <NavItem 
+            icon={LifeBuoy} 
+            label="Support" 
+            active={activeView === 'support'} 
+            onClick={() => setActiveView('support')} 
+          />
+          <NavItem 
+            icon={Languages} 
+            label="Translations" 
+            active={activeView === 'language'} 
+            onClick={() => setActiveView('language')} 
+          />
+          <NavItem 
+            icon={Settings} 
+            label="Website Settings" 
+            active={activeView === 'settings'} 
+            onClick={() => setActiveView('settings')} 
           />
         </nav>
 
@@ -115,7 +154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast }) 
             <div className="flex items-center gap-2 text-sm text-gray-500">
                 <span>Admin</span>
                 <span className="text-gray-300">/</span>
-                <span className="text-gray-900 font-medium capitalize">{activeView}</span>
+                <span className="text-gray-900 font-medium capitalize">{activeView.replace('-', ' ')}</span>
             </div>
             <button 
                 onClick={onLogout}

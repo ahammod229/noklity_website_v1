@@ -1,0 +1,148 @@
+/**
+ * Website Settings Service (Placeholder)
+ * 
+ * Handles global configuration, branding, and CMS-style settings.
+ * Designed to be swapped with real Supabase DB and Storage calls later.
+ */
+
+export interface WebsiteSettings {
+  branding: {
+    siteName: string;
+    tagline: string;
+    headerLogo: string;
+    footerLogo: string;
+    favicon: string;
+  };
+  header: {
+    showSearch: boolean;
+    showWishlist: boolean;
+    showCart: boolean;
+    showLogin: boolean;
+    ctaText: string;
+  };
+  footer: {
+    description: string;
+    supportEmail: string;
+    whatsappNumber: string;
+    copyrightText: string;
+    showSocialIcons: boolean;
+    showPaymentIcons: boolean;
+  };
+  homePage: {
+    sections: Array<{ id: string; name: string; enabled: boolean; order: number }>;
+  };
+  socialLinks: {
+    facebook: string;
+    instagram: string;
+    youtube: string;
+    linkedin: string;
+  };
+  maintenance: {
+    enabled: boolean;
+    message: string;
+  };
+}
+
+const DEFAULT_SETTINGS: WebsiteSettings = {
+  branding: {
+    siteName: 'NOKLITY',
+    tagline: 'Premium Automotive Performance Parts',
+    headerLogo: 'https://images.unsplash.com/photo-1599507591144-667d404d4902?q=80&w=200&auto=format&fit=crop',
+    footerLogo: '',
+    favicon: '',
+  },
+  header: {
+    showSearch: true,
+    showWishlist: true,
+    showCart: true,
+    showLogin: true,
+    ctaText: 'Free Shipping on orders over $500',
+  },
+  footer: {
+    description: 'Your premium destination for high-performance automotive parts. Engineered for speed, built for durability.',
+    supportEmail: 'support@noklity.com',
+    whatsappNumber: '+880 1713-812668',
+    copyrightText: '© 2024 NOKLITY Automotive. All rights reserved.',
+    showSocialIcons: true,
+    showPaymentIcons: true,
+  },
+  homePage: {
+    sections: [
+      { id: 'hero', name: 'Hero Section', enabled: true, order: 0 },
+      { id: 'categories', name: 'Categories Section', enabled: true, order: 1 },
+      { id: 'flash-sale', name: 'Flash Sale Section', enabled: true, order: 2 },
+      { id: 'featured', name: 'Featured Products', enabled: true, order: 3 },
+      { id: 'testimonials', name: 'Testimonials', enabled: false, order: 4 },
+      { id: 'newsletter', name: 'Newsletter Section', enabled: true, order: 5 },
+    ],
+  },
+  socialLinks: {
+    facebook: 'https://facebook.com/noklity',
+    instagram: 'https://instagram.com/noklity',
+    youtube: 'https://youtube.com/noklity',
+    linkedin: '',
+  },
+  maintenance: {
+    enabled: false,
+    message: 'We are currently performing scheduled maintenance. We will be back online shortly.',
+  },
+};
+
+/**
+ * Retrieves the current website settings.
+ */
+export const getSettings = async (): Promise<WebsiteSettings> => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  /*
+    TODO: SUPABASE INTEGRATION
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('*')
+      .single();
+  */
+
+  return { ...DEFAULT_SETTINGS };
+};
+
+/**
+ * Updates global website settings.
+ */
+export const updateSettings = async (settings: WebsiteSettings): Promise<boolean> => {
+  console.log('[Settings Service] Updating website configuration:', settings);
+  
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1200));
+
+  /*
+    TODO: SUPABASE INTEGRATION
+    const { error } = await supabase
+      .from('site_settings')
+      .update(settings)
+      .eq('id', 1);
+  */
+
+  return true;
+};
+
+/**
+ * Uploads an image asset to storage.
+ */
+export const uploadAsset = async (file: File, path: string): Promise<string> => {
+  console.log(`[Settings Service] Uploading asset to ${path}:`, file.name);
+  
+  // Simulate upload latency
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  /*
+    TODO: SUPABASE STORAGE INTEGRATION
+    const { data, error } = await supabase.storage
+      .from('assets')
+      .upload(`${path}/${Date.now()}-${file.name}`, file);
+    
+    if (data) return supabase.storage.from('assets').getPublicUrl(data.path).data.publicUrl;
+  */
+
+  return URL.createObjectURL(file); // Temporary mock URL
+};

@@ -1,6 +1,11 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { X, Star, Truck, Shield, Check, ShoppingCart } from 'lucide-react';
+import { X, ShoppingCart, Zap, ArrowLeft } from 'lucide-react';
+import ProductImageGallery from './ProductImageGallery';
+import ProductPriceBlock from './ProductPriceBlock';
+import QuantitySelector from './QuantitySelector';
+import ProductTabs from './ProductTabs';
 
 interface ProductDetailsProps {
   product: Product | null;
@@ -8,103 +13,154 @@ interface ProductDetailsProps {
   onAddToCart: (product: Product) => void;
 }
 
+// Mock Specs Data generator since basic Product type doesn't have it
+const getMockSpecs = (category: string) => ({
+  'Material': 'High-Grade Aluminum Alloy',
+  'Weight': '2.4 kg',
+  'Dimensions': '12 x 8 x 6 inches',
+  'Warranty': '2 Years Manufacturer',
+  'Compatibility': 'Universal Fit (Check manual)',
+  'Part Number': `NK-${category.substring(0,3).toUpperCase()}-001`,
+  'Country of Origin': 'Japan'
+});
+
 const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAddToCart }) => {
+  const [quantity, setQuantity] = useState(1);
+  
+  // Reset scroll when product opens
+  useEffect(() => {
+    if (product) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [product]);
+
   if (!product) return null;
 
-  const discountPercentage = product.originalPrice 
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
-    : 0;
+  // Enhance product with mock data for display
+  const specs = getMockSpecs(product.category);
+  const variants = ['Red', 'Black', 'Carbon Fiber'];
+  const [selectedVariant, setSelectedVariant] = useState(variants[0]);
+
+  const handleAddToCart = () => {
+    // In a real app, pass quantity and variant
+    console.log(`Adding to cart: ${product.name}, Qty: ${quantity}, Variant: ${selectedVariant}`);
+    onAddToCart(product);
+    onClose();
+  };
+
+  const handleBuyNow = () => {
+    console.log('Buy Now Clicked');
+    onAddToCart(product);
+    // Navigate to checkout logic would go here
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"
-        onClick={onClose}
-      />
-      
-      <div className="relative bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-300 max-h-[90vh]">
-        
+    <div className="fixed inset-0 z-[100] bg-gray-100 overflow-y-auto font-sans">
+      {/* Top Navigation Bar */}
+      <div className="sticky top-0 bg-white shadow-sm z-50 px-4 h-16 flex items-center justify-between">
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-white transition-all shadow-sm"
+          className="flex items-center gap-2 text-gray-600 hover:text-primary transition-colors font-bold text-sm"
         >
-          <X className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5" />
+          Back to Results
         </button>
+        <h2 className="hidden md:block font-bold text-gray-900 truncate max-w-md">{product.name}</h2>
+        <div className="w-8"></div> {/* Spacer for alignment */}
+      </div>
 
-        {/* Image Section */}
-        <div className="w-full md:w-1/2 bg-gray-50 p-8 flex items-center justify-center relative">
-          <img 
-            src={product.image} 
-            alt={product.name} 
-            className="w-full h-auto max-h-[400px] object-contain mix-blend-multiply"
-          />
-          {product.isNew && (
-            <div className="absolute top-6 left-6 bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">
-              New Arrival
+      <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 pb-32">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-8">
+            
+            {/* LEFT COLUMN: Images */}
+            <div className="lg:col-span-5 p-4 md:p-6 lg:border-r border-gray-100">
+              <ProductImageGallery mainImage={product.image} productName={product.name} />
             </div>
-          )}
+
+            {/* RIGHT COLUMN: Info & Actions */}
+            <div className="lg:col-span-7 p-4 md:p-6 lg:pr-12">
+              <ProductPriceBlock 
+                name={product.name}
+                price={product.price}
+                originalPrice={product.originalPrice}
+                rating={product.rating}
+                brand="NOKLITY Performance"
+              />
+
+              <div className="mt-6 space-y-6">
+                {/* Variants */}
+                <div>
+                  <h3 className="text-sm font-bold text-gray-500 mb-3">Color Family</h3>
+                  <div className="flex gap-3">
+                    {variants.map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setSelectedVariant(v)}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                          selectedVariant === v 
+                          ? 'border-primary text-primary bg-red-50' 
+                          : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quantity */}
+                <QuantitySelector 
+                  quantity={quantity} 
+                  setQuantity={setQuantity} 
+                  maxStock={product.stock || 20}
+                />
+
+                {/* Desktop Actions */}
+                <div className="hidden lg:flex gap-4 pt-4">
+                  <button 
+                    onClick={handleBuyNow}
+                    className="flex-1 bg-primary hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-5 h-5 fill-current" />
+                    Buy Now
+                  </button>
+                  <button 
+                    onClick={handleAddToCart}
+                    className="flex-1 bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Add to Cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Content Section */}
-        <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col overflow-y-auto bg-white">
-          <div className="flex items-center space-x-2 mb-3">
-            <span className="text-primary font-bold text-xs uppercase tracking-widest">{product.category}</span>
-            <span className="text-gray-300">•</span>
-            <div className="flex items-center text-yellow-400">
-              <Star className="w-3.5 h-3.5 fill-current" />
-              <span className="ml-1 text-gray-600 text-xs font-bold">{product.rating} (124 reviews)</span>
-            </div>
-          </div>
+        {/* Bottom Section: Tabs */}
+        <ProductTabs 
+          description={product.description || "No description available."}
+          specs={specs}
+        />
+      </div>
 
-          <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-4 leading-tight">{product.name}</h2>
-
-          <div className="flex items-end gap-3 mb-6">
-            <span className="text-3xl font-extrabold text-gray-900">${product.price.toLocaleString()}</span>
-            {product.originalPrice && (
-              <>
-                <span className="text-lg text-gray-400 line-through mb-1">${product.originalPrice.toLocaleString()}</span>
-                <span className="bg-red-50 text-red-600 text-xs font-bold px-2 py-1 rounded-md mb-2">-{discountPercentage}%</span>
-              </>
-            )}
-          </div>
-
-          <p className="text-gray-600 leading-relaxed mb-8">
-            Engineered for peak performance, this {product.category.toLowerCase()} component meets the highest standards of automotive excellence. Designed to withstand extreme conditions while delivering optimal results.
-          </p>
-
-          {/* Features / Specs */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
-             <div className="flex items-start gap-3">
-                <Truck className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                    <h4 className="text-sm font-bold text-gray-900">Fast Shipping</h4>
-                    <p className="text-xs text-gray-500">Delivery in 2-4 business days</p>
-                </div>
-             </div>
-             <div className="flex items-start gap-3">
-                <Shield className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                    <h4 className="text-sm font-bold text-gray-900">Warranty</h4>
-                    <p className="text-xs text-gray-500">2 Years Manufacturer Warranty</p>
-                </div>
-             </div>
-          </div>
-
-          <div className="mt-auto pt-6 border-t border-gray-100 flex gap-4">
-             <button 
-                onClick={() => {
-                    onAddToCart(product);
-                    onClose();
-                }}
-                className="flex-1 bg-gray-900 text-white font-bold py-4 rounded-xl hover:bg-black transition-colors flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-[0.98]"
-             >
-                <ShoppingCart className="w-4 h-4" />
-                Add to Cart
-             </button>
-             <button className="px-6 py-4 border border-gray-200 rounded-xl font-bold text-gray-900 hover:bg-gray-50 transition-colors">
-                Wishlist
-             </button>
-          </div>
+      {/* Mobile Sticky Action Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 pb-6 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <div className="flex gap-3">
+          <button 
+            onClick={handleBuyNow}
+            className="flex-1 bg-primary text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform"
+          >
+            Buy Now
+          </button>
+          <button 
+            onClick={handleAddToCart}
+            className="flex-1 bg-gray-900 text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform"
+          >
+            Add to Cart
+          </button>
         </div>
       </div>
     </div>

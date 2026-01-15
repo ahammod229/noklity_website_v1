@@ -8,6 +8,7 @@ interface CartDrawerProps {
   items: CartItem[];
   onUpdateQuantity: (id: string, delta: number) => void;
   onRemoveItem: (id: string) => void;
+  onCheckout: () => void;
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ 
@@ -15,7 +16,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
   onClose, 
   items, 
   onUpdateQuantity, 
-  onRemoveItem 
+  onRemoveItem,
+  onCheckout
 }) => {
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -111,7 +113,13 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
               <span className="text-xl font-extrabold text-gray-900">${total.toLocaleString()}</span>
             </div>
             <p className="text-xs text-gray-400 mb-6 text-center">Shipping and taxes calculated at checkout.</p>
-            <button className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-red-700 transition-all active:scale-[0.98] shadow-lg shadow-red-500/20 flex items-center justify-center gap-2">
+            <button 
+              onClick={() => {
+                onClose();
+                onCheckout();
+              }}
+              className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-red-700 transition-all active:scale-[0.98] shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+            >
               Checkout <ArrowRight className="w-4 h-4" />
             </button>
           </div>

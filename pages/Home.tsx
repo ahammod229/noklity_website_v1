@@ -1,82 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
-import Header from '../components/Header';
 import Hero from '../components/Hero';
 import CategoryGrid from '../components/CategoryGrid';
 import ProductCard from '../components/ProductCard';
 import FlashSale from '../components/FlashSale';
-import Footer from '../components/Footer';
 import { SkeletonList } from '../components/SkeletonLoader';
 import { Product } from '../types';
-
-// MOCK DATA
-const FEATURED_PRODUCTS: Product[] = [
-  {
-    id: '101',
-    name: 'Brembo GT Braking System Kit',
-    category: 'Brakes',
-    price: 1250.00,
-    image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop',
-    isNew: true,
-    rating: 5.0
-  },
-  {
-    id: '102',
-    name: 'Garrett G-Series Turbocharger',
-    category: 'Engine',
-    price: 2499.99,
-    image: 'https://images.unsplash.com/photo-1606775089350-f1c5039535eb?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.8
-  },
-  {
-    id: '103',
-    name: 'KW V3 Coilover Suspension',
-    category: 'Suspension',
-    price: 1895.50,
-    image: 'https://images.unsplash.com/photo-1614251412693-4a1f6494cb68?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.9
-  },
-  {
-    id: '104',
-    name: 'Akrapovič Titanium Exhaust',
-    category: 'Exhaust',
-    price: 3200.00,
-    image: 'https://images.unsplash.com/photo-1565538361093-9c59573887c3?q=80&w=2940&auto=format&fit=crop',
-    isNew: true,
-    rating: 5.0
-  },
-  {
-    id: '105',
-    name: 'Recaro Sportster CS Seat',
-    category: 'Interior',
-    price: 1450.00,
-    image: 'https://images.unsplash.com/photo-1582239433989-13833215904d?q=80&w=2848&auto=format&fit=crop',
-    rating: 4.7
-  },
-  {
-    id: '106',
-    name: 'BBS FI-R Forged Wheels',
-    category: 'Wheels',
-    price: 2150.00,
-    image: 'https://images.unsplash.com/photo-1605658632617-640954992524?q=80&w=2940&auto=format&fit=crop',
-    rating: 5.0
-  },
-  {
-    id: '107',
-    name: 'MOMO Montecarlo Steering Wheel',
-    category: 'Interior',
-    price: 249.99,
-    image: 'https://images.unsplash.com/photo-1595188800996-3c0f46c6422d?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.5
-  },
-  {
-    id: '108',
-    name: 'K&N High-Flow Air Filter',
-    category: 'Engine',
-    price: 65.99,
-    image: 'https://images.unsplash.com/photo-1508209803874-51e443831844?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.6
-  }
-];
+import { MOCK_PRODUCTS } from '../data/mockData';
 
 interface HomeProps {
   onLoginClick: () => void;
@@ -86,29 +16,32 @@ interface HomeProps {
   onAddToCart: (product: Product) => void;
   activeCategory: string | null;
   onSelectCategory: (category: string) => void;
+  onHelpClick?: () => void;
+  onWishlistClick: () => void;
 }
 
 const Home: React.FC<HomeProps> = ({ 
-  onLoginClick, 
-  cartItemCount, 
-  onCartClick, 
   onProductClick, 
   onAddToCart,
   activeCategory,
-  onSelectCategory
+  onSelectCategory,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [displayedProducts, setDisplayedProducts] = useState(FEATURED_PRODUCTS);
+  const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     setIsLoading(true);
     // Simulate loading/filtering delay
     const timer = setTimeout(() => {
+      // Filter out Flash Sale items from main grid to avoid duplication if needed, 
+      // or just show main catalog items. Here we filter by category if present.
+      let filtered = MOCK_PRODUCTS.filter(p => !p.isFlashSale);
+      
       if (activeCategory) {
-        setDisplayedProducts(FEATURED_PRODUCTS.filter(p => p.category === activeCategory));
-      } else {
-        setDisplayedProducts(FEATURED_PRODUCTS);
+        filtered = MOCK_PRODUCTS.filter(p => p.category === activeCategory);
       }
+      
+      setDisplayedProducts(filtered);
       setIsLoading(false);
     }, 600);
     return () => clearTimeout(timer);
@@ -116,12 +49,6 @@ const Home: React.FC<HomeProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <Header 
-        onLoginClick={onLoginClick} 
-        cartItemCount={cartItemCount}
-        onCartClick={onCartClick}
-      />
-      
       <main className="flex-grow space-y-4">
         {!activeCategory && <Hero />}
         
@@ -166,7 +93,7 @@ const Home: React.FC<HomeProps> = ({
                     <ProductCard 
                       key={product.id} 
                       product={product} 
-                      onClick={onProductClick}
+                      onClick={() => onProductClick(product)}
                       onAddToCart={onAddToCart}
                     />
                   ))}
@@ -218,8 +145,6 @@ const Home: React.FC<HomeProps> = ({
         </section>
 
       </main>
-      
-      <Footer />
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -57,15 +58,53 @@ export interface Database {
           is_flash_sale: boolean;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at'>;
-        Update: Partial<Database['public']['Tables']['products']['Insert']>;
+        Insert: {
+          title: string;
+          description?: string | null;
+          price: number;
+          discount_price?: number | null;
+          image_url?: string | null;
+          category?: string | null;
+          rating?: number;
+          stock: number;
+          is_flash_sale?: boolean;
+        };
+        Update: {
+          title?: string;
+          description?: string | null;
+          price?: number;
+          discount_price?: number | null;
+          image_url?: string | null;
+          category?: string | null;
+          rating?: number;
+          stock?: number;
+          is_flash_sale?: boolean;
+        };
       };
       profiles: {
         Row: {
           id: string;
           email: string;
           role: 'admin' | 'user';
+          full_name: string | null;
+          phone: string | null;
           created_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          role?: 'admin' | 'user';
+          full_name?: string | null;
+          phone?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          role?: 'admin' | 'user';
+          full_name?: string | null;
+          phone?: string | null;
+          created_at?: string;
         };
       };
     };
