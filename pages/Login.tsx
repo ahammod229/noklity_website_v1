@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthLayout from '../components/AuthLayout';
 import AuthInput from '../components/AuthInput';
 import { Mail, Lock, Loader2 } from 'lucide-react';
 import { loginUser } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LoginProps {
   onNavigate: (view: any) => void;
@@ -11,12 +12,19 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onNavigate, onLoginSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      onNavigate('profile');
+    }
+  }, [user, onNavigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -33,18 +41,24 @@ const Login: React.FC<LoginProps> = ({ onNavigate, onLoginSuccess }) => {
       
       if (response.error) {
         setError(response.error);
+        setLoading(false);
       } else {
         // Success
-        console.log('Login successful', response.user);
         onLoginSuccess?.();
-        onNavigate('home');
+        // Navigation will be handled by the useEffect dependent on 'user' state update
+        // or we can force it here if context update is slow, but usually auth state change triggers it.
+        // For safety/speed:
+        onNavigate('profile');
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
+
+  if (user) {
+    return null; // Prevent flash of login form while redirecting
+  }
 
   return (
     <AuthLayout 

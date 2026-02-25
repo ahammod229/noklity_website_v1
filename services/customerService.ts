@@ -1,8 +1,9 @@
+
+import { supabase } from '../lib/supabase';
+
 /**
- * Customer Service (Placeholder)
- * 
- * Handles administrative user management tasks.
- * Designed to be swapped with real Supabase Auth/DB calls later.
+ * Customer Service
+ * Handles administrative user management tasks via Supabase.
  */
 
 export interface Customer {
@@ -16,81 +17,117 @@ export interface Customer {
   joinedDate: string;
   lastOrderDate: string;
   address: string;
-  avatar?: string;
+  recentOrders?: Array<{
+    id: string;
+    date: string;
+    total: number;
+    status: string;
+  }>;
 }
 
-const MOCK_CUSTOMERS: Customer[] = [
-  {
-    id: 'CUST-101',
-    name: 'Alex Morgan',
-    email: 'alex.morgan@example.com',
-    phone: '+1 (555) 123-4567',
-    ordersCount: 12,
-    totalSpent: 4250.00,
-    status: 'Active',
-    joinedDate: 'Mar 12, 2024',
-    lastOrderDate: 'Oct 12, 2024',
-    address: '123 Performance Blvd, Speedway City, CA'
-  },
-  {
-    id: 'CUST-102',
-    name: 'Sarah Jenkins',
-    email: 'sarah.j@auto.net',
-    phone: '+1 (555) 987-6543',
-    ordersCount: 5,
-    totalSpent: 1200.50,
-    status: 'Active',
-    joinedDate: 'May 05, 2024',
-    lastOrderDate: 'Sep 28, 2024',
-    address: '456 Tech Lane, Silicon Valley, CA'
-  },
-  {
-    id: 'CUST-103',
-    name: 'Robert Fox',
-    email: 'robert.fox@foxmail.com',
-    phone: '+1 (555) 555-0199',
-    ordersCount: 0,
-    totalSpent: 0,
-    status: 'Blocked',
-    joinedDate: 'Aug 21, 2024',
-    lastOrderDate: 'N/A',
-    address: '789 Maple Drive, Gotham, NY'
-  },
-  {
-    id: 'CUST-104',
-    name: 'Diana Prince',
-    email: 'diana@themyscira.gov',
-    phone: '+1 (555) 222-3333',
-    ordersCount: 22,
-    totalSpent: 18450.75,
-    status: 'Active',
-    joinedDate: 'Jan 15, 2024',
-    lastOrderDate: 'Oct 10, 2024',
-    address: '1 Paradise Island, Greece'
-  }
-];
-
 /**
- * Fetches all registered customers with filtering options.
+ * Fetches all registered customers with aggregated order statistics.
  */
 export const getCustomers = async (): Promise<Customer[]> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return [...MOCK_CUSTOMERS];
+  try {
+    // 1. Fetch profiles
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .neq('role', 'admin'); // Optional: Exclude admins from customer list if desired
+
+    if (profileError) throw profileError;
+
+    // 2. Fetch orders (simplified fetch for client-side aggregation)
+    // In production with thousands of orders, this should be an RPC or Edge Function
+    const { data: orders, error: orderError } = await supabase
+      .from('orders')
+      .select('id, user_id, total_amount, created_at, shipping_address, status');
+
+    if (orderError) throw orderError;
+
+    // 3. Merge data
+    const customers: Customer[] = profiles.map(profile => {
+      const userOrders = orders?.filter(o => o.user_id === profile.id) || [];
+      
+      // Sort orders descending
+      userOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const totalSpent = userOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+      
+      let lastOrderDate = 'N/A';
+      let address = 'N/A';
+      
+      if (userOrders.length > 0) {
+        lastOrderDate = new Date(userOrders[0].created_at).toLocaleDateString('en-US', { 
+          month: 'short', day: 'numeric', year: 'numeric' 
+        });
+        
+        // Extract address from last order if available
+        const shipping = userOrders[0].shipping_address as any;
+        if (shipping) {
+          address = `${shipping.address || ''}, ${shipping.city || ''}, ${shipping.country || ''}`.replace(/^, |^, /, '').trim();
+          if (address === ', ,') address = 'N/A';
+        }
+      }
+
+      // Map recent orders for details view (limit 5)
+      const recentOrders = userOrders.slice(0, 5).map(o => ({
+        id: o.id,
+        date: new Date(o.created_at).toLocaleDateString(),
+        total: Number(o.total_amount),
+        status: o.status
+      }));
+
+      return {
+        id: profile.id,
+        name: profile.full_name || 'Guest User',
+        email: profile.email || '',
+        phone: profile.phone || 'N/A',
+        ordersCount: userOrders.length,
+        totalSpent,
+        status: (profile.status === 'blocked' ? 'Blocked' : 'Active') as 'Active' | 'Blocked',
+        joinedDate: new Date(profile.created_at).toLocaleDateString('en-US', { 
+          month: 'short', day: 'numeric', year: 'numeric' 
+        }),
+        lastOrderDate,
+        address,
+        recentOrders
+      };
+    });
+
+    return customers;
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    return [];
+  }
 };
 
 /**
  * Toggles a customer's access status.
  */
 export const updateCustomerStatus = async (id: string, status: 'Active' | 'Blocked'): Promise<boolean> => {
-  console.log(`[Customer Service] Updating status for ${id} to ${status}`);
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return true;
+  try {
+    const dbStatus = status === 'Blocked' ? 'blocked' : 'active';
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: dbStatus })
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error(`Error updating status for ${id}:`, error);
+    return false;
+  }
 };
 
 /**
- * Retrieves deep-dive details for a specific customer.
+ * Retrieves deep-dive details for a specific customer (Not strictly needed if getCustomers fetches all, 
+ * but useful if pagination is added later).
  */
 export const getCustomerDetails = async (id: string): Promise<Customer | null> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return MOCK_CUSTOMERS.find(c => c.id === id) || null;
+  // Re-use logic or fetch single profile
+  const all = await getCustomers();
+  return all.find(c => c.id === id) || null;
 };

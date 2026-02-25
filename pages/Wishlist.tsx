@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import WishlistCard from '../components/WishlistCard';
-import { Heart, Package } from 'lucide-react';
+import { Heart, Package, Loader2, ArrowLeft } from 'lucide-react';
 import { Product } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { useWishlist } from '../contexts/WishlistContext';
 
 interface WishlistProps {
   onLoginClick: () => void;
@@ -17,37 +17,63 @@ const Wishlist: React.FC<WishlistProps> = ({
   onNavigate,
   onAddToCart
 }) => {
-  // Initialize with some mock data for demonstration
-  // In a real app, this would be fetched inside a useEffect
-  const [items, setItems] = useState<Product[]>(MOCK_PRODUCTS.slice(0, 3) || []);
-
-  const removeItem = (id: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== id));
-  };
+  const { wishlist, removeFromWishlist, isLoading } = useWishlist();
 
   const handleAddToCart = (product: Product) => {
     onAddToCart(product);
   };
 
+  const handleRemove = async (id: string) => {
+    try {
+      await removeFromWishlist(id);
+    } catch (error) {
+      console.error("Failed to remove wishlist item:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+        <p className="text-gray-500 font-bold text-sm uppercase tracking-widest">Loading Wishlist...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
-      <main className="flex-grow py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+      <main className="flex-grow py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         {/* Page Header */}
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-primary shadow-sm">
-              <Heart className="w-6 h-6 fill-current" />
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-primary shadow-sm border border-red-100">
+                <Heart className="w-6 h-6 fill-current" />
+              </div>
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight">My Wishlist</h1>
             </div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">My Wishlist</h1>
+            <p className="text-gray-500 font-bold ml-1">
+               {wishlist.length > 0 
+                 ? `You have ${wishlist.length} saved ${wishlist.length === 1 ? 'item' : 'items'}` 
+                 : 'Your saved products will appear here'
+               }
+            </p>
           </div>
-          <p className="text-gray-500 font-bold ml-1">
-             {items.length > 0 ? `You have ${items.length} saved items` : 'Your saved products will appear here'}
-          </p>
+          
+          {wishlist.length > 0 && (
+            <button 
+                onClick={() => onNavigate('home')}
+                className="text-sm font-bold text-gray-500 hover:text-primary transition-colors flex items-center gap-2 mb-1"
+            >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Store
+            </button>
+          )}
         </div>
 
-        {items && items.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {items.map((product) => (
+        {wishlist.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {wishlist.map((product) => (
               <WishlistCard
                 key={product.id}
                 image={product.image || ''}
@@ -56,14 +82,14 @@ const Wishlist: React.FC<WishlistProps> = ({
                 price={product.price || 0}
                 isNew={product.isNew}
                 stock={product.stock}
-                onRemove={() => removeItem(product.id)}
+                onRemove={() => handleRemove(product.id)}
                 onAddToCart={() => handleAddToCart(product)}
               />
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[2.5rem] border border-dashed border-gray-200 shadow-sm text-center">
-            <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 animate-in zoom-in duration-300">
+          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[2.5rem] border border-dashed border-gray-200 shadow-sm text-center animate-in zoom-in-95 duration-300">
+            <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
                <Heart className="w-10 h-10 text-gray-300" />
             </div>
             <h2 className="text-2xl font-black text-gray-900 mb-2">Your wishlist is empty</h2>

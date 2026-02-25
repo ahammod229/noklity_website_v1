@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import AccountLayout from '../../components/account/AccountLayout';
 import AddressForm from '../../components/account/AddressForm';
-import { MapPin, Plus, Trash2, Edit2, CheckCircle2, Home, Building2, Package, Loader2 } from 'lucide-react';
+import { MapPin, Plus, Trash2, Edit2, CheckCircle2, Home, Building2, Package, Loader2, AlertCircle } from 'lucide-react';
 import { getAddresses, addAddress, updateAddress, deleteAddress, setDefaultAddress, Address } from '../../services/addressService';
 
 interface AddressesProps {
@@ -14,6 +15,7 @@ interface AddressesProps {
 const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCartClick, onNavigate }) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
@@ -24,34 +26,57 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
 
   const fetchAddresses = async () => {
     setLoading(true);
-    const data = await getAddresses();
-    setAddresses(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await getAddresses();
+      setAddresses(data);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load addresses.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddOrUpdate = async (data: Omit<Address, 'id'>) => {
     setIsSaving(true);
-    if (editingAddress) {
-      await updateAddress(editingAddress.id, data);
-    } else {
-      await addAddress(data);
+    try {
+      if (editingAddress) {
+        await updateAddress(editingAddress.id, data);
+      } else {
+        await addAddress(data);
+      }
+      await fetchAddresses();
+      setIsFormOpen(false);
+      setEditingAddress(undefined);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save address. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
-    await fetchAddresses();
-    setIsFormOpen(false);
-    setEditingAddress(undefined);
-    setIsSaving(false);
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this address?')) {
-      await deleteAddress(id);
-      await fetchAddresses();
+      try {
+        await deleteAddress(id);
+        await fetchAddresses();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to delete address.');
+      }
     }
   };
 
   const handleSetDefault = async (id: string) => {
-    await setDefaultAddress(id);
-    await fetchAddresses();
+    try {
+      await setDefaultAddress(id);
+      await fetchAddresses();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to set default address.');
+    }
   };
 
   if (loading) {
@@ -87,7 +112,13 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
           </button>
         </div>
 
-        {addresses.length > 0 ? (
+        {error ? (
+          <div className="bg-red-50 p-8 rounded-3xl border border-red-100 text-center">
+            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+            <p className="text-red-700 font-bold">{error}</p>
+            <button onClick={fetchAddresses} className="mt-4 text-sm font-bold text-red-700 underline">Try Again</button>
+          </div>
+        ) : addresses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {addresses.map((address) => (
               <div 

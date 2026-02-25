@@ -2,15 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import ProductCard from '../components/ProductCard';
 import SearchFilters from '../components/SearchFilters';
-import { searchProducts } from '../services/searchService';
+import { searchProducts, SearchFilters as FilterType } from '../services/searchService';
 import { Product } from '../types';
-import { Search as SearchIcon, SlidersHorizontal, ArrowLeft, ArrowDownUp } from 'lucide-react';
+import { Search as SearchIcon, SlidersHorizontal, ArrowLeft, ArrowDownUp, PackageX } from 'lucide-react';
 
 interface SearchPageProps {
   onLoginClick: () => void;
   cartItemCount: number;
   onCartClick: () => void;
-  onNavigate: (view: any) => void;
+  onNavigate: (view: any, param?: any) => void;
   onAddToCart: (product: Product) => void;
   initialQuery?: string;
 }
@@ -18,28 +18,45 @@ interface SearchPageProps {
 const Search: React.FC<SearchPageProps> = ({
   onNavigate,
   onAddToCart,
-  initialQuery = "Brake Pads"
+  initialQuery = ""
 }) => {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [sortOption, setSortOption] = useState('relevance');
+  const [filters, setFilters] = useState<FilterType>({ sortBy: 'relevance' });
+  const [facets, setFacets] = useState<{ categories: {name: string, count: number}[], priceRange: {min: number, max: number} } | undefined>(undefined);
 
+  // Initial Search
   useEffect(() => {
-    // Perform initial mock search
-    const performSearch = async () => {
-        setLoading(true);
-        const data = await searchProducts(query);
-        setResults(data.products);
-        setLoading(false);
-    };
     performSearch();
-  }, [query]);
+  }, [query, filters]);
+
+  const performSearch = async () => {
+    setLoading(true);
+    const data = await searchProducts(query, filters);
+    setResults(data.products);
+    setTotalCount(data.totalCount);
+    
+    // Only set facets on initial load or if we want them to update dynamically with queries
+    // Usually facets are based on the query result set before filters, 
+    // the mock service handles this.
+    setFacets(data.facets);
+    
+    setLoading(false);
+  };
+
+  const handleFilterChange = (newFilters: FilterType) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  };
 
   const handleClearFilters = () => {
-    // Mock logic to reset filters (visual only)
-    console.log("Filters cleared");
+    setFilters({ sortBy: 'relevance' });
+  };
+
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters(prev => ({ ...prev, sortBy: e.target.value as any }));
   };
 
   return (
@@ -50,44 +67,51 @@ const Search: React.FC<SearchPageProps> = ({
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <button 
                     onClick={() => onNavigate('home')}
-                    className="flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 mb-6 group"
+                    className="flex items-center text-xs font-black text-gray-400 hover:text-gray-900 mb-6 group uppercase tracking-widest transition-colors"
                 >
-                    <ArrowLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" />
+                    <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                     Back to Home
                 </button>
                 
-                <h1 className="text-3xl font-black text-gray-900 mb-2">Search Results</h1>
-                <p className="text-gray-500">
-                    Results for <span className="font-bold text-gray-900">"{query}"</span>
+                <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-3 tracking-tight">Search Results</h1>
+                <p className="text-gray-500 font-medium">
+                    {query ? (
+                      <>Found <span className="font-bold text-gray-900">{totalCount}</span> results for <span className="font-bold text-primary">"{query}"</span></>
+                    ) : (
+                      <>Browsing all products</>
+                    )}
                 </p>
             </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex flex-col lg:flex-row gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
                 
                 {/* Left Sidebar - Filters */}
                 <div className="flex-shrink-0">
                     <SearchFilters 
                         mobileOpen={isMobileFiltersOpen}
                         onCloseMobile={() => setIsMobileFiltersOpen(false)}
+                        onFilterChange={handleFilterChange}
                         onClearFilters={handleClearFilters}
+                        initialFilters={filters}
+                        facets={facets}
                     />
                 </div>
 
                 {/* Right Content - Results */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     
                     {/* Toolbar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-gray-100">
                         <span className="font-bold text-gray-700 text-sm">
-                            Showing {results.length} results
+                            Showing {results.length} of {totalCount} products
                         </span>
 
                         <div className="flex items-center gap-3">
                             <button 
                                 onClick={() => setIsMobileFiltersOpen(true)}
-                                className="lg:hidden flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-700"
+                                className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-700 hover:bg-gray-50"
                             >
                                 <SlidersHorizontal className="w-4 h-4" />
                                 Filters
@@ -98,9 +122,9 @@ const Search: React.FC<SearchPageProps> = ({
                                     <ArrowDownUp className="h-4 w-4 text-gray-400" />
                                 </div>
                                 <select 
-                                    value={sortOption}
-                                    onChange={(e) => setSortOption(e.target.value)}
-                                    className="pl-10 pr-8 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-gray-300 appearance-none cursor-pointer"
+                                    value={filters.sortBy}
+                                    onChange={handleSortChange}
+                                    className="pl-10 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-gray-300 appearance-none cursor-pointer transition-all min-w-[180px]"
                                 >
                                     <option value="relevance">Relevance</option>
                                     <option value="price_asc">Price: Low to High</option>
@@ -113,50 +137,59 @@ const Search: React.FC<SearchPageProps> = ({
 
                     {/* Results Grid */}
                     {loading ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-pulse">
-                            {[1, 2, 3, 4].map(i => (
-                                <div key={i} className="bg-gray-100 rounded-2xl h-[350px]"></div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                <div key={i} className="bg-gray-100 rounded-[2rem] h-[420px] animate-pulse"></div>
                             ))}
                         </div>
                     ) : results.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                             {results.map(product => (
                                 <ProductCard 
                                     key={product.id}
                                     product={product}
                                     onAddToCart={onAddToCart}
-                                    // onClick={() => onNavigate('product', product)} // Optional if we had product detail page route ready in main app
+                                    // Navigate to detail would be handled by parent or ProductCard internal link
+                                    onClick={() => onNavigate('product-details', product.id)}
                                 />
                             ))}
                         </div>
                     ) : (
                         /* Empty State */
-                        <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
-                                <SearchIcon className="w-8 h-8 text-gray-300" />
+                        <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
+                            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
+                                <PackageX className="w-10 h-10 text-gray-300" strokeWidth={1.5} />
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">No products found</h2>
-                            <p className="text-gray-500 mb-8 max-w-sm">
-                                We couldn't find any matches for "{query}". Try checking for typos or using different keywords.
+                            <h2 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">No products found</h2>
+                            <p className="text-gray-500 mb-8 max-w-sm font-medium leading-relaxed">
+                                We couldn't find any matches for your current filters. Try checking for typos or using different keywords.
                             </p>
-                            <button 
-                                onClick={() => onNavigate('home')}
-                                className="bg-primary text-white font-bold py-3 px-8 rounded-full hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95"
-                            >
-                                Back to Home
-                            </button>
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={handleClearFilters}
+                                    className="bg-white text-gray-900 border border-gray-200 font-bold py-3 px-8 rounded-2xl hover:bg-gray-50 transition-all text-sm"
+                                >
+                                    Clear Filters
+                                </button>
+                                <button 
+                                    onClick={() => onNavigate('home')}
+                                    className="bg-primary text-white font-bold py-3 px-8 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95 text-sm"
+                                >
+                                    Back to Home
+                                </button>
+                            </div>
                         </div>
                     )}
 
                     {/* Pagination Mock */}
-                    {results.length > 0 && (
-                        <div className="mt-12 flex justify-center">
-                            <nav className="flex gap-2">
-                                <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-400 cursor-not-allowed">Previous</button>
-                                <button className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-bold">1</button>
-                                <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50">2</button>
-                                <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50">3</button>
-                                <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50">Next</button>
+                    {!loading && results.length > 0 && (
+                        <div className="mt-16 flex justify-center">
+                            <nav className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
+                                <button className="px-6 py-3 bg-white text-gray-400 rounded-xl text-xs font-black uppercase tracking-widest cursor-not-allowed">Prev</button>
+                                <button className="px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black shadow-lg">1</button>
+                                <button className="px-6 py-3 bg-transparent text-gray-500 rounded-xl text-xs font-black hover:bg-white hover:text-gray-900 transition-all">2</button>
+                                <button className="px-6 py-3 bg-transparent text-gray-500 rounded-xl text-xs font-black hover:bg-white hover:text-gray-900 transition-all">3</button>
+                                <button className="px-6 py-3 bg-white text-gray-900 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all">Next</button>
                             </nav>
                         </div>
                     )}

@@ -6,7 +6,7 @@ import ProductCard from '../components/ProductCard';
 import FlashSale from '../components/FlashSale';
 import { SkeletonList } from '../components/SkeletonLoader';
 import { Product } from '../types';
-import { MOCK_PRODUCTS } from '../data/mockData';
+import { getProducts } from '../services/productService';
 
 interface HomeProps {
   onLoginClick: () => void;
@@ -26,26 +26,25 @@ const Home: React.FC<HomeProps> = ({
   activeCategory,
   onSelectCategory,
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    setIsLoading(true);
-    // Simulate loading/filtering delay
-    const timer = setTimeout(() => {
-      // Filter out Flash Sale items from main grid to avoid duplication if needed, 
-      // or just show main catalog items. Here we filter by category if present.
-      let filtered = MOCK_PRODUCTS.filter(p => !p.isFlashSale);
-      
-      if (activeCategory) {
-        filtered = MOCK_PRODUCTS.filter(p => p.category === activeCategory);
-      }
-      
-      setDisplayedProducts(filtered);
-      setIsLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
+    fetchData();
   }, [activeCategory]);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch products based on category (or all)
+      const products = await getProducts(activeCategory);
+      setDisplayedProducts(products);
+    } catch (error) {
+      console.error("Failed to load products", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -57,6 +56,7 @@ const Home: React.FC<HomeProps> = ({
           onSelectCategory={onSelectCategory} 
         />
         
+        {/* Only show Flash Sale block on main home view */}
         {!activeCategory && (
           <FlashSale 
             onProductClick={onProductClick} 
@@ -64,7 +64,7 @@ const Home: React.FC<HomeProps> = ({
           />
         )}
         
-        {/* Featured Section */}
+        {/* Featured / Catalog Section */}
         <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-[600px]">
           <div className="flex flex-col md:flex-row justify-between items-end mb-10">
             <div>
@@ -112,7 +112,7 @@ const Home: React.FC<HomeProps> = ({
             </>
           )}
 
-          {!activeCategory && (
+          {!activeCategory && displayedProducts.length > 0 && (
             <div className="mt-16 text-center">
               <button className="inline-block border-2 border-gray-900 text-gray-900 font-bold py-3.5 px-10 rounded-full hover:bg-gray-900 hover:text-white transition-all duration-300">
                 View All Parts

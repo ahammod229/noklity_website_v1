@@ -1,3 +1,5 @@
+
+import { supabase } from '../lib/supabase';
 import { CartItem, Order } from '../types';
 
 export interface OrderData {
@@ -15,7 +17,7 @@ export interface OrderData {
   total: number;
 }
 
-// Extended types for UI consumption (mocking DB joins)
+// Extended types for UI consumption
 export interface OrderDetail extends Order {
   shippingAddress: any;
   paymentMethod: string;
@@ -26,162 +28,153 @@ export interface OrderDetail extends Order {
 }
 
 /**
- * Creates a new order.
- * 
- * @param orderData - The order details
- * @returns Promise resolving to the created order ID
+ * Creates a new order using Supabase RPC for transaction safety.
  */
 export const createOrder = async (orderData: OrderData): Promise<{ success: boolean; orderId: string }> => {
-  // MOCK BEHAVIOR
-  console.log('-----------------------------------');
-  console.log('MOCK: Creating Order');
-  console.log('Customer:', orderData.shipping.fullName);
-  console.log('Items:', orderData.items.length);
-  console.log('Total:', orderData.total);
-  console.log('Payment:', orderData.paymentMethod);
-  console.log('-----------------------------------');
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
 
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 2000));
+    if (!userId) throw new Error('User not authenticated');
 
-  /* 
-    TODO: SUPABASE INTEGRATION
-    1. Validate session/user (if logged in)
-    2. Start Transaction (if using RPC) or sequential inserts
-    3. Insert into 'orders' table:
-       const { data, error } = await supabase
-         .from('orders')
-         .insert({ 
-           user_id: user.id, 
-           total: orderData.total, 
-           status: 'Pending',
-           shipping_address: orderData.shipping 
-         })
-         .select()
-         .single();
-    4. Insert into 'order_items' table for each item in orderData.items
-    5. Handle stock decrement in 'products' table
-  */
+    const formattedItems = orderData.items.map(item => ({
+      product_id: item.id,
+      quantity: item.quantity,
+      price: item.price
+    }));
 
-  // Generate a random mock order ID
-  const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+    const { data, error } = await supabase.rpc('create_order', {
+      order_items: formattedItems,
+      total_amount: orderData.total,
+      shipping_address: orderData.shipping,
+      payment_method: orderData.paymentMethod
+    });
 
-  return {
-    success: true,
-    orderId,
-  };
+    if (error) throw error;
+
+    return {
+      success: true,
+      orderId: data, // RPC returns the UUID string
+    };
+  } catch (error) {
+    console.error('Error creating order:', error);
+    throw error;
+  }
 };
 
 /**
  * Retrieves a list of orders for the current user.
- * 
- * @returns Promise resolving to an array of orders
  */
 export const getOrders = async (): Promise<any[]> => {
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user) return [];
 
-  /*
-    TODO: SUPABASE INTEGRATION
-    1. Get current user ID
-    2. Fetch orders:
-       const { data, error } = await supabase
-         .from('orders')
-         .select('*, order_items(*, products(*))')
-         .eq('user_id', user.id)
-         .order('created_at', { ascending: false });
-  */
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        items:order_items(
+          *,
+          product:products(*)
+        )
+      `)
+      .order('created_at', { ascending: false });
 
-  // MOCK RETURN DATA (Matching Orders.tsx expectation)
-  return [
-    { 
-        id: 'ORD-9921', 
-        date: 'Oct 12, 2024', 
-        total: 1265.00, 
-        status: 'Processing', 
-        itemCount: 2,
-        previewName: 'Brembo GT Braking System Kit',
-        previewImage: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop'
-      },
-      { 
-        id: 'ORD-8842', 
-        date: 'Sep 28, 2024', 
-        total: 89.00, 
-        status: 'Delivered', 
-        itemCount: 1,
-        previewName: 'Sparco Racing Gloves',
-        previewImage: 'https://images.unsplash.com/photo-1599951304911-37d044439031?q=80&w=2787&auto=format&fit=crop'
-      },
-      { 
-        id: 'ORD-7735', 
-        date: 'Sep 15, 2024', 
-        total: 2450.50, 
-        status: 'Shipped', 
-        itemCount: 4,
-        previewName: 'Garrett G-Series Turbocharger',
-        previewImage: 'https://images.unsplash.com/photo-1606775089350-f1c5039535eb?q=80&w=2940&auto=format&fit=crop'
-      }
-  ];
+    if (error) throw error;
+
+    return data.map((order: any) => {
+      const firstItem = order.items?.[0];
+      const firstProduct = firstItem?.product;
+      
+      return {
+        id: order.id,
+        displayId: `ORD-${order.id.slice(0, 8).toUpperCase()}`,
+        date: new Date(order.created_at).toLocaleDateString(),
+        total: order.total_amount,
+        status: order.status,
+        itemCount: order.items?.length || 0,
+        previewName: firstProduct?.title || 'Unknown Product',
+        previewImage: firstProduct?.image_url || '',
+        paymentStatus: 'Paid', // Simplified logic
+        items: order.items?.map((i: any) => ({
+          id: i.product_id,
+          name: i.product?.title,
+          price: i.price,
+          qty: i.quantity,
+          image: i.product?.image_url
+        })),
+        address: `${order.shipping_address?.address}, ${order.shipping_address?.city}, ${order.shipping_address?.zip}`
+      };
+    });
+
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    return [];
+  }
 };
 
 /**
  * Retrieves details for a specific order by ID.
- * 
- * @param id - The order ID
- * @returns Promise resolving to the order details
  */
 export const getOrderById = async (id: string): Promise<OrderDetail | null> => {
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 800));
+  try {
+    // If we have "ORD-" prefix from URL, assume the ID is the UUID part if possible, 
+    // but typically the UI passes the UUID as `id` in `getOrders` mapper. 
+    // If `id` passed here is just a UUID, we query directly.
+    
+    // Note: If ID passed is "ORD-XXXX", this query will fail for UUID type. 
+    // The UI `Orders.tsx` passes `order.id` which is the UUID from `getOrders` mapper.
+    
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        items:order_items(
+          *,
+          product:products(*)
+        )
+      `)
+      .eq('id', id)
+      .single();
 
-  /*
-    TODO: SUPABASE INTEGRATION
-    1. Fetch order with joins:
-       const { data, error } = await supabase
-         .from('orders')
-         .select('*, order_items(*, products(*))')
-         .eq('id', id)
-         .single();
-  */
+    if (error) throw error;
 
-  // MOCK RETURN DATA (Matching OrderDetails.tsx expectation)
-  return {
-    id: id || 'ORD-7782',
-    customerName: 'Alex Morgan',
-    email: 'alex@example.com',
-    date: 'October 12, 2024',
-    status: 'Shipped', // Type cast for mock
-    paymentMethod: 'Visa ending in 4242',
-    shippingAddress: {
-      name: 'Alex Morgan',
-      street: '123 Performance Blvd',
-      city: 'Speedway City',
-      state: 'CA',
-      zip: '90210',
-      country: 'United States'
-    },
-    items: [
-      {
-        id: '101',
-        name: 'Brembo GT Braking System Kit',
-        category: 'Brakes',
-        price: 1250.00,
-        quantity: 1,
-        image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop'
+    const shipping = data.shipping_address as any;
+    const items = data.items.map((i: any) => ({
+      id: i.product_id,
+      name: i.product?.title || 'Product Removed',
+      category: i.product?.category || 'General',
+      price: i.price,
+      quantity: i.quantity,
+      image: i.product?.image_url || ''
+    }));
+
+    return {
+      id: data.id,
+      customerName: shipping?.fullName || 'Customer',
+      email: shipping?.email || '',
+      date: new Date(data.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      status: data.status as any,
+      paymentMethod: data.payment_method === 'cod' ? 'Cash on Delivery' : 'Card',
+      shippingAddress: {
+        name: shipping?.fullName,
+        street: shipping?.address,
+        city: shipping?.city,
+        state: shipping?.state || 'N/A',
+        zip: shipping?.zip,
+        country: shipping?.country
       },
-      {
-        id: '108',
-        name: 'K&N High-Flow Air Filter',
-        category: 'Engine',
-        price: 65.99,
-        quantity: 2,
-        image: 'https://images.unsplash.com/photo-1508209803874-51e443831844?q=80&w=2940&auto=format&fit=crop'
-      }
-    ],
-    subtotal: 1381.98,
-    shipping: 25.00,
-    tax: 110.56,
-    total: 1517.54,
-    itemsCount: 3
-  } as unknown as OrderDetail;
+      items: items,
+      subtotal: data.total_amount, // Simplified: assuming total_amount includes everything
+      shipping: 0, // In this model, shipping was included in total or calculated at checkout. Displaying 0 for simplicity or extract if saved separately.
+      tax: 0,
+      total: data.total_amount,
+      itemsCount: items.length
+    };
+
+  } catch (error) {
+    console.error('Error fetching order details:', error);
+    return null;
+  }
 };

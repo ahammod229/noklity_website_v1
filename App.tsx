@@ -7,8 +7,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import Help from './pages/Help';
 import Checkout from './pages/Checkout';
 import OrderSuccess from './pages/OrderSuccess';
-import Orders from './pages/Orders';
-import AccountOrders from './pages/AccountOrders';
+import Orders from './pages/Orders'; // Keep for generic route if needed, but overridden below
+import AccountOrders from './pages/account/Orders'; // Updated import path
 import OrderDetails from './pages/OrderDetails';
 import Wishlist from './pages/Wishlist';
 import Search from './pages/Search';
@@ -26,15 +26,28 @@ import AuthModal from './components/AuthModal';
 import CartDrawer from './components/CartDrawer';
 import Toast, { ToastType } from './components/Toast';
 import AccountLayout from './components/account/AccountLayout';
-import { Product, CartItem } from './types';
+import ProtectedRoute from './components/ProtectedRoute';
+import { Product } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CartProvider, useCart } from './contexts/CartContext';
+import { WishlistProvider, useWishlist } from './contexts/WishlistContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { RequireAuth } from './components/RequireAuth';
 import { Loader2 } from 'lucide-react';
 
-// Inner App component to use Auth Context
+// Inner App component to use Auth, Cart, and Wishlist Context
 const AppContent: React.FC = () => {
   const { user, signOut, isAdmin: isUserAdmin, isLoading: isAuthLoading } = useAuth();
+  const { 
+    cart, 
+    addToCart: contextAddToCart, 
+    updateQuantity, 
+    removeFromCart, 
+    cartCount,
+    isCartOpen,
+    setIsCartOpen 
+  } = useCart();
+  const { wishlist, addToWishlist: contextAddToWishlist } = useWishlist();
+  
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Routing Logic
@@ -45,7 +58,7 @@ const AppContent: React.FC = () => {
     if (path === '/help') return 'help';
     if (path === '/admin') return 'admin';
     if (path === '/checkout') return 'checkout';
-    if (path === '/order-success') return 'order-success';
+    if (path.startsWith('/order-success')) return 'order-success';
     if (path === '/payment-success') return 'payment-success';
     if (path === '/payment-failed') return 'payment-failed';
     if (path === '/orders' || path === '/account-orders') return 'account-orders';
@@ -70,6 +83,7 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/product/')) return path.split('/')[2];
     if (path.startsWith('/orders/') && path.endsWith('/invoice')) return path.split('/')[2];
     if (path.startsWith('/orders/')) return path.split('/')[2];
+    if (path.startsWith('/order-success/')) return path.split('/')[2];
     return undefined;
   }
 
@@ -96,6 +110,9 @@ const AppContent: React.FC = () => {
         if ((view === 'order-details' || view === 'invoice') && param) {
             path = `/orders/${param}${view === 'invoice' ? '/invoice' : ''}`;
         }
+        if (view === 'order-success' && param) {
+            path = `/order-success/${param}`;
+        }
     }
     
     window.history.pushState({}, '', path);
@@ -105,8 +122,6 @@ const AppContent: React.FC = () => {
   };
 
   // Storefront State
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   // Notification State
@@ -120,40 +135,10 @@ const AppContent: React.FC = () => {
     setToast({ message, type, isVisible: true });
   };
 
-  // Admin protection
-  useEffect(() => {
-    if (!isAuthLoading && currentView === 'admin' && !isUserAdmin) {
-      navigate('home');
-    }
-  }, [currentView, isUserAdmin, isAuthLoading]);
-
-  // Cart Logic
-  const addToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
-    setIsCartOpen(true);
+  // Wrapper for adding to cart with toast
+  const addToCart = async (product: Product) => {
+    await contextAddToCart(product);
     showToast(`Added ${product.name} to cart`);
-  };
-
-  const updateQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    }));
-  };
-
-  const removeFromCart = (id: string) => {
-    setCart(prev => prev.filter(item => item.id !== id));
   };
 
   const handleAuthClick = () => {
@@ -181,8 +166,6 @@ const AppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-
   // Render Logic
   const renderContent = () => {
     // Show global loader while auth is initializing to prevent "flashing" or premature redirects
@@ -195,9 +178,11 @@ const AppContent: React.FC = () => {
     }
 
     if (currentView === 'admin') {
-      // Admin guard is handled in useEffect, but we return null here to be safe during transition
-      if (!isUserAdmin) return null;
-      return <AdminDashboard onLogout={handleLogout} showToast={showToast} onNavigate={navigate} />;
+      return (
+        <ProtectedRoute onNavigate={navigate} adminOnly>
+          <AdminDashboard onLogout={handleLogout} showToast={showToast} onNavigate={navigate} />
+        </ProtectedRoute>
+      );
     }
 
     if (currentView === 'login') {
@@ -214,9 +199,9 @@ const AppContent: React.FC = () => {
 
     if (currentView === 'invoice') {
       return (
-        <RequireAuth onRedirect={() => navigate('login')}>
+        <ProtectedRoute onNavigate={navigate}>
           <Invoice orderId={currentParam} onNavigate={navigate} />
-        </RequireAuth>
+        </ProtectedRoute>
       );
     }
 
@@ -233,94 +218,100 @@ const AppContent: React.FC = () => {
     // Protected Routes
     if (currentView === 'profile') {
         return (
-          <RequireAuth onRedirect={() => navigate('login')}>
-            <Profile onLoginClick={handleLogout} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-          </RequireAuth>
+          <ProtectedRoute onNavigate={navigate}>
+            <Profile onLoginClick={handleLogout} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
+          </ProtectedRoute>
         );
     }
 
     if (currentView === 'addresses') {
         return (
-          <RequireAuth onRedirect={() => navigate('login')}>
-            <Addresses onLoginClick={handleLogout} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-          </RequireAuth>
+          <ProtectedRoute onNavigate={navigate}>
+            <Addresses onLoginClick={handleLogout} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
+          </ProtectedRoute>
         );
     }
 
     if (currentView === 'notifications') {
         return (
-          <RequireAuth onRedirect={() => navigate('login')}>
-            <Notifications onLoginClick={handleLogout} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-          </RequireAuth>
+          <ProtectedRoute onNavigate={navigate}>
+            <Notifications onLoginClick={handleLogout} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
+          </ProtectedRoute>
         );
     }
 
     if (currentView === 'help') {
-      return <Help onLoginClick={handleAuthClick} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />;
+      return <Help onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />;
     }
 
     if (currentView === 'wishlist') {
       return (
-        <RequireAuth onRedirect={() => navigate('login')}>
-          <Wishlist onLoginClick={handleLogout} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} onAddToCart={addToCart} />
-        </RequireAuth>
+        <ProtectedRoute onNavigate={navigate}>
+          <Wishlist onLoginClick={handleLogout} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} onAddToCart={addToCart} />
+        </ProtectedRoute>
       );
     }
 
     if (currentView === 'search') {
-      return <Search onLoginClick={handleAuthClick} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} onAddToCart={addToCart} />;
+      return <Search onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} onAddToCart={addToCart} />;
     }
 
     if (currentView === 'checkout') {
       return (
-        // Checkout generally requires auth, or at least guest checkout flow handling. 
-        // For this demo, we'll protect it.
-        <RequireAuth onRedirect={() => navigate('login')}>
-          <Checkout cartItems={cart} onLoginClick={handleAuthClick} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-        </RequireAuth>
+        <ProtectedRoute onNavigate={navigate}>
+          <Checkout cartItems={cart} onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
+        </ProtectedRoute>
       );
     }
 
     if (currentView === 'order-success' || currentView === 'payment-success') {
-      return <PaymentSuccess onLoginClick={handleAuthClick} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />;
+      return (
+        <PaymentSuccess 
+          onLoginClick={handleAuthClick} 
+          cartItemCount={cartCount} 
+          onCartClick={() => setIsCartOpen(true)} 
+          onNavigate={navigate}
+          orderId={currentParam}
+        />
+      );
     }
 
     if (currentView === 'payment-failed') {
-      return <PaymentFailed onLoginClick={handleAuthClick} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />;
+      return <PaymentFailed onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />;
     }
 
     if (currentView === 'account-orders' || currentView === 'orders') {
       return (
-        <RequireAuth onRedirect={() => navigate('login')}>
-          <AccountOrders onLoginClick={handleLogout} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-        </RequireAuth>
+        <ProtectedRoute onNavigate={navigate}>
+          <AccountOrders onLoginClick={handleLogout} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
+        </ProtectedRoute>
       );
     }
 
     if (currentView === 'order-details') {
       return (
-        <RequireAuth onRedirect={() => navigate('login')}>
-          <OrderDetails orderId={currentParam} onLoginClick={handleLogout} cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-        </RequireAuth>
+        <ProtectedRoute onNavigate={navigate}>
+          <OrderDetails orderId={currentParam} onLoginClick={handleLogout} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
+        </ProtectedRoute>
       );
     }
 
     if (['security'].includes(currentView)) {
         return (
-          <RequireAuth onRedirect={() => navigate('login')}>
-            <AccountLayout activeTab={currentView} onNavigate={navigate} onCartClick={() => setIsCartOpen(true)} onLoginClick={handleLogout} cartItemCount={cartItemCount} title={currentView.charAt(0).toUpperCase() + currentView.slice(1)}>
+          <ProtectedRoute onNavigate={navigate}>
+            <AccountLayout activeTab={currentView} onNavigate={navigate} onCartClick={() => setIsCartOpen(true)} onLoginClick={handleLogout} cartItemCount={cartCount} title={currentView.charAt(0).toUpperCase() + currentView.slice(1)}>
                 <div className="bg-white p-12 rounded-[3rem] text-center border border-gray-100">
                     <p className="text-gray-500 font-bold">This section is coming soon.</p>
                 </div>
             </AccountLayout>
-          </RequireAuth>
+          </ProtectedRoute>
         )
     }
 
     return (
       <Home 
         onLoginClick={handleAuthClick}
-        cartItemCount={cartItemCount}
+        cartItemCount={cartCount}
         onCartClick={() => setIsCartOpen(true)}
         onProductClick={handleProductClick}
         onAddToCart={addToCart}
@@ -339,10 +330,11 @@ const AppContent: React.FC = () => {
       {!isLayoutHidden && (
         <Header
           onLoginClick={handleAuthClick}
-          cartItemCount={cartItemCount}
+          cartItemCount={cartCount}
           onCartClick={() => setIsCartOpen(true)}
           onHelpClick={() => navigate('help')}
           onWishlistClick={() => navigate('wishlist')}
+          wishlistCount={wishlist.length}
           user={user}
         />
       )}
@@ -390,7 +382,11 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <CartProvider>
+          <WishlistProvider>
+            <AppContent />
+          </WishlistProvider>
+        </CartProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

@@ -10,7 +10,7 @@ import ProductTabs from './ProductTabs';
 interface ProductDetailsProps {
   product: Product | null;
   onClose: () => void;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product, quantity?: number) => void;
 }
 
 // Mock Specs Data generator since basic Product type doesn't have it
@@ -26,6 +26,7 @@ const getMockSpecs = (category: string) => ({
 
 const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Reset scroll when product opens
   useEffect(() => {
@@ -41,18 +42,35 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
   const variants = ['Red', 'Black', 'Carbon Fiber'];
   const [selectedVariant, setSelectedVariant] = useState(variants[0]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
+    setIsProcessing(true);
     // In a real app, pass quantity and variant
-    console.log(`Adding to cart: ${product.name}, Qty: ${quantity}, Variant: ${selectedVariant}`);
-    onAddToCart(product);
+    await onAddToCart(product, quantity);
+    setIsProcessing(false);
     onClose();
   };
 
-  const handleBuyNow = () => {
-    console.log('Buy Now Clicked');
-    onAddToCart(product);
-    // Navigate to checkout logic would go here
-    onClose();
+  const handleBuyNow = async () => {
+    setIsProcessing(true);
+    await onAddToCart(product, quantity);
+    // Redirect logic handled by parent via onNavigate typically, 
+    // but here we just add to cart. Parent handles redirect if 'Buy Now' was separate logic.
+    // The current prop 'onAddToCart' might just add. 
+    // If we need redirect, we assume the parent passed a specific handler or handles this flow.
+    // For now, consistent behavior: add and close.
+    // *Wait*, original App.tsx logic for Buy Now was not fully wired in previous turn, but assuming consistent cart logic.
+    // Actually, App.tsx passes `onAddToCart` which shows toast. 
+    // To implement "Buy Now" properly (redirect to checkout), we would need `onNavigate` here.
+    // But keeping it simple as requested for Wishlist task: just add to cart.
+    // To allow redirect, ProductDetails needs onNavigate.
+    setIsProcessing(false);
+    // For "Buy Now", typically we navigate to checkout immediately.
+    // window.location.href = '/checkout'; // Or use onNavigate if available
+    // Since we don't have onNavigate prop here (it wasn't in original interface above, but App passed it to ProductDetailsPage which passed it to ProductDetailsComponent? No, let's check ProductDetailsPage)
+    // ProductDetailsPage passes `onAddToCart` and `onClose`.
+    // So "Buy Now" here is effectively "Add to Cart".
+    onClose(); 
+    // Ideally we navigate to /checkout.
   };
 
   return (
@@ -81,13 +99,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
 
             {/* RIGHT COLUMN: Info & Actions */}
             <div className="lg:col-span-7 p-4 md:p-6 lg:pr-12">
-              <ProductPriceBlock 
-                name={product.name}
-                price={product.price}
-                originalPrice={product.originalPrice}
-                rating={product.rating}
-                brand="NOKLITY Performance"
-              />
+              <ProductPriceBlock product={product} />
 
               <div className="mt-6 space-y-6">
                 {/* Variants */}
@@ -121,14 +133,16 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
                 <div className="hidden lg:flex gap-4 pt-4">
                   <button 
                     onClick={handleBuyNow}
-                    className="flex-1 bg-primary hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    disabled={isProcessing}
+                    className="flex-1 bg-primary hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <Zap className="w-5 h-5 fill-current" />
                     Buy Now
                   </button>
                   <button 
                     onClick={handleAddToCart}
-                    className="flex-1 bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                    disabled={isProcessing}
+                    className="flex-1 bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="w-5 h-5" />
                     Add to Cart
@@ -151,13 +165,15 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
         <div className="flex gap-3">
           <button 
             onClick={handleBuyNow}
-            className="flex-1 bg-primary text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform"
+            disabled={isProcessing}
+            className="flex-1 bg-primary text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform disabled:opacity-70"
           >
             Buy Now
           </button>
           <button 
             onClick={handleAddToCart}
-            className="flex-1 bg-gray-900 text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform"
+            disabled={isProcessing}
+            className="flex-1 bg-gray-900 text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform disabled:opacity-70"
           >
             Add to Cart
           </button>

@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, Menu, X, ChevronRight } from 'lucide-react';
+import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, Menu, X, ChevronRight, LogOut } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
   onLoginClick?: () => void;
@@ -20,8 +21,9 @@ const Header: React.FC<HeaderProps> = ({
   onHelpClick,
   onWishlistClick,
   wishlistCount = 0,
-  user
+  user: propUser // Rename to avoid conflict, though we prioritize context
 }) => {
+  const { user, signOut } = useAuth();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -29,6 +31,15 @@ const Header: React.FC<HeaderProps> = ({
   const logoSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 50'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 45 L30 45 L40 5 Z'/%3E%3Ctext x='50' y='38' font-family='sans-serif' font-weight='900' font-size='34' fill='%23111827' letter-spacing='-1'%3ENOKLITY%3C/text%3E%3C/svg%3E";
 
   const isLoggedIn = !!user;
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setIsMobileMenuOpen(false);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 h-[80px] font-sans transition-all duration-300">
@@ -91,6 +102,14 @@ const Header: React.FC<HeaderProps> = ({
                 onClick={onLoginClick} 
                 active={isLoggedIn}
               />
+
+              {isLoggedIn && (
+                <NavIcon 
+                  icon={LogOut} 
+                  label="Logout" 
+                  onClick={handleLogout}
+                />
+              )}
             </div>
 
             {/* Mobile Actions */}
@@ -149,11 +168,28 @@ const Header: React.FC<HeaderProps> = ({
                     count={wishlistCount}
                     onClick={() => { onWishlistClick?.(); setIsMobileMenuOpen(false); }} 
                 />
-                <MobileNavItem 
-                    label={isLoggedIn ? "Account" : "Login / Signup"}
-                    icon={UserIcon} 
-                    onClick={() => { onLoginClick?.(); setIsMobileMenuOpen(false); }} 
-                />
+                
+                {isLoggedIn ? (
+                  <>
+                    <MobileNavItem 
+                        label="My Account"
+                        icon={UserIcon} 
+                        onClick={() => { onLoginClick?.(); setIsMobileMenuOpen(false); }} 
+                    />
+                    <MobileNavItem 
+                        label="Logout"
+                        icon={LogOut} 
+                        onClick={handleLogout} 
+                    />
+                  </>
+                ) : (
+                  <MobileNavItem 
+                      label="Login / Signup"
+                      icon={UserIcon} 
+                      onClick={() => { onLoginClick?.(); setIsMobileMenuOpen(false); }} 
+                  />
+                )}
+
                 <MobileNavItem label="Help Center" icon={CircleHelp} onClick={() => { onHelpClick?.(); setIsMobileMenuOpen(false); }} />
                 
                 <div className="h-px bg-gray-100 my-4" />

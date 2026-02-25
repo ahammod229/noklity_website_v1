@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { Product } from '../types';
-import { ShoppingCart, Star } from 'lucide-react';
+import { ShoppingCart, Star, Heart } from 'lucide-react';
+import { useWishlist } from '../contexts/WishlistContext';
 
 interface ProductCardProps {
   product: Product;
@@ -10,13 +12,33 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToCart, onClick }) => {
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  
   const discountPercentage = product.originalPrice 
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
     : 0;
 
+  const isWishlisted = isInWishlist(product.id);
+
   const handleCartClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onAddToCart?.(product);
+  };
+
+  const handleWishlistClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      if (isWishlisted) {
+        await removeFromWishlist(product.id);
+      } else {
+        await addToWishlist(product);
+      }
+    } catch (error: any) {
+      if (error.message === 'Not logged in') {
+        // Ideally prompt login, for now alert or ignore if parent handles global auth events
+        alert('Please login to save items to your wishlist');
+      }
+    }
   };
 
   return (
@@ -38,6 +60,19 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
           </div>
         )}
       </div>
+
+      {/* Wishlist Button */}
+      <button 
+        onClick={handleWishlistClick}
+        className={`absolute top-4 right-4 z-20 p-2.5 rounded-full transition-all duration-300 shadow-sm ${
+          isWishlisted 
+            ? 'bg-red-50 text-red-500 hover:bg-red-100' 
+            : 'bg-white/80 backdrop-blur text-gray-400 hover:text-red-500 hover:bg-white'
+        }`}
+        title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+      >
+        <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
+      </button>
 
       {/* Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden bg-gray-50 p-6 group-hover:bg-gray-100/50 transition-colors duration-500">

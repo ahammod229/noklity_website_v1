@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { X, Mail, Phone, MapPin, ShoppingBag, Wallet, Calendar, ShieldCheck, UserMinus, MessageSquare } from 'lucide-react';
+import { X, Mail, Phone, MapPin, ShoppingBag, Wallet, Calendar, ShieldCheck, UserMinus, MessageSquare, Clock } from 'lucide-react';
 import { Customer } from '../../services/customerService';
 
 interface CustomerDetailsProps {
@@ -9,6 +10,15 @@ interface CustomerDetailsProps {
 }
 
 const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, onToggleStatus }) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Delivered': return 'text-green-600 bg-green-50 border-green-100';
+      case 'Processing': return 'text-blue-600 bg-blue-50 border-blue-100';
+      case 'Cancelled': return 'text-red-600 bg-red-50 border-red-100';
+      default: return 'text-yellow-600 bg-yellow-50 border-yellow-100';
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-end p-4 sm:p-6 lg:p-8">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
@@ -18,7 +28,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
         <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-black text-gray-900 mb-1">Customer 360</h2>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">ID: {customer.id}</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">ID: {customer.id.slice(0, 8)}</p>
           </div>
           <button onClick={onClose} className="p-2.5 bg-white text-gray-400 hover:text-gray-900 rounded-full shadow-sm border border-gray-100 transition-all">
             <X className="w-6 h-6" />
@@ -31,7 +41,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
           {/* Profile Basic */}
           <section className="flex flex-col items-center text-center">
             <div className="w-24 h-24 rounded-[2rem] bg-primary text-white flex items-center justify-center font-black text-4xl shadow-2xl shadow-red-500/20 mb-6">
-              {customer.name.charAt(0)}
+              {customer.name.charAt(0).toUpperCase()}
             </div>
             <h3 className="text-2xl font-black text-gray-900 tracking-tight">{customer.name}</h3>
             <div className="mt-2 flex items-center gap-2 justify-center">
@@ -63,7 +73,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
           </div>
 
           {/* Detailed Info Groups */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div className="space-y-4">
               <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">Contact Information</h4>
               <div className="space-y-3">
@@ -84,12 +94,31 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">Account Activity</h4>
-              <div className="flex items-center gap-4 text-sm font-bold text-gray-600">
-                <Calendar className="w-4 h-4 text-gray-300" /> Last Order: <span className="text-gray-900 ml-1">{customer.lastOrderDate}</span>
+            {/* Recent Orders List */}
+            {customer.recentOrders && customer.recentOrders.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">Recent Activity</h4>
+                <div className="space-y-3">
+                  {customer.recentOrders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-gray-900">Order #{order.id.slice(0, 8).toUpperCase()}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Clock className="w-3 h-3 text-gray-400" />
+                          <span className="text-[10px] font-bold text-gray-500">{order.date}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-sm font-black text-gray-900">${order.total.toLocaleString()}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Communication CTA */}

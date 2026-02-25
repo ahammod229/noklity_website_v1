@@ -74,11 +74,11 @@ const PaymentFailed: React.FC<PaymentFailedProps> = ({
                       Support
                   </button>
                   <button 
-                      onClick={() => onNavigate('home')}
+                      onClick={() => onNavigate('checkout')}
                       className="bg-white text-gray-900 border border-gray-200 font-black py-3.5 rounded-2xl hover:bg-gray-50 hover:border-gray-900 transition-all flex items-center justify-center gap-2 text-sm"
                   >
                       <ShoppingCart className="w-4 h-4 text-gray-400" />
-                      Back to Cart
+                      Checkout
                   </button>
                 </div>
             </div>

@@ -1,33 +1,37 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types';
 
-// Safely access environment variables to prevent runtime crashes
-// This handles cases where import.meta.env might be undefined in certain environments
 const getEnvVar = (key: string) => {
-  try {
-    const env = (import.meta as any).env || {};
-    return env[key] || '';
-  } catch {
-    return '';
+  // Check import.meta.env (Vite standard)
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
+    return (import.meta as any).env[key];
   }
+  // Fallback to process.env if available (some environments)
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key];
+  }
+  return '';
 };
 
-// Retrieve configuration from environment variables
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+let supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-// Validate configuration or use safe placeholders
-// This ensures createClient doesn't throw an error during initialization if env vars are missing
-const validUrl = supabaseUrl && supabaseUrl.startsWith('http') 
-  ? supabaseUrl 
-  : 'https://placeholder.supabase.co';
+// Ensure URL has protocol
+if (supabaseUrl && !supabaseUrl.startsWith('http')) {
+  supabaseUrl = `https://${supabaseUrl}`;
+}
 
+const validUrl = supabaseUrl || 'https://placeholder.supabase.co';
 const validKey = supabaseAnonKey || 'placeholder-key';
 
-// Export the typed client
 export const supabase = createClient<Database>(validUrl, validKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true
   },
+  global: {
+    headers: { 'x-application-name': 'noklity-ecommerce' }
+  }
 });

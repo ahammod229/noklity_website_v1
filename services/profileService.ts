@@ -1,9 +1,5 @@
-/**
- * Profile Service (Placeholder)
- * 
- * Handles customer profile data operations.
- * Designed to be swapped with real Supabase/API calls later.
- */
+
+import { supabase } from '../lib/supabase';
 
 export interface UserProfile {
   id: string;
@@ -15,49 +11,71 @@ export interface UserProfile {
   memberSince: string;
 }
 
-const MOCK_PROFILE: UserProfile = {
-  id: 'user-8821',
-  fullName: 'Alex Morgan',
-  email: 'alex.morgan@example.com',
-  phone: '+1 (555) 123-4567',
-  lastLogin: 'Today at 10:24 AM',
-  memberSince: 'March 2024'
-};
-
 /**
  * Retrieves the current user's profile details.
  */
-export const getProfile = async (): Promise<UserProfile> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
+export const getProfile = async (): Promise<UserProfile | null> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
 
-  /*
-    TODO: SUPABASE INTEGRATION
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
+      .eq('id', user.id)
       .single();
-  */
 
-  return { ...MOCK_PROFILE };
+    if (error) {
+      console.error('Error fetching profile:', JSON.stringify(error, null, 2));
+      // Fallback to basic auth data if profile row missing
+      return {
+        id: user.id,
+        fullName: user.user_metadata?.full_name || '',
+        email: user.email || '',
+        phone: '',
+        lastLogin: new Date().toLocaleDateString(),
+        memberSince: new Date(user.created_at).toLocaleDateString()
+      };
+    }
+
+    return {
+      id: data.id,
+      fullName: data.full_name || user.user_metadata?.full_name || '',
+      email: data.email || user.email || '',
+      phone: data.phone || '',
+      lastLogin: 'Just now', // Placeholder as auth logs aren't exposed directly
+      memberSince: new Date(data.created_at).toLocaleDateString()
+    };
+  } catch (err) {
+    console.error('Unexpected error in getProfile:', err);
+    return null;
+  }
 };
 
 /**
  * Updates the user's profile information.
  */
 export const updateProfile = async (updates: Partial<UserProfile>): Promise<boolean> => {
-  console.log('[Profile Service] Updating profile with:', updates);
-  
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
 
-  /*
-    TODO: SUPABASE INTEGRATION
+    const dbUpdates: any = {};
+    if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+
     const { error } = await supabase
       .from('profiles')
-      .update(updates)
-      .eq('id', userId);
-  */
+      .update(dbUpdates)
+      .eq('id', user.id);
 
-  return true;
+    if (error) {
+      console.error('Error updating profile:', JSON.stringify(error, null, 2));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Unexpected error in updateProfile:', err);
+    return false;
+  }
 };

@@ -1,6 +1,8 @@
+
+import { supabase } from '../lib/supabase';
 import { Product } from '../types';
 
-interface SearchFilters {
+export interface SearchFilters {
   category?: string[];
   minPrice?: number;
   maxPrice?: number;
@@ -8,7 +10,7 @@ interface SearchFilters {
   sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'newest';
 }
 
-interface SearchResult {
+export interface SearchResult {
   products: Product[];
   totalCount: number;
   facets: {
@@ -17,103 +19,98 @@ interface SearchResult {
   };
 }
 
-// MOCK DATA
-const MOCK_SEARCH_RESULTS: Product[] = [
-  {
-    id: 's-1',
-    name: 'Brembo Ceramic Brake Pads - Front',
-    category: 'Brakes',
-    price: 85.00,
-    image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.8,
-    stock: 15,
-    description: 'High performance ceramic brake pads for superior stopping power and low dust.'
-  },
-  {
-    id: 's-2',
-    name: 'Performance Drilled & Slotted Rotors',
-    category: 'Brakes',
-    price: 245.00,
-    originalPrice: 299.00,
-    image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop', // Reusing mock image for brakes
-    rating: 4.9,
-    stock: 8,
-    isNew: true
-  },
-  {
-    id: 's-3',
-    name: 'Brake Caliper Assembly - Red',
-    category: 'Brakes',
-    price: 320.00,
-    image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.5,
-    stock: 3
-  },
-  {
-    id: 's-4',
-    name: 'Hydraulic Brake Fluid DOT 4',
-    category: 'Fluids',
-    price: 18.99,
-    image: 'https://images.unsplash.com/photo-1563290747-0e3189196b42?q=80&w=2832&auto=format&fit=crop',
-    rating: 4.7,
-    stock: 50
-  },
-  {
-    id: 's-5',
-    name: 'Stainless Steel Brake Lines',
-    category: 'Brakes',
-    price: 110.00,
-    image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.6,
-    stock: 12
-  }
-];
+const mapProduct = (row: any): Product => ({
+  id: row.id,
+  name: row.title,
+  category: row.category || 'Uncategorized',
+  price: row.discount_price || row.price,
+  originalPrice: row.discount_price ? row.price : undefined,
+  image: row.image_url || '',
+  rating: row.rating || 0,
+  stock: row.stock || 0,
+  isFlashSale: row.is_flash_sale || false,
+  description: row.description || '',
+  isNew: (new Date().getTime() - new Date(row.created_at).getTime()) < (30 * 24 * 60 * 60 * 1000)
+});
 
 /**
  * Searches for products based on query and filters.
- * 
- * @param query - Search keyword
- * @param filters - Object containing filter criteria
- * @returns Promise resolving to search results
  */
 export const searchProducts = async (query: string, filters: SearchFilters = {}): Promise<SearchResult> => {
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 600));
+  try {
+    let dbQuery = supabase.from('products').select('*', { count: 'exact' });
 
-  console.log(`[Mock Service] Searching for "${query}" with filters:`, filters);
-
-  /* 
-    TODO: BACKEND INTEGRATION
-    1. Sanitize input query.
-    2. Construct Supabase Full Text Search query:
-       let dbQuery = supabase
-         .from('products')
-         .select('*')
-         .textSearch('title', query);
-    3. Apply filters:
-       if (filters.category) dbQuery = dbQuery.in('category', filters.category);
-       if (filters.minPrice) dbQuery = dbQuery.gte('price', filters.minPrice);
-    4. Execute query and return data.
-  */
-
-  // Basic mock filtering logic for demonstration
-  let results = [...MOCK_SEARCH_RESULTS];
-
-  // If query is empty, maybe return nothing or all? For this UI demo, we always return brake related stuff if query is "brake"
-  if (query.toLowerCase().includes('empty')) {
-      results = [];
-  }
-
-  return {
-    products: results,
-    totalCount: results.length,
-    facets: {
-      categories: [
-        { name: 'Brakes', count: 15 },
-        { name: 'Fluids', count: 4 },
-        { name: 'Suspension', count: 2 },
-      ],
-      priceRange: { min: 0, max: 1000 }
+    // 1. Text Search (ILIKE)
+    if (query && query.trim() !== '') {
+      // Searching primarily in title. 
+      // Note: For advanced search, full text search (fts) vector setup in DB is better.
+      // Using simple ilike for now.
+      dbQuery = dbQuery.ilike('title', `%${query}%`);
     }
-  };
+
+    // 2. Apply Filters
+    if (filters.category && filters.category.length > 0) {
+      dbQuery = dbQuery.in('category', filters.category);
+    }
+
+    if (filters.minPrice !== undefined) {
+      dbQuery = dbQuery.gte('price', filters.minPrice);
+    }
+
+    if (filters.maxPrice !== undefined) {
+      dbQuery = dbQuery.lte('price', filters.maxPrice);
+    }
+
+    if (filters.rating !== undefined) {
+      dbQuery = dbQuery.gte('rating', filters.rating);
+    }
+
+    // 3. Sorting
+    if (filters.sortBy) {
+      switch (filters.sortBy) {
+        case 'price_asc':
+          dbQuery = dbQuery.order('price', { ascending: true });
+          break;
+        case 'price_desc':
+          dbQuery = dbQuery.order('price', { ascending: false });
+          break;
+        case 'newest':
+          dbQuery = dbQuery.order('created_at', { ascending: false });
+          break;
+        default:
+          // Default sorting
+          break;
+      }
+    }
+
+    const { data, count, error } = await dbQuery;
+
+    if (error) {
+      console.error('Search error:', JSON.stringify(error, null, 2));
+      return { 
+        products: [], 
+        totalCount: 0, 
+        facets: { categories: [], priceRange: { min: 0, max: 0 } } 
+      };
+    }
+
+    const products = (data || []).map(mapProduct);
+
+    // Simplified Facets (In a real app, these would be separate aggregation queries)
+    return {
+      products,
+      totalCount: count || 0,
+      facets: {
+        categories: [], 
+        priceRange: { min: 0, max: 5000 }
+      }
+    };
+  } catch (err) {
+    console.error('Unexpected error in searchProducts:', err);
+    return { 
+      products: [], 
+      totalCount: 0, 
+      facets: { categories: [], priceRange: { min: 0, max: 0 } } 
+    };
+  }
 };

@@ -3,12 +3,13 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
   phone?: string;
   role: 'user' | 'admin';
+  created_at?: string;
 }
 
 interface AuthContextType {
@@ -18,6 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,9 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (mounted) {
           setSession(session);
@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const fetchProfile = async (userId: string, mounted: boolean) => {
+  const fetchProfile = async (userId: string, mounted: boolean = true) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -87,8 +87,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (mounted) {
         if (error) {
+          // If profile missing (rare race condition), user still exists but has no role yet.
+          // isAdmin will default to false.
           console.warn('Profile fetch warning:', error.message);
-          // Don't set profile if error, keep as null (basic user)
           setProfile(null);
         } else {
           setProfile(data as UserProfile);
@@ -98,6 +99,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Unexpected error fetching profile:', err);
     } finally {
       if (mounted) setIsLoading(false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      // Helper to force-refresh profile data (e.g. after role update)
+      await fetchProfile(user.id, true);
     }
   };
 
@@ -119,7 +127,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     isLoading,
     signOut,
-    isAdmin: profile?.role === 'admin'
+    isAdmin: profile?.role === 'admin',
+    refreshProfile
   };
 
   return (

@@ -2,22 +2,28 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
 import { supabase } from '../../lib/supabase';
-import { ToastType } from '../Toast';
-import { Plus, Search } from 'lucide-react';
-import { ProductTable } from './products/ProductTable';
-import { ProductForm, ProductFormData } from './products/ProductForm';
+import { Plus, Search, Loader2 } from 'lucide-react';
+import { ProductTable } from '../../components/admin/products/ProductTable';
+import ProductForm, { ProductFormData } from '../../components/admin/ProductForm';
+import { ToastType } from '../../components/Toast';
 
-interface ProductManagerProps {
-  showToast: (message: string, type?: ToastType) => void;
+interface ProductsPageProps {
+  showToast?: (message: string, type?: ToastType) => void;
 }
 
-const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
+const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Helper to show toast if provided, otherwise console log or alert
+  const notify = (msg: string, type: ToastType = 'success') => {
+    if (showToast) showToast(msg, type);
+    else console.log(`[${type.toUpperCase()}] ${msg}`);
+  };
 
   useEffect(() => {
     fetchProducts();
@@ -31,7 +37,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      showToast('Failed to load products', 'error');
+      notify('Failed to load products', 'error');
       setLoading(false);
       return;
     }
@@ -41,8 +47,13 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
         id: row.id,
         name: row.title,
         category: row.category || 'Uncategorized',
-        price: row.discount_price || row.price,
-        originalPrice: row.discount_price ? row.price : undefined,
+        price: row.price,
+        originalPrice: row.discount_price ? row.price : undefined, // Logic adjustment: if discount_price exists, display price is discount_price? Usually price is MSRP.
+        // Let's align with schema: price is selling price. If discount_price is set in DB, that's likely the sale price.
+        // However, standard e-comm schema usually has `price` (regular) and `sale_price` (discounted).
+        // Let's assume row.price is REGULAR and row.discount_price is SALE.
+        // So for the Product type: price = row.discount_price || row.price. originalPrice = row.discount_price ? row.price : undefined.
+        // This matches the previous logic.
         image: row.image_url || '',
         stock: row.stock,
         rating: row.rating,
@@ -75,15 +86,14 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
 
     if (error) {
       setProducts(prevProducts);
-      showToast('Failed to delete product', 'error');
+      notify('Failed to delete product', 'error');
     } else {
-      showToast('Product deleted successfully');
+      notify('Product deleted successfully');
     }
   };
 
   const handleToggleFlashSale = async (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Optimistic UI
     const updatedProducts = products.map(p => 
       p.id === product.id ? { ...p, isFlashSale: !p.isFlashSale } : p
     );
@@ -97,25 +107,31 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
     if (error) {
       // Revert
       setProducts(products);
-      showToast('Failed to update flash sale status', 'error');
+      notify('Failed to update flash sale status', 'error');
     } else {
         const status = !product.isFlashSale ? 'added to' : 'removed from';
-        showToast(`Product ${status} Flash Sale`);
+        notify(`Product ${status} Flash Sale`);
     }
   };
 
   const handleSubmit = async (formData: ProductFormData) => {
     setIsSaving(true);
 
+    // Map form data to DB schema
+    // Logic: If salePrice is valid and < regularPrice, we store regularPrice as 'price' and salePrice as 'discount_price' (or vice versa depending on schema interp).
+    // Let's stick to: 'price' column is the base price. 'discount_price' is the lower price.
+    // If formData.salePrice is present, use it.
+    
     const payload = {
       title: formData.name,
       category: formData.category,
-      price: formData.regularPrice,
-      discount_price: formData.salePrice && formData.salePrice < formData.regularPrice ? formData.salePrice : null,
+      price: formData.regularPrice, // Base price
+      discount_price: (formData.salePrice && formData.salePrice < formData.regularPrice) ? formData.salePrice : null,
       stock: formData.stock,
       image_url: formData.image,
       is_flash_sale: formData.isFlashSale,
-      rating: editingProduct ? undefined : 0, 
+      description: formData.description || null,
+      // rating: handled by default or ignored on update
     };
 
     let error;
@@ -129,16 +145,16 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
     } else {
       const { error: insertError } = await supabase
         .from('products')
-        .insert([{ ...payload, rating: 5.0 }]); 
+        .insert([{ ...payload, rating: 5.0 }]); // Default rating for new items
       error = insertError;
     }
 
     if (error) {
-      showToast(error.message, 'error');
+      notify(error.message, 'error');
     } else {
-      showToast(editingProduct ? 'Product updated successfully' : 'Product created successfully');
+      notify(editingProduct ? 'Product updated successfully' : 'Product created successfully');
       handleCloseModal();
-      fetchProducts(); // Refresh list to ensure data consistency
+      fetchProducts();
     }
     setIsSaving(false);
   };
@@ -150,31 +166,31 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
 
   return (
     <div className="animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-           <h2 className="text-2xl font-bold text-gray-900">Products</h2>
-           <p className="text-gray-500 text-sm">Manage your product inventory</p>
+           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Products</h2>
+           <p className="text-gray-500 text-sm font-medium">Manage your product inventory and pricing</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
-          className="bg-primary text-white font-bold px-4 py-2.5 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+          className="bg-primary text-white font-bold px-6 py-3 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95 flex items-center gap-2"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-5 h-5" />
           Add Product
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex gap-4">
+        <div className="p-6 border-b border-gray-50 bg-gray-50/30 flex gap-4">
             <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-4 top-3 w-4 h-4 text-gray-400" />
                 <input 
                     type="text" 
-                    placeholder="Search products..." 
+                    placeholder="Search products by name or category..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all"
                 />
             </div>
         </div>
@@ -202,4 +218,4 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
   );
 };
 
-export default ProductManager;
+export default ProductsPage;

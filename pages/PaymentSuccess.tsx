@@ -7,16 +7,17 @@ interface PaymentSuccessProps {
   cartItemCount: number;
   onCartClick: () => void;
   onNavigate: (view: any, param?: any) => void;
+  orderId?: string;
 }
 
 const PaymentSuccess: React.FC<PaymentSuccessProps> = ({ 
-  onNavigate 
+  onNavigate,
+  orderId
 }) => {
-  // Mock Data
-  const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+  // Use passed ID or fallback
+  const displayId = orderId || `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  const total = 1265.00;
-  const paymentMethod = "Visa ending in 4242";
+  const paymentMethod = "Cash on Delivery"; // Mock for display
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
@@ -32,9 +33,9 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
                 <CheckCircle className="w-12 h-12 text-green-500" strokeWidth={3} />
             </div>
             
-            <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Payment Successful</h1>
+            <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Order Placed!</h1>
             <p className="text-gray-500 mb-10 font-medium">
-              Thank you for your purchase! Your order has been placed successfully and is being processed.
+              Thank you for your purchase. Your order has been placed successfully and is being processed.
             </p>
 
             {/* Order Summary Card */}
@@ -46,7 +47,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
                         <ShoppingBag className="w-4 h-4 text-gray-400" />
                         <span className="text-sm font-bold text-gray-600">Order ID</span>
                     </div>
-                    <span className="font-mono font-black text-gray-900">{orderId}</span>
+                    <span className="font-mono font-black text-gray-900 text-sm md:text-base">{displayId}</span>
                 </div>
 
                 <div className="flex justify-between items-center pb-3 border-b border-gray-200/50">
@@ -57,23 +58,12 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
                     <span className="font-bold text-gray-900 text-sm">{date}</span>
                 </div>
 
-                <div className="flex justify-between items-center pb-3 border-b border-gray-200/50">
+                <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <CreditCard className="w-4 h-4 text-gray-400" />
                         <span className="text-sm font-bold text-gray-600">Payment Method</span>
                     </div>
                     <span className="font-bold text-gray-900 text-sm">{paymentMethod}</span>
-                </div>
-
-                <div className="flex justify-between items-center pt-2">
-                    <div className="flex items-center gap-3">
-                        <DollarSign className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-bold text-gray-600">Total Paid</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-2xl font-black text-green-600 tracking-tighter">${total.toLocaleString()}</span>
-                      <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded-full uppercase tracking-widest">Confirmed</span>
-                    </div>
                 </div>
             </div>
 
@@ -84,7 +74,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
                     className="w-full bg-gray-900 text-white font-black py-4 rounded-2xl hover:bg-black transition-all flex items-center justify-center gap-3 shadow-xl shadow-gray-200 active:scale-[0.98] group"
                 >
                     <Package className="w-5 h-5 transition-transform group-hover:-translate-y-1" />
-                    View Order Details
+                    View Order History
                 </button>
 
                 <button 

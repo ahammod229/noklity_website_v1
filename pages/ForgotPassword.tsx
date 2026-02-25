@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import AuthLayout from '../components/AuthLayout';
 import AuthInput from '../components/AuthInput';
-import { Mail, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { resetPassword } from '../services/authService';
 
 interface ForgotPasswordProps {
@@ -28,7 +28,7 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigate }) => {
         setSuccess(true);
       }
     } catch (err) {
-      setError('An unexpected error occurred.');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -41,16 +41,18 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigate }) => {
         subtitle={`We sent a password reset link to ${email}`}
         onBack={() => onNavigate('login')}
       >
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-6">
+        <div className="flex flex-col items-center justify-center py-8 animate-in fade-in slide-in-from-bottom-4">
+          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-6 animate-in zoom-in duration-300">
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
-          <p className="text-center text-gray-500 text-sm mb-8">
-            Click the link in the email to set a new password. If you don't see it, check your spam folder.
+          <p className="text-center text-gray-900 font-bold mb-2">Email Sent!</p>
+          <p className="text-center text-gray-500 text-sm mb-8 leading-relaxed">
+            Click the link in the email to set a new password. 
+            <br />If you don't see it, check your spam folder.
           </p>
           <button 
             onClick={() => onNavigate('login')}
-            className="w-full bg-white text-gray-900 border border-gray-200 font-bold py-3.5 rounded-xl hover:bg-gray-50 transition-all"
+            className="w-full bg-white text-gray-900 border border-gray-200 font-bold py-3.5 rounded-xl hover:bg-gray-50 transition-all hover:border-gray-300"
           >
             Back to Login
           </button>
@@ -78,8 +80,9 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigate }) => {
         />
 
         {error && (
-          <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-lg border border-red-100">
-            {error}
+          <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-lg border border-red-100 flex items-start gap-2 animate-in slide-in-from-top-1">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
 

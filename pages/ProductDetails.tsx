@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
 import ProductDetailsComponent from '../components/ProductDetails';
-import { MOCK_PRODUCTS } from '../data/mockData';
 import { Product } from '../types';
+import { getProductById } from '../services/productService';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 
 interface ProductDetailsPageProps {
@@ -21,27 +21,31 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    // Simulate fetch
-    const timer = setTimeout(() => {
+    const loadProduct = async () => {
+      setLoading(true);
       if (!productId) {
-          setError('Invalid Product ID');
-          setLoading(false);
-          return;
+        setError('Invalid Product ID');
+        setLoading(false);
+        return;
       }
-      
-      // In a real app, this would be a Supabase call
-      const found = MOCK_PRODUCTS.find(p => p.id === productId);
-      if (found) {
-        setProduct(found);
-        setError(null);
-      } else {
-        setError('Product not found.');
-        setProduct(null);
+
+      try {
+        const found = await getProductById(productId);
+        if (found) {
+          setProduct(found);
+          setError(null);
+        } else {
+          setError('Product not found.');
+          setProduct(null);
+        }
+      } catch (err) {
+        setError('Error loading product');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
+    };
+
+    loadProduct();
   }, [productId]);
 
   const handleClose = () => {
@@ -76,7 +80,6 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
     );
   }
 
-  // Reuse the existing component which now acts as a full page overlay
   return (
     <ProductDetailsComponent 
       product={product} 

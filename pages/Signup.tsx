@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthLayout from '../components/AuthLayout';
 import AuthInput from '../components/AuthInput';
 import { Mail, Lock, User, Loader2, CheckCircle } from 'lucide-react';
 import { registerUser } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SignupProps {
   onNavigate: (view: any) => void;
@@ -11,6 +12,7 @@ interface SignupProps {
 }
 
 const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -21,6 +23,13 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      onNavigate('profile');
+    }
+  }, [user, onNavigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -33,6 +42,11 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -49,10 +63,8 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
       if (response.error) {
         setError(response.error);
       } else {
-        console.log('Registration successful', response.user);
         setIsSuccess(true);
-        // We delay the navigation slightly or let user click back
-        // onSignupSuccess?.();
+        onSignupSuccess?.();
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
@@ -60,6 +72,8 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
       setLoading(false);
     }
   };
+
+  if (user) return null; // Prevent flash of content
 
   if (isSuccess) {
     return (
@@ -69,17 +83,17 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
         onBack={() => onNavigate('home')}
       >
         <div className="flex flex-col items-center justify-center py-8">
-          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-6">
+          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-6 animate-in zoom-in">
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
-          <p className="text-center text-gray-900 font-bold mb-2">Welcome to NOKLITY!</p>
-          <p className="text-center text-gray-500 text-sm mb-8">
-            We've sent a confirmation link to <strong>{formData.email}</strong>. 
-            Please verify your email address to log in.
+          <p className="text-center text-gray-900 font-bold mb-2 text-lg">Welcome to NOKLITY!</p>
+          <p className="text-center text-gray-500 text-sm mb-8 leading-relaxed">
+            We've sent a confirmation link to <span className="font-bold text-gray-900">{formData.email}</span>. 
+            <br />Please verify your email address to log in.
           </p>
           <button 
             onClick={() => onNavigate('login')}
-            className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-red-700 transition-all"
+            className="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-[0.98]"
           >
             Go to Login
           </button>
@@ -140,14 +154,14 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
         />
 
         {error && (
-            <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-lg border border-red-100 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+            <div className="bg-red-50 text-red-600 text-xs font-bold p-3 rounded-lg border border-red-100 flex items-center gap-2 animate-in slide-in-from-top-1">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0"></span>
                 {error}
             </div>
         )}
 
         <div className="flex items-start gap-3 py-2">
-            <div className="relative flex items-center">
+            <div className="relative flex items-center pt-0.5">
                 <input 
                     type="checkbox"
                     id="terms"

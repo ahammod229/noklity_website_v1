@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
@@ -14,23 +15,25 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ToastType } from '../components/Toast';
-import DashboardOverview from '../components/admin/DashboardOverview';
-import ProductManager from '../components/admin/ProductManager';
-import AdminOrders from './admin/AdminOrders';
+import AdminDashboardPage from './admin/Dashboard';
+import ProductsPage from './admin/Products';
+import AdminOrders from './admin/Orders';
 import CategoryManager from '../components/admin/CategoryManager';
 import SupportManager from '../components/admin/SupportManager';
-import AdminSettings from './admin/AdminSettings';
+import SiteSettings from './admin/SiteSettings';
 import AdminLanguage from './admin/AdminLanguage';
 import AdminCustomers from './admin/AdminCustomers';
+import FlashSales from './admin/FlashSales';
 
 interface AdminDashboardProps {
   onLogout: () => void;
   showToast: (message: string, type?: ToastType) => void;
+  onNavigate?: (view: any, param?: any) => void;
 }
 
 type View = 'overview' | 'products' | 'orders' | 'categories' | 'flash' | 'support' | 'settings' | 'language' | 'customers';
 
-const AdminDashboard: React.FC<AdminDashboardProps & { onNavigate?: (view: any, param?: any) => void }> = ({ onLogout, showToast, onNavigate }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, onNavigate }) => {
   const [activeView, setActiveView] = useState<View>('overview');
 
   const handleLogout = async () => {
@@ -40,20 +43,16 @@ const AdminDashboard: React.FC<AdminDashboardProps & { onNavigate?: (view: any, 
 
   const renderView = () => {
     switch(activeView) {
-      case 'products': return <ProductManager showToast={showToast} />;
+      case 'overview': return <AdminDashboardPage />;
+      case 'products': return <ProductsPage showToast={showToast} />;
       case 'orders': return <AdminOrders onNavigate={onNavigate} />;
       case 'categories': return <CategoryManager />;
       case 'support': return <SupportManager />;
-      case 'settings': return <AdminSettings />;
+      case 'settings': return <SiteSettings />;
       case 'language': return <AdminLanguage />;
       case 'customers': return <AdminCustomers />;
-      case 'flash': return (
-        <div className="flex flex-col items-center justify-center h-96 text-gray-400">
-            <Zap className="w-12 h-12 mb-4 text-gray-300" />
-            <p className="font-medium">Flash Sale Manager Coming Soon</p>
-        </div>
-      );
-      default: return <DashboardOverview />;
+      case 'flash': return <FlashSales showToast={showToast} />;
+      default: return <AdminDashboardPage />;
     }
   };
 
