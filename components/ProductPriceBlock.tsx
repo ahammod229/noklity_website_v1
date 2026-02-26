@@ -3,6 +3,7 @@ import React from 'react';
 import { Star, Share2, Heart, ShieldCheck } from 'lucide-react';
 import { useWishlist } from '../contexts/WishlistContext';
 import { Product } from '../types';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ProductPriceBlockProps {
   product: Product;
@@ -10,6 +11,7 @@ interface ProductPriceBlockProps {
 
 const ProductPriceBlock: React.FC<ProductPriceBlockProps> = ({ product }) => {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { formatCurrency } = useCurrency();
   
   const discountPercentage = product.originalPrice 
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
@@ -76,7 +78,7 @@ const ProductPriceBlock: React.FC<ProductPriceBlockProps> = ({ product }) => {
       <div className="pt-2">
         <div className="flex items-baseline gap-3">
           <span className="text-4xl font-black text-primary tracking-tight">
-            ${product.price.toLocaleString()}
+            {formatCurrency(product.price)}
           </span>
           {discountPercentage > 0 && (
             <span className="bg-red-100 text-primary text-xs font-bold px-2 py-1 rounded">
@@ -86,7 +88,7 @@ const ProductPriceBlock: React.FC<ProductPriceBlockProps> = ({ product }) => {
         </div>
         {product.originalPrice && (
           <p className="text-sm text-gray-400 line-through mt-1">
-            ${product.originalPrice.toLocaleString()}
+            {formatCurrency(product.originalPrice)}
           </p>
         )}
       </div>

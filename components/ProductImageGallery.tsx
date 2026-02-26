@@ -3,17 +3,13 @@ import React, { useState } from 'react';
 
 interface ProductImageGalleryProps {
   mainImage: string;
+  images?: string[];
   productName: string;
 }
 
-const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, productName }) => {
-  // Mocking multiple images for the gallery effect
-  const images = [
-    mainImage,
-    mainImage, // In a real app, these would be different angles
-    mainImage,
-    mainImage
-  ];
+const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, images = [], productName }) => {
+  const uniqueImages = Array.from(new Set([mainImage, ...images].filter(Boolean)));
+  const galleryImages = uniqueImages.length > 0 ? uniqueImages : [mainImage];
 
   const [activeImage, setActiveImage] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -36,7 +32,7 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, pr
         onMouseMove={handleMouseMove}
       >
         <img 
-          src={images[activeImage]} 
+          src={galleryImages[activeImage]} 
           alt={productName}
           className={`w-full h-full object-contain mix-blend-multiply transition-transform duration-200 ${isHovered ? 'scale-150' : 'scale-100'}`}
           style={{
@@ -52,7 +48,7 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, pr
 
       {/* Thumbnails */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        {images.map((img, idx) => (
+        {galleryImages.map((img, idx) => (
           <button
             key={idx}
             onClick={() => setActiveImage(idx)}

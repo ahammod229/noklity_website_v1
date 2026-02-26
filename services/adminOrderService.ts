@@ -1,10 +1,4 @@
-/**
- * Admin Order Service (Placeholder)
- * 
- * Handles all order-related operations for the administrative panel.
- * Designed to be swapped with real Supabase/API calls later.
- */
-
+import { supabase } from '../lib/supabase';
 import { Order } from '../types';
 
 export interface AdminOrderDetail extends Order {
@@ -26,99 +20,91 @@ export interface AdminOrderDetail extends Order {
   }>;
 }
 
-const MOCK_ADMIN_ORDERS: AdminOrderDetail[] = [
-  { 
-    id: 'ORD-7782', 
-    customerName: 'Alex Morgan', 
-    email: 'alex@example.com', 
-    phone: '+1 (555) 123-4567',
-    date: '2024-03-10', 
-    total: 1250.00, 
-    status: 'Processing', 
-    itemsCount: 1,
-    paymentStatus: 'Paid',
-    shippingAddress: { street: '123 Performance Blvd', city: 'Speedway City', state: 'CA', zip: '90210', country: 'US' },
-    items: [{ id: '1', name: 'Brembo GT Braking System Kit', price: 1250, quantity: 1, image: 'https://images.unsplash.com/photo-1626438061453-623e1987d603?q=80&w=2940&auto=format&fit=crop' }]
-  },
-  { 
-    id: 'ORD-7781', 
-    customerName: 'Sarah Connor', 
-    email: 'sarah@skynet.com', 
-    phone: '+1 (555) 987-6543',
-    date: '2024-03-09', 
-    total: 89.00, 
-    status: 'Shipped', 
-    itemsCount: 1,
-    paymentStatus: 'Paid',
-    shippingAddress: { street: '456 Future Lane', city: 'Tech Valley', state: 'CA', zip: '94043', country: 'US' },
-    items: [{ id: '2', name: 'Sparco Racing Gloves', price: 89, quantity: 1, image: 'https://images.unsplash.com/photo-1599951304911-37d044439031?q=80&w=2787&auto=format&fit=crop' }]
-  },
-  { 
-    id: 'ORD-7780', 
-    customerName: 'Bruce Wayne', 
-    email: 'bruce@wayne.ent', 
-    phone: '+1 (555) 000-0000',
-    date: '2024-03-08', 
-    total: 3200.00, 
-    status: 'Delivered', 
-    itemsCount: 1,
-    paymentStatus: 'Paid',
-    shippingAddress: { street: '1007 Mountain Drive', city: 'Gotham', state: 'NJ', zip: '07001', country: 'US' },
-    items: [{ id: '3', name: 'Akrapovič Titanium Exhaust', price: 3200, quantity: 1, image: 'https://images.unsplash.com/photo-1565538361093-9c59573887c3?q=80&w=2940&auto=format&fit=crop' }]
-  },
-  { 
-    id: 'ORD-7779', 
-    customerName: 'Diana Prince', 
-    email: 'diana@themyscira.gov', 
-    phone: '+1 (555) 111-2222',
-    date: '2024-03-07', 
-    total: 1895.50, 
-    status: 'Pending', 
-    itemsCount: 1,
-    paymentStatus: 'Pending',
-    shippingAddress: { street: '1 Paradise Island', city: 'Themyscira', state: 'GR', zip: '00000', country: 'GR' },
-    items: [{ id: '4', name: 'KW V3 Coilover Suspension', price: 1895.50, quantity: 1, image: 'https://images.unsplash.com/photo-1614251412693-4a1f6494cb68?q=80&w=2940&auto=format&fit=crop' }]
-  }
-];
+const mapPaymentStatus = (status?: string): 'Paid' | 'Pending' | 'Failed' => {
+  if (status === 'paid') return 'Paid';
+  if (status === 'failed') return 'Failed';
+  return 'Pending';
+};
 
 /**
  * Fetches all orders for the admin panel.
  */
 export const getAllAdminOrders = async (): Promise<AdminOrderDetail[]> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  /*
-    TODO: SUPABASE INTEGRATION
+  try {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, customer:profiles(full_name, email), order_items(*, product:products(*))')
+      .select(`
+        *,
+        user:profiles(email),
+        order_items(
+          quantity,
+          price,
+          product:products(id, title, image_url)
+        )
+      `)
       .order('created_at', { ascending: false });
-  */
 
-  return [...MOCK_ADMIN_ORDERS];
+    if (error) throw error;
+
+    return (data || []).map((order: any) => {
+      const shipping = order.shipping_address || {};
+      return {
+        id: order.id,
+        customerName: shipping.fullName || 'Guest',
+        email: shipping.email || order.user?.email || 'N/A',
+        phone: shipping.phone || 'N/A',
+        date: new Date(order.created_at).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }),
+        total: Number(order.total_amount) || 0,
+        status: order.status,
+        itemsCount: (order.order_items || []).length,
+        paymentStatus: mapPaymentStatus(order.payment_status),
+        shippingAddress: {
+          street: shipping.address || '',
+          city: shipping.city || '',
+          state: shipping.state || '',
+          zip: shipping.zip || '',
+          country: shipping.country || ''
+        },
+        items: (order.order_items || []).map((item: any) => ({
+          id: item.product?.id || 'unknown',
+          name: item.product?.title || 'Unknown Product',
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 0,
+          image: item.product?.image_url || ''
+        }))
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching admin orders:', error);
+    return [];
+  }
 };
 
 /**
  * Updates the status of an existing order.
  */
 export const updateOrderStatus = async (orderId: string, status: string): Promise<boolean> => {
-  console.log(`[Admin Service] Updating order ${orderId} status to: ${status}`);
-  
-  /*
-    TODO: SUPABASE INTEGRATION
+  try {
     const { error } = await supabase
       .from('orders')
       .update({ status })
       .eq('id', orderId);
-  */
-
-  return true;
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating admin order status:', error);
+    return false;
+  }
 };
 
 /**
  * Retrieves full details for a single order.
  */
 export const getAdminOrderDetails = async (orderId: string): Promise<AdminOrderDetail | null> => {
-  return MOCK_ADMIN_ORDERS.find(o => o.id === orderId) || null;
+  const allOrders = await getAllAdminOrders();
+  return allOrders.find(o => o.id === orderId) || null;
 };

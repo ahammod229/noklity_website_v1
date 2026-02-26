@@ -2,15 +2,36 @@
 export interface Product {
   id: string;
   name: string;
+  slug?: string;
+  brand?: string;
+  modelNumber?: string;
+  sku?: string;
   category: string;
   price: number;
   originalPrice?: number;
+  taxPercent?: number;
+  defaultDeliveryFee?: number;
   image: string;
+  images?: string[];
+  deliveryCharges?: Record<string, number>;
+  warrantyMonths?: number;
+  warrantyPolicy?: string;
+  shippingInfo?: string;
+  returnPolicy?: string;
+  faqText?: string;
+  relatedProductIds?: string[];
+  isActive?: boolean;
   isNew?: boolean;
   rating: number;
   stock?: number;
   description?: string;
-  specs?: Record<string, string>;
+  specifications?: Record<string, string>;
+  compatibility?: string[];
+  weight?: number;
+  deliveryCharge?: number;
+  warranty?: string;
+  countryOfOrigin?: string;
+  status?: 'active' | 'inactive';
   isFlashSale?: boolean;
 }
 
@@ -22,6 +43,7 @@ export interface Category {
   id: string;
   name: string;
   icon: string;
+  logoUrl?: string;
   count: number;
 }
 
@@ -114,10 +136,32 @@ export interface Database {
         Row: {
           id: string;
           title: string;
+          slug: string | null;
+          brand: string | null;
+          model_number: string | null;
+          sku: string | null;
           description: string | null;
           price: number;
           discount_price: number | null;
+          specifications: Json | null;
+          compatibility: Json | null;
+          weight: number | null;
+          delivery_charge: number | null;
+          warranty: string | null;
+          country_of_origin: string | null;
+          status: 'active' | 'inactive' | null;
+          tax_percent: number | null;
+          default_delivery_fee: number | null;
           image_url: string | null;
+          image_urls: Json | null;
+          delivery_charges: Json | null;
+          warranty_months: number | null;
+          warranty_policy: string | null;
+          shipping_info: string | null;
+          return_policy: string | null;
+          faq_text: string | null;
+          related_product_ids: string[] | null;
+          is_active: boolean | null;
           category: string | null;
           rating: number;
           stock: number;
@@ -126,10 +170,32 @@ export interface Database {
         };
         Insert: {
           title: string;
+          slug?: string | null;
+          brand?: string | null;
+          model_number?: string | null;
+          sku?: string | null;
           description?: string | null;
           price: number;
           discount_price?: number | null;
+          specifications?: Json | null;
+          compatibility?: Json | null;
+          weight?: number | null;
+          delivery_charge?: number | null;
+          warranty?: string | null;
+          country_of_origin?: string | null;
+          status?: 'active' | 'inactive' | null;
+          tax_percent?: number | null;
+          default_delivery_fee?: number | null;
           image_url?: string | null;
+          image_urls?: Json | null;
+          delivery_charges?: Json | null;
+          warranty_months?: number | null;
+          warranty_policy?: string | null;
+          shipping_info?: string | null;
+          return_policy?: string | null;
+          faq_text?: string | null;
+          related_product_ids?: string[] | null;
+          is_active?: boolean | null;
           category?: string | null;
           rating?: number;
           stock: number;
@@ -137,10 +203,32 @@ export interface Database {
         };
         Update: {
           title?: string;
+          slug?: string | null;
+          brand?: string | null;
+          model_number?: string | null;
+          sku?: string | null;
           description?: string | null;
           price?: number;
           discount_price?: number | null;
+          specifications?: Json | null;
+          compatibility?: Json | null;
+          weight?: number | null;
+          delivery_charge?: number | null;
+          warranty?: string | null;
+          country_of_origin?: string | null;
+          status?: 'active' | 'inactive' | null;
+          tax_percent?: number | null;
+          default_delivery_fee?: number | null;
           image_url?: string | null;
+          image_urls?: Json | null;
+          delivery_charges?: Json | null;
+          warranty_months?: number | null;
+          warranty_policy?: string | null;
+          shipping_info?: string | null;
+          return_policy?: string | null;
+          faq_text?: string | null;
+          related_product_ids?: string[] | null;
+          is_active?: boolean | null;
           category?: string | null;
           rating?: number;
           stock?: number;
@@ -236,7 +324,10 @@ export interface Database {
           user_id: string;
           total_amount: number;
           status: string;
-          payment_method: string;
+          payment_method: 'bkash' | 'nogad' | 'bank_transfer' | 'cod' | 'card' | 'wallet';
+          payment_status: 'pending' | 'paid' | 'failed';
+          transaction_id: string | null;
+          paid_at: string | null;
           shipping_address: Json;
           created_at: string;
         };
@@ -245,7 +336,10 @@ export interface Database {
           user_id: string;
           total_amount: number;
           status?: string;
-          payment_method: string;
+          payment_method: 'bkash' | 'nogad' | 'bank_transfer' | 'cod' | 'card' | 'wallet';
+          payment_status?: 'pending' | 'paid' | 'failed';
+          transaction_id?: string | null;
+          paid_at?: string | null;
           shipping_address: Json;
           created_at?: string;
         };
@@ -254,7 +348,10 @@ export interface Database {
           user_id?: string;
           total_amount?: number;
           status?: string;
-          payment_method?: string;
+          payment_method?: 'bkash' | 'nogad' | 'bank_transfer' | 'cod' | 'card' | 'wallet';
+          payment_status?: 'pending' | 'paid' | 'failed';
+          transaction_id?: string | null;
+          paid_at?: string | null;
           shipping_address?: Json;
           created_at?: string;
         };
@@ -306,22 +403,324 @@ export interface Database {
       };
       site_settings: {
         Row: {
-          id: number;
           key: string;
-          value: string | null;
+          value: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      categories: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          icon: string | null;
+          logo_url: string | null;
+          description: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          icon?: string | null;
+          logo_url?: string | null;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          slug?: string;
+          icon?: string | null;
+          logo_url?: string | null;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      finance_ledger: {
+        Row: {
+          id: string;
+          type: 'add_funds' | 'withdrawal';
+          amount: number;
+          note: string | null;
+          created_by: string | null;
           created_at: string;
         };
         Insert: {
-          id?: number;
-          key: string;
-          value?: string | null;
+          id?: string;
+          type: 'add_funds' | 'withdrawal';
+          amount: number;
+          note?: string | null;
+          created_by?: string | null;
           created_at?: string;
         };
         Update: {
-          id?: number;
-          key?: string;
-          value?: string | null;
+          id?: string;
+          type?: 'add_funds' | 'withdrawal';
+          amount?: number;
+          note?: string | null;
+          created_by?: string | null;
           created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "finance_ledger_created_by_fkey"
+            columns: ["created_by"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ];
+      };
+      payment_methods: {
+        Row: {
+          id: string;
+          code: string;
+          name: string;
+          type: string;
+          logo_url: string | null;
+          account_details: Json | null;
+          instructions: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          name: string;
+          type: string;
+          logo_url?: string | null;
+          account_details?: Json | null;
+          instructions?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          name?: string;
+          type?: string;
+          logo_url?: string | null;
+          account_details?: Json | null;
+          instructions?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      support_tickets: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          name: string;
+          email: string;
+          phone: string | null;
+          channel: string;
+          subject: string;
+          message: string;
+          status: 'Pending' | 'In Progress' | 'Resolved' | 'Closed';
+          priority: 'Low' | 'Normal' | 'High' | 'Urgent';
+          admin_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          name: string;
+          email: string;
+          phone?: string | null;
+          channel?: string;
+          subject: string;
+          message: string;
+          status?: 'Pending' | 'In Progress' | 'Resolved' | 'Closed';
+          priority?: 'Low' | 'Normal' | 'High' | 'Urgent';
+          admin_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          name?: string;
+          email?: string;
+          phone?: string | null;
+          channel?: string;
+          subject?: string;
+          message?: string;
+          status?: 'Pending' | 'In Progress' | 'Resolved' | 'Closed';
+          priority?: 'Low' | 'Normal' | 'High' | 'Urgent';
+          admin_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      payment_submissions: {
+        Row: {
+          id: string;
+          order_id: string;
+          user_id: string;
+          payment_method: 'bkash' | 'nogad' | 'bank_transfer';
+          bank_code: string | null;
+          document_type: string | null;
+          transaction_reference: string | null;
+          document_path: string | null;
+          notes: string | null;
+          status: 'pending' | 'approved' | 'rejected';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          user_id: string;
+          payment_method: 'bkash' | 'nogad' | 'bank_transfer';
+          bank_code?: string | null;
+          document_type?: string | null;
+          transaction_reference?: string | null;
+          document_path?: string | null;
+          notes?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          user_id?: string;
+          payment_method?: 'bkash' | 'nogad' | 'bank_transfer';
+          bank_code?: string | null;
+          document_type?: string | null;
+          transaction_reference?: string | null;
+          document_path?: string | null;
+          notes?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payment_submissions_order_id_fkey"
+            columns: ["order_id"]
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_submissions_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ];
+      };
+      product_reviews: {
+        Row: {
+          id: string;
+          product_id: string;
+          order_id: string;
+          user_id: string;
+          rating: number;
+          title: string | null;
+          comment: string | null;
+          status: 'pending' | 'approved' | 'rejected';
+          admin_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          order_id: string;
+          user_id: string;
+          rating: number;
+          title?: string | null;
+          comment?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          admin_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          order_id?: string;
+          user_id?: string;
+          rating?: number;
+          title?: string | null;
+          comment?: string | null;
+          status?: 'pending' | 'approved' | 'rejected';
+          admin_note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      api_integrations: {
+        Row: {
+          id: string;
+          key: string;
+          name: string;
+          base_url: string | null;
+          auth_type: 'none' | 'api_key' | 'bearer' | 'basic';
+          secret_ref: string | null;
+          status: 'active' | 'inactive';
+          last_checked_at: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          name: string;
+          base_url?: string | null;
+          auth_type?: 'none' | 'api_key' | 'bearer' | 'basic';
+          secret_ref?: string | null;
+          status?: 'active' | 'inactive';
+          last_checked_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          name?: string;
+          base_url?: string | null;
+          auth_type?: 'none' | 'api_key' | 'bearer' | 'basic';
+          secret_ref?: string | null;
+          status?: 'active' | 'inactive';
+          last_checked_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

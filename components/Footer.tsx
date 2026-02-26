@@ -1,7 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Facebook, Twitter, Instagram, Youtube, MapPin, Phone, Mail } from 'lucide-react';
+import { getPublicSiteConfig } from '../services/siteConfigService';
 
 const Footer: React.FC = () => {
+  const [footerText, setFooterText] = useState('© 2024 NOKLITY Automotive. All rights reserved.');
+  const [footerLogo, setFooterLogo] = useState('');
+  const [supportEmail, setSupportEmail] = useState('support@noklity.com');
+  const [siteTagline, setSiteTagline] = useState(
+    'Your premium destination for high-performance automotive parts. Engineered for speed, built for durability.'
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    getPublicSiteConfig().then((cfg) => {
+      if (!mounted) return;
+      setFooterText(cfg.footerText || footerText);
+      setFooterLogo(cfg.footerLogo || '');
+      setSupportEmail(cfg.supportEmail || supportEmail);
+      setSiteTagline(cfg.siteTagline || siteTagline);
+    }).catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <footer className="bg-gray-900 text-white pt-16 pb-8 border-t-4 border-primary">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -10,15 +32,21 @@ const Footer: React.FC = () => {
           {/* Brand Column */}
           <div className="space-y-4">
             <div className="flex items-center">
-                <div className="w-8 h-8 bg-primary skew-x-[-10deg] flex items-center justify-center mr-2">
-                    <span className="text-white font-bold text-lg skew-x-[10deg]">N</span>
-                </div>
-                <span className="font-bold text-2xl tracking-tighter text-white">
-                NOKLITY
-                </span>
+                {footerLogo ? (
+                  <img src={footerLogo} alt="Footer Logo" className="h-10 w-auto object-contain" />
+                ) : (
+                  <>
+                    <div className="w-8 h-8 bg-primary skew-x-[-10deg] flex items-center justify-center mr-2">
+                        <span className="text-white font-bold text-lg skew-x-[10deg]">N</span>
+                    </div>
+                    <span className="font-bold text-2xl tracking-tighter text-white">
+                    NOKLITY
+                    </span>
+                  </>
+                )}
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Your premium destination for high-performance automotive parts. Engineered for speed, built for durability.
+              {siteTagline}
             </p>
             <div className="flex space-x-4 pt-2">
               <a href="#" className="text-gray-400 hover:text-primary transition-colors"><Facebook className="w-5 h-5"/></a>
@@ -66,14 +94,14 @@ const Footer: React.FC = () => {
               </li>
               <li className="flex items-center">
                 <Mail className="w-5 h-5 mr-3 text-primary flex-shrink-0" />
-                <span>support@noklity.com</span>
+                <span>{supportEmail}</span>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-sm text-gray-500">© 2024 NOKLITY Automotive. All rights reserved.</p>
+          <p className="text-sm text-gray-500">{footerText}</p>
           <div className="flex space-x-6 mt-4 md:mt-0 text-sm text-gray-500">
             <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-white transition-colors">Terms of Service</a>

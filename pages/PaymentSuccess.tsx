@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle, ArrowRight, ShoppingBag, Calendar, CreditCard, DollarSign, Package } from 'lucide-react';
+import { getOrderById } from '../services/orderService';
 
 interface PaymentSuccessProps {
   onLoginClick: () => void;
@@ -17,7 +18,18 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
   // Use passed ID or fallback
   const displayId = orderId || `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  const paymentMethod = "Cash on Delivery"; // Mock for display
+  const [paymentMethod, setPaymentMethod] = useState('Pending Confirmation');
+
+  useEffect(() => {
+    const loadOrder = async () => {
+      if (!orderId) return;
+      const order = await getOrderById(orderId);
+      if (order?.paymentMethod) {
+        setPaymentMethod(order.paymentMethod);
+      }
+    };
+    loadOrder();
+  }, [orderId]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">

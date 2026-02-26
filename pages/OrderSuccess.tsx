@@ -1,11 +1,13 @@
 import React from 'react';
 import { CheckCircle, ArrowRight, ShoppingBag, Calendar, CreditCard, DollarSign } from 'lucide-react';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface OrderSuccessProps {
   onNavigate: (view: any) => void;
 }
 
 const OrderSuccess: React.FC<OrderSuccessProps> = ({ onNavigate }) => {
+  const { formatCurrency } = useCurrency();
   // Mock Data
   const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -73,7 +75,7 @@ const OrderSuccess: React.FC<OrderSuccessProps> = ({ onNavigate }) => {
                             </div>
                             <span className="text-sm font-medium text-gray-600">Total Amount</span>
                         </div>
-                        <span className="text-xl font-black text-primary">${total.toLocaleString()}</span>
+                        <span className="text-xl font-black text-primary">{formatCurrency(total)}</span>
                     </div>
                 </div>
             </div>

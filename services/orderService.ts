@@ -13,7 +13,7 @@ export interface OrderData {
     country: string;
     zip: string;
   };
-  paymentMethod: 'cod' | 'card' | 'wallet';
+  paymentMethod: 'bkash' | 'nogad' | 'bank_transfer';
   total: number;
 }
 
@@ -21,21 +21,43 @@ export interface OrderData {
 export interface OrderDetail extends Order {
   shippingAddress: any;
   paymentMethod: string;
+  paymentStatus: 'Paid' | 'Pending' | 'Failed';
   items: any[];
   subtotal: number;
   shipping: number;
   tax: number;
 }
 
+const mapPaymentMethodLabel = (paymentMethod: string) => {
+  switch (paymentMethod) {
+    case 'bkash':
+      return 'bKash';
+    case 'nogad':
+      return 'Nogad';
+    case 'bank_transfer':
+      return 'Bank Transfer';
+    case 'cod':
+      return 'Cash on Delivery';
+    case 'card':
+      return 'Card';
+    default:
+      return paymentMethod || 'Unknown';
+  }
+};
+
 /**
  * Creates a new order using Supabase RPC for transaction safety.
  */
 export const createOrder = async (orderData: OrderData): Promise<{ success: boolean; orderId: string }> => {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
-
-    if (!userId) throw new Error('User not authenticated');
+    let { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.user?.id) {
+      const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError || !anonData.user) {
+        throw new Error('Unable to continue as guest. Please sign in and try again.');
+      }
+      sessionData = { session: anonData.session };
+    }
 
     const formattedItems = orderData.items.map(item => ({
       product_id: item.id,
@@ -83,6 +105,12 @@ export const getOrders = async (): Promise<any[]> => {
 
     if (error) throw error;
 
+    const mapPaymentStatus = (status?: string) => {
+      if (status === 'paid') return 'Paid';
+      if (status === 'failed') return 'Failed';
+      return 'Pending';
+    };
+
     return data.map((order: any) => {
       const firstItem = order.items?.[0];
       const firstProduct = firstItem?.product;
@@ -96,7 +124,7 @@ export const getOrders = async (): Promise<any[]> => {
         itemCount: order.items?.length || 0,
         previewName: firstProduct?.title || 'Unknown Product',
         previewImage: firstProduct?.image_url || '',
-        paymentStatus: 'Paid', // Simplified logic
+        paymentStatus: mapPaymentStatus(order.payment_status),
         items: order.items?.map((i: any) => ({
           id: i.product_id,
           name: i.product?.title,
@@ -150,13 +178,20 @@ export const getOrderById = async (id: string): Promise<OrderDetail | null> => {
       image: i.product?.image_url || ''
     }));
 
+    const paymentStatus = data.payment_status === 'paid'
+      ? 'Paid'
+      : data.payment_status === 'failed'
+        ? 'Failed'
+        : 'Pending';
+
     return {
       id: data.id,
       customerName: shipping?.fullName || 'Customer',
       email: shipping?.email || '',
       date: new Date(data.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       status: data.status as any,
-      paymentMethod: data.payment_method === 'cod' ? 'Cash on Delivery' : 'Card',
+      paymentMethod: mapPaymentMethodLabel(data.payment_method),
+      paymentStatus,
       shippingAddress: {
         name: shipping?.fullName,
         street: shipping?.address,

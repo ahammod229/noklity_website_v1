@@ -59,8 +59,8 @@ const AppContent: React.FC = () => {
     if (path === '/admin') return 'admin';
     if (path === '/checkout') return 'checkout';
     if (path.startsWith('/order-success')) return 'order-success';
-    if (path === '/payment-success') return 'payment-success';
-    if (path === '/payment-failed') return 'payment-failed';
+    if (path === '/payment-success' || path.startsWith('/payment-success/')) return 'payment-success';
+    if (path === '/payment-failed' || path.startsWith('/payment-failed/')) return 'payment-failed';
     if (path === '/orders' || path === '/account-orders') return 'account-orders';
     if (path === '/wishlist') return 'wishlist';
     if (path === '/search') return 'search';
@@ -84,6 +84,8 @@ const AppContent: React.FC = () => {
     if (path.startsWith('/orders/') && path.endsWith('/invoice')) return path.split('/')[2];
     if (path.startsWith('/orders/')) return path.split('/')[2];
     if (path.startsWith('/order-success/')) return path.split('/')[2];
+    if (path.startsWith('/payment-success/')) return path.split('/')[2];
+    if (path.startsWith('/payment-failed/')) return path.split('/')[2];
     return undefined;
   }
 
@@ -112,6 +114,12 @@ const AppContent: React.FC = () => {
         }
         if (view === 'order-success' && param) {
             path = `/order-success/${param}`;
+        }
+        if (view === 'payment-success' && param) {
+            path = `/payment-success/${param}`;
+        }
+        if (view === 'payment-failed' && param) {
+            path = `/payment-failed/${param}`;
         }
     }
     
@@ -258,9 +266,7 @@ const AppContent: React.FC = () => {
 
     if (currentView === 'checkout') {
       return (
-        <ProtectedRoute onNavigate={navigate}>
-          <Checkout cartItems={cart} onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
-        </ProtectedRoute>
+        <Checkout cartItems={cart} onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />
       );
     }
 
@@ -277,7 +283,7 @@ const AppContent: React.FC = () => {
     }
 
     if (currentView === 'payment-failed') {
-      return <PaymentFailed onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} />;
+      return <PaymentFailed onLoginClick={handleAuthClick} cartItemCount={cartCount} onCartClick={() => setIsCartOpen(true)} onNavigate={navigate} orderId={currentParam} />;
     }
 
     if (currentView === 'account-orders' || currentView === 'orders') {

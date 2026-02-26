@@ -1,57 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import ProductCard from './ProductCard';
 import { Product } from '../types';
 import { Timer, ArrowRight } from 'lucide-react';
-
-// Flash sale mock data
-const FLASH_PRODUCTS: Product[] = [
-  {
-    id: 'fs-1',
-    name: 'Castrol Edge 5W-30 Full Synthetic Oil',
-    category: 'Fluids',
-    price: 24.99,
-    originalPrice: 45.00,
-    image: 'https://images.unsplash.com/photo-1563290747-0e3189196b42?q=80&w=2832&auto=format&fit=crop',
-    rating: 4.9
-  },
-  {
-    id: 'fs-2',
-    name: 'Sparco Racing Gloves',
-    category: 'Interior',
-    price: 89.00,
-    originalPrice: 120.00,
-    image: 'https://images.unsplash.com/photo-1599951304911-37d044439031?q=80&w=2787&auto=format&fit=crop',
-    rating: 4.7
-  },
-  {
-    id: 'fs-3',
-    name: 'NGK Iridium Spark Plugs (Set of 4)',
-    category: 'Engine',
-    price: 35.50,
-    originalPrice: 52.00,
-    image: 'https://images.unsplash.com/photo-1628522336332-9cb52501a35c?q=80&w=2960&auto=format&fit=crop',
-    rating: 4.8
-  },
-  {
-    id: 'fs-4',
-    name: 'Michelin Pilot Sport 4S',
-    category: 'Wheels',
-    price: 285.00,
-    originalPrice: 345.00,
-    image: 'https://images.unsplash.com/photo-1578844251758-2f71da645217?q=80&w=2940&auto=format&fit=crop',
-    rating: 5.0,
-    isNew: true
-  },
-  {
-    id: 'fs-5',
-    name: 'K&N Air Filter Cleaning Kit',
-    category: 'Maintenance',
-    price: 15.99,
-    originalPrice: 24.99,
-    image: 'https://images.unsplash.com/photo-1632512396328-9d5113945415?q=80&w=2940&auto=format&fit=crop',
-    rating: 4.5
-  }
-];
+import { getFlashSaleProducts } from '../services/productService';
 
 interface FlashSaleProps {
   onProductClick?: (product: Product) => void;
@@ -59,6 +10,24 @@ interface FlashSaleProps {
 }
 
 const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart }) => {
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const load = () => getFlashSaleProducts().then(setProducts).catch(() => setProducts([]));
+    load();
+    const interval = setInterval(load, 30000);
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, []);
+
+  if (products.length === 0) return null;
+
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -78,7 +47,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart }) =>
       {/* Horizontal Scroll Container */}
       <div className="relative">
           <div className="flex overflow-x-auto gap-6 pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
-            {FLASH_PRODUCTS.map(product => (
+            {products.map(product => (
                 <div key={product.id} className="min-w-[260px] md:min-w-[280px] snap-start h-full">
                     <ProductCard 
                       product={product} 

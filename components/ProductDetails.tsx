@@ -6,6 +6,7 @@ import ProductImageGallery from './ProductImageGallery';
 import ProductPriceBlock from './ProductPriceBlock';
 import QuantitySelector from './QuantitySelector';
 import ProductTabs from './ProductTabs';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ProductDetailsProps {
   product: Product | null;
@@ -13,18 +14,16 @@ interface ProductDetailsProps {
   onAddToCart: (product: Product, quantity?: number) => void;
 }
 
-// Mock Specs Data generator since basic Product type doesn't have it
-const getMockSpecs = (category: string) => ({
-  'Material': 'High-Grade Aluminum Alloy',
-  'Weight': '2.4 kg',
-  'Dimensions': '12 x 8 x 6 inches',
-  'Warranty': '2 Years Manufacturer',
-  'Compatibility': 'Universal Fit (Check manual)',
-  'Part Number': `NK-${category.substring(0,3).toUpperCase()}-001`,
-  'Country of Origin': 'Japan'
+const getProductSpecs = (product: Product) => ({
+  ...(product.specifications || {}),
+  ...(product.weight ? { Weight: `${product.weight} kg` } : {}),
+  ...(product.countryOfOrigin ? { 'Country of Origin': product.countryOfOrigin } : {}),
+  ...(product.sku ? { SKU: product.sku } : {}),
+  ...(product.modelNumber ? { 'Model Number': product.modelNumber } : {})
 });
 
 const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAddToCart }) => {
+  const { formatCurrency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -38,9 +37,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
   if (!product) return null;
 
   // Enhance product with mock data for display
-  const specs = getMockSpecs(product.category);
-  const variants = ['Red', 'Black', 'Carbon Fiber'];
-  const [selectedVariant, setSelectedVariant] = useState(variants[0]);
+  const specs = getProductSpecs(product);
+  const compatibilityList = product.compatibility || [];
 
   const handleAddToCart = async () => {
     setIsProcessing(true);
@@ -94,7 +92,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
             
             {/* LEFT COLUMN: Images */}
             <div className="lg:col-span-5 p-4 md:p-6 lg:border-r border-gray-100">
-              <ProductImageGallery mainImage={product.image} productName={product.name} />
+              <ProductImageGallery mainImage={product.image} images={product.images} productName={product.name} />
             </div>
 
             {/* RIGHT COLUMN: Info & Actions */}
@@ -102,32 +100,50 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
               <ProductPriceBlock product={product} />
 
               <div className="mt-6 space-y-6">
-                {/* Variants */}
-                <div>
-                  <h3 className="text-sm font-bold text-gray-500 mb-3">Color Family</h3>
-                  <div className="flex gap-3">
-                    {variants.map(v => (
-                      <button
-                        key={v}
-                        onClick={() => setSelectedVariant(v)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
-                          selectedVariant === v 
-                          ? 'border-primary text-primary bg-red-50' 
-                          : 'border-gray-100 text-gray-600 hover:border-gray-200'
-                        }`}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Quantity */}
                 <QuantitySelector 
                   quantity={quantity} 
                   setQuantity={setQuantity} 
                   maxStock={product.stock || 20}
                 />
+                <p className={`text-sm font-bold ${Number(product.stock || 0) > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {Number(product.stock || 0) > 0 ? `${product.stock} item(s) in stock` : 'Out of stock'}
+                </p>
+
+                <div className="p-4 rounded-xl border border-gray-100 bg-gray-50 space-y-2">
+                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Delivery & Warranty</p>
+                  <p className="text-sm font-bold text-gray-800">Warranty: {product.warranty || `${product.warrantyMonths || 0} months`}</p>
+                  <p className="text-sm font-bold text-gray-800">
+                    Delivery Charge: {formatCurrency(Number(product.deliveryCharge || product.defaultDeliveryFee || product.deliveryCharges?.Dhaka || 0))}
+                  </p>
+                  <p className="text-sm font-bold text-gray-800">
+                    Base Delivery Fee: {formatCurrency(Number(product.defaultDeliveryFee || 0))}
+                  </p>
+                  <p className="text-sm font-bold text-gray-800">
+                    Tax: {Number(product.taxPercent || 0).toFixed(2)}%
+                  </p>
+                  {product.warrantyPolicy && (
+                    <p className="text-xs text-gray-600">{product.warrantyPolicy}</p>
+                  )}
+                  {product.shippingInfo && (
+                    <p className="text-xs text-gray-600">{product.shippingInfo}</p>
+                  )}
+                  {product.returnPolicy && (
+                    <p className="text-xs text-gray-600">Return policy: {product.returnPolicy}</p>
+                  )}
+                  {product.faqText && <p className="text-xs text-gray-600 whitespace-pre-line">{product.faqText}</p>}
+                </div>
+
+                {compatibilityList.length > 0 && (
+                  <div className="p-4 rounded-xl border border-gray-100 bg-white">
+                    <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Compatibility</p>
+                    <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                      {compatibilityList.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {/* Desktop Actions */}
                 <div className="hidden lg:flex gap-4 pt-4">

@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+
 // Types for support interactions
 export interface SupportTicketData {
   name: string;
@@ -18,31 +20,33 @@ export interface SupportTicketData {
  * @returns Promise resolving to success status
  */
 export const sendSupportEmail = async (data: SupportTicketData): Promise<{ success: boolean; message: string }> => {
-  // MOCK BEHAVIOR
-  console.log('-----------------------------------');
-  console.log('MOCK: Sending Support Email');
-  console.log('To: support@noklity.com');
-  console.log('From:', data.email);
-  console.log('Subject:', data.subject);
-  console.log('Message:', data.message);
-  console.log('-----------------------------------');
+  try {
+    const { data: authData } = await supabase.auth.getUser();
 
-  // Simulate network latency
-  await new Promise(resolve => setTimeout(resolve, 1500));
+    const { error } = await supabase.from('support_tickets').insert({
+      user_id: authData.user?.id || null,
+      name: data.name,
+      email: data.email,
+      channel: 'email',
+      subject: data.subject,
+      message: data.message,
+      status: 'Pending',
+      priority: 'Normal'
+    });
 
-  /* 
-    TODO: BACKEND INTEGRATION
-    1. Validate input data (Zod or similar)
-    2. Call Supabase Edge Function or backend API endpoint (e.g., /api/support/email)
-    3. Integration with email provider (Resend, SendGrid, AWS SES)
-    4. Save ticket record to 'support_tickets' table in Supabase for history
-    5. Handle error states (rate limiting, invalid email, server errors)
-  */
+    if (error) throw error;
 
-  return {
-    success: true,
-    message: 'Your support request has been sent successfully.',
-  };
+    return {
+      success: true,
+      message: 'Your support request has been submitted successfully.'
+    };
+  } catch (error: any) {
+    console.error('Support ticket submission failed:', error);
+    return {
+      success: false,
+      message: error?.message || 'Failed to submit support request.'
+    };
+  }
 };
 
 /**

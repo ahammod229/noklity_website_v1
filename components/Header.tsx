@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, Menu, X, ChevronRight, LogOut } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { useAuth } from '../contexts/AuthContext';
+import { getPublicSiteConfig } from '../services/siteConfigService';
 
 interface HeaderProps {
   onLoginClick?: () => void;
@@ -27,8 +28,8 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Embedded SVG logo to satisfy "image-based" requirement reliably
-  const logoSrc = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 50'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 45 L30 45 L40 5 Z'/%3E%3Ctext x='50' y='38' font-family='sans-serif' font-weight='900' font-size='34' fill='%23111827' letter-spacing='-1'%3ENOKLITY%3C/text%3E%3C/svg%3E";
+  const [logoSrc, setLogoSrc] = useState('');
+  const fallbackLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 50'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 45 L30 45 L40 5 Z'/%3E%3Ctext x='50' y='38' font-family='sans-serif' font-weight='900' font-size='34' fill='%23111827' letter-spacing='-1'%3ENOKLITY%3C/text%3E%3C/svg%3E";
 
   const isLoggedIn = !!user;
 
@@ -41,6 +42,20 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  useEffect(() => {
+    let mounted = true;
+    getPublicSiteConfig().then((cfg) => {
+      if (!mounted) return;
+      setLogoSrc(cfg.headerLogoLight || '');
+    }).catch(() => {
+      if (!mounted) return;
+      setLogoSrc('');
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 h-[80px] font-sans transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
@@ -49,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({
           {/* LEFT: Logo (Image Based) */}
           <a href="/" className="flex-shrink-0 flex items-center group relative z-50">
             <img 
-              src={logoSrc} 
+              src={logoSrc || fallbackLogo} 
               alt="NOKLITY" 
               className="h-[32px] md:h-[36px] w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {

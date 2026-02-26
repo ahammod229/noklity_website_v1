@@ -11,7 +11,14 @@ import {
   ChevronLeft, 
   LifeBuoy, 
   Settings, 
-  Languages 
+  Languages,
+  Star,
+  CreditCard,
+  Database,
+  Search,
+  Bell,
+  Sun,
+  Wallet
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ToastType } from '../components/Toast';
@@ -20,10 +27,14 @@ import ProductsPage from './admin/Products';
 import AdminOrders from './admin/Orders';
 import CategoryManager from '../components/admin/CategoryManager';
 import SupportManager from '../components/admin/SupportManager';
-import SiteSettings from './admin/SiteSettings';
+import AdminSettings from './admin/Settings';
 import AdminLanguage from './admin/AdminLanguage';
 import AdminCustomers from './admin/AdminCustomers';
 import FlashSales from './admin/FlashSales';
+import ProductReviews from './admin/ProductReviews';
+import PaymentMethods from './admin/PaymentMethods';
+import ApiManagement from './admin/ApiManagement';
+import Finance from './admin/Finance';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -31,7 +42,20 @@ interface AdminDashboardProps {
   onNavigate?: (view: any, param?: any) => void;
 }
 
-type View = 'overview' | 'products' | 'orders' | 'categories' | 'flash' | 'support' | 'settings' | 'language' | 'customers';
+type View =
+  | 'overview'
+  | 'finance'
+  | 'products'
+  | 'orders'
+  | 'categories'
+  | 'flash'
+  | 'reviews'
+  | 'support'
+  | 'settings'
+  | 'language'
+  | 'customers'
+  | 'payments'
+  | 'api';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, onNavigate }) => {
   const [activeView, setActiveView] = useState<View>('overview');
@@ -45,13 +69,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
     switch(activeView) {
       case 'overview': return <AdminDashboardPage />;
       case 'products': return <ProductsPage showToast={showToast} />;
+      case 'finance': return <Finance />;
       case 'orders': return <AdminOrders onNavigate={onNavigate} />;
       case 'categories': return <CategoryManager />;
       case 'support': return <SupportManager />;
-      case 'settings': return <SiteSettings />;
+      case 'settings': return <AdminSettings />;
       case 'language': return <AdminLanguage />;
       case 'customers': return <AdminCustomers />;
       case 'flash': return <FlashSales showToast={showToast} />;
+      case 'reviews': return <ProductReviews />;
+      case 'payments': return <PaymentMethods />;
+      case 'api': return <ApiManagement />;
       default: return <AdminDashboardPage />;
     }
   };
@@ -68,11 +96,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
         </div>
         
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
+          <div className="pt-1 pb-1 pl-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Analytics</div>
           <NavItem 
             icon={LayoutDashboard} 
             label="Overview" 
             active={activeView === 'overview'} 
             onClick={() => setActiveView('overview')} 
+          />
+          <NavItem
+            icon={Wallet}
+            label="Finance"
+            active={activeView === 'finance'}
+            onClick={() => setActiveView('finance')}
           />
           <div className="pt-4 pb-1 pl-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Store Management</div>
           <NavItem 
@@ -99,6 +134,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
             active={activeView === 'flash'} 
             onClick={() => setActiveView('flash')} 
           />
+          <NavItem 
+            icon={Star} 
+            label="Reviews" 
+            active={activeView === 'reviews'} 
+            onClick={() => setActiveView('reviews')} 
+          />
           <div className="pt-4 pb-1 pl-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Platform</div>
           <NavItem 
             icon={Users} 
@@ -120,9 +161,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
           />
           <NavItem 
             icon={Settings} 
-            label="Website Settings" 
+            label="Settings" 
             active={activeView === 'settings'} 
             onClick={() => setActiveView('settings')} 
+          />
+          <NavItem 
+            icon={CreditCard} 
+            label="Payment Methods" 
+            active={activeView === 'payments'} 
+            onClick={() => setActiveView('payments')} 
+          />
+          <NavItem 
+            icon={Database} 
+            label="API Management" 
+            active={activeView === 'api'} 
+            onClick={() => setActiveView('api')} 
           />
         </nav>
 
@@ -148,20 +201,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
 
       {/* Main Content */}
       <main className="flex-1 ml-64 p-8">
-        {/* Header Strip */}
-        <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span>Admin</span>
-                <span className="text-gray-300">/</span>
-                <span className="text-gray-900 font-medium capitalize">{activeView.replace('-', ' ')}</span>
+        {/* Top Bar */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-8 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between shadow-sm">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Admin</p>
+            <h1 className="text-2xl font-black text-gray-900 capitalize">{activeView.replace('-', ' ')}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative w-full lg:w-72">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full h-11 pl-10 pr-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-semibold"
+              />
             </div>
-            <button 
-                onClick={onLogout}
-                className="text-sm font-medium text-gray-500 hover:text-gray-900 flex items-center gap-1"
-            >
-                <ChevronLeft className="w-4 h-4" />
-                Back to Store
+            <button className="w-11 h-11 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-gray-900 flex items-center justify-center">
+              <Sun className="w-4 h-4" />
             </button>
+            <button className="w-11 h-11 rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-gray-900 flex items-center justify-center">
+              <Bell className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onLogout}
+              className="text-sm font-bold text-gray-600 hover:text-gray-900 flex items-center gap-1 px-3 h-11 rounded-xl border border-gray-200 bg-white"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back to Store
+            </button>
+          </div>
         </div>
 
         {renderView()}

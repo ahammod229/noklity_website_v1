@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
 import { CartItem } from '../types';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
   onRemoveItem,
   onCheckout
 }) => {
+  const { formatCurrency } = useCurrency();
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   if (!isOpen) return null;
@@ -82,7 +84,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                     <p className="text-xs text-gray-500 mt-1">{item.category}</p>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="font-bold text-gray-900">${item.price.toLocaleString()}</span>
+                    <span className="font-bold text-gray-900">{formatCurrency(item.price)}</span>
                     <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-2 py-1">
                       <button 
                         onClick={() => onUpdateQuantity(item.id, -1)}
@@ -110,7 +112,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
           <div className="p-6 border-t border-gray-100 bg-gray-50/50">
             <div className="flex justify-between items-center mb-4">
               <span className="text-gray-500 text-sm">Subtotal</span>
-              <span className="text-xl font-extrabold text-gray-900">${total.toLocaleString()}</span>
+              <span className="text-xl font-extrabold text-gray-900">{formatCurrency(total)}</span>
             </div>
             <p className="text-xs text-gray-400 mb-6 text-center">Shipping and taxes calculated at checkout.</p>
             <button 

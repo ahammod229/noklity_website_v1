@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { getOrderById, OrderDetail } from '../services/orderService';
 import { downloadInvoicePDF } from '../services/invoiceService';
+import { supabase } from '../lib/supabase';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface OrderDetailsProps {
   onLoginClick: () => void;
@@ -30,9 +32,11 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
   onNavigate,
   orderId
 }) => {
+  const { formatCurrency } = useCurrency();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submittingReviewFor, setSubmittingReviewFor] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -91,6 +95,52 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
       </div>
     );
   }
+
+  const handleWriteReview = async (productId: string, productName: string) => {
+    if (!order || order.status !== 'Delivered') {
+      alert('You can only review after delivery.');
+      return;
+    }
+
+    const ratingInput = window.prompt(`Rate "${productName}" (1-5)`);
+    if (!ratingInput) return;
+    const rating = Math.max(1, Math.min(5, Number(ratingInput)));
+    if (Number.isNaN(rating)) {
+      alert('Please enter a valid rating number.');
+      return;
+    }
+
+    const comment = window.prompt('Write your review comment') || '';
+    const title = window.prompt('Review title (optional)') || null;
+
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) {
+      alert('Please login again.');
+      return;
+    }
+
+    setSubmittingReviewFor(productId);
+    const { error: reviewError } = await supabase
+      .from('product_reviews')
+      .upsert({
+        product_id: productId,
+        order_id: order.id,
+        user_id: authData.user.id,
+        rating,
+        title,
+        comment,
+        status: 'pending'
+      }, { onConflict: 'order_id,user_id,product_id' });
+    setSubmittingReviewFor(null);
+
+    if (reviewError) {
+      console.error('Failed to submit review:', reviewError);
+      alert(reviewError.message || 'Failed to submit review');
+      return;
+    }
+
+    alert('Review submitted and waiting for admin approval.');
+  };
 
   // Timeline Logic
   const steps = [
@@ -256,15 +306,19 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                                             <h3 className="font-bold text-gray-900 text-lg line-clamp-2">{item.name}</h3>
                                             <p className="text-sm text-gray-500">{item.category}</p>
                                         </div>
-                                        <p className="font-bold text-gray-900 text-lg">${item.price.toLocaleString()}</p>
+                                        <p className="font-bold text-gray-900 text-lg">{formatCurrency(item.price)}</p>
                                     </div>
                                     <div className="flex items-center justify-between mt-4">
                                         <div className="inline-flex items-center bg-gray-50 rounded-lg px-3 py-1 text-sm font-medium text-gray-600">
                                             Qty: {item.quantity}
                                         </div>
                                         {order.status === 'Delivered' && (
-                                            <button className="text-primary text-sm font-bold hover:underline">
-                                                Write a Review
+                                            <button
+                                                onClick={() => handleWriteReview(item.id, item.name)}
+                                                disabled={submittingReviewFor === item.id}
+                                                className="text-primary text-sm font-bold hover:underline disabled:opacity-60"
+                                            >
+                                                {submittingReviewFor === item.id ? 'Submitting...' : 'Write a Review'}
                                             </button>
                                         )}
                                     </div>
@@ -286,20 +340,20 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                     <div className="space-y-3 pb-6 border-b border-gray-100">
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Subtotal</span>
-                            <span className="font-medium text-gray-900">${order.subtotal.toLocaleString()}</span>
+                            <span className="font-medium text-gray-900">{formatCurrency(order.subtotal)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Shipping</span>
-                            <span className="font-medium text-gray-900">${order.shipping.toFixed(2)}</span>
+                            <span className="font-medium text-gray-900">{formatCurrency(order.shipping)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Tax</span>
-                            <span className="font-medium text-gray-900">${order.tax.toFixed(2)}</span>
+                            <span className="font-medium text-gray-900">{formatCurrency(order.tax)}</span>
                         </div>
                     </div>
                     <div className="flex justify-between items-center pt-4 mb-6">
                         <span className="text-lg font-bold text-gray-900">Total</span>
-                        <span className="text-2xl font-black text-primary">${order.total.toLocaleString()}</span>
+                        <span className="text-2xl font-black text-primary">{formatCurrency(order.total)}</span>
                     </div>
                     {/* Only allow reordering if delivered */}
                     {order.status === 'Delivered' && (

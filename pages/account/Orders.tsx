@@ -16,6 +16,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { getOrders } from '../../services/orderService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface OrdersProps {
   onLoginClick: () => void;
@@ -32,6 +33,7 @@ const Orders: React.FC<OrdersProps> = ({
   onCartClick, 
   onNavigate 
 }) => {
+  const { formatCurrency } = useCurrency();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,7 +160,7 @@ const Orders: React.FC<OrdersProps> = ({
                         <div className="flex flex-wrap items-center gap-3 md:gap-8">
                           <div className="text-right hidden sm:block">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
-                            <p className="text-lg font-black text-gray-900 tracking-tight">${order.total.toLocaleString()}</p>
+                            <p className="text-lg font-black text-gray-900 tracking-tight">{formatCurrency(order.total)}</p>
                           </div>
                           
                           <div className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-black uppercase tracking-widest ${color}`}>

@@ -4,18 +4,21 @@ import { supabase } from '../../lib/supabase';
 import { Product } from '../../types';
 import { Zap, Plus, Trash2, Save, Search, X, Loader2, AlertCircle } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface FlashSalesProps {
   showToast?: (message: string, type?: ToastType) => void;
 }
 
 const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
+  const { formatCurrency, currencyCode } = useCurrency();
   const [activeItems, setActiveItems] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // States for inline editing
   const [editingPrices, setEditingPrices] = useState<Record<string, number>>({});
+  const [editingImages, setEditingImages] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
   // States for Add Modal
@@ -62,10 +65,13 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
       setActiveItems(mapped);
       
       const prices: Record<string, number> = {};
+      const images: Record<string, string> = {};
       data.forEach((row: any) => {
         prices[row.id] = row.discount_price || row.price;
+        images[row.id] = row.image_url || '';
       });
       setEditingPrices(prices);
+      setEditingImages(images);
     }
     setLoading(false);
   };
@@ -169,6 +175,23 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
     setAdding(false);
   };
 
+  const handleUpdateImage = async (id: string) => {
+    const image = editingImages[id];
+    if (!image) return;
+    const { error } = await supabase
+      .from('products')
+      .update({ image_url: image })
+      .eq('id', id);
+
+    if (error) {
+      notify('Failed to update image', 'error');
+      return;
+    }
+
+    notify('Image updated');
+    setActiveItems((prev) => prev.map((p) => (p.id === id ? { ...p, image } : p)));
+  };
+
   // Safe filtering logic
   const filteredCandidates = candidates.filter(c => 
     (c.name && c.name.toLowerCase().includes(candidateSearch.toLowerCase())) ||
@@ -222,11 +245,29 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                   </div>
                 </div>
 
-                {/* Price Editor */}
+                {/* Price + Image Editor */}
                 <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <div className="max-w-[220px]">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Image URL</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={editingImages[product.id] || ''}
+                        onChange={(e) => setEditingImages((prev) => ({ ...prev, [product.id]: e.target.value }))}
+                        className="w-40 bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs font-medium text-gray-700"
+                      />
+                      <button
+                        onClick={() => handleUpdateImage(product.id)}
+                        className="p-2 bg-white border border-gray-200 text-gray-700 rounded-lg"
+                        title="Update Image"
+                      >
+                        <Save className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="text-right pr-4 border-r border-gray-200">
                     <p className="text-[10px] font-bold text-gray-400 uppercase">Regular</p>
-                    <p className="text-sm font-black text-gray-900 line-through">${regularPrice.toLocaleString()}</p>
+                    <p className="text-sm font-black text-gray-900 line-through">{formatCurrency(regularPrice)}</p>
                   </div>
                   
                   <div>
@@ -234,7 +275,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                       <Zap className="w-3 h-3 fill-current" /> Sale Price
                     </p>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-gray-400">$</span>
+                      <span className="text-sm font-bold text-gray-400">{currencyCode}</span>
                       <input 
                         type="number" 
                         value={editingPrices[product.id] || ''}
@@ -338,7 +379,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                         </div>
                         <div className="flex-1">
                           <p className={`text-sm font-bold ${selectedCandidateId === product.id ? 'text-primary' : 'text-gray-900'}`}>{product.name}</p>
-                          <p className="text-xs text-gray-500">${product.price.toLocaleString()} • {product.stock} in stock</p>
+                          <p className="text-xs text-gray-500">{formatCurrency(product.price)} • {product.stock} in stock</p>
                         </div>
                       </div>
                     ))
@@ -355,12 +396,12 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                   <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-center gap-6">
                     <div>
                       <p className="text-xs font-bold text-amber-800 uppercase mb-1">Regular Price</p>
-                      <p className="text-xl font-black text-gray-900">${selectedProduct.price.toLocaleString()}</p>
+                      <p className="text-xl font-black text-gray-900">{formatCurrency(selectedProduct.price)}</p>
                     </div>
                     <div className="flex-1">
                       <label className="text-xs font-bold text-amber-800 uppercase mb-1 block">New Sale Price</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">$</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">{currencyCode}</span>
                         <input 
                           type="number" 
                           value={newSalePrice}
@@ -374,7 +415,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                   {(newSalePrice && typeof newSalePrice === 'number' && newSalePrice >= selectedProduct.price) && (
                     <div className="mt-2 flex items-center gap-2 text-red-500 text-xs font-bold">
                       <AlertCircle className="w-3 h-3" />
-                      Sale price must be lower than regular price (${selectedProduct.price})
+                      Sale price must be lower than regular price ({formatCurrency(selectedProduct.price)})
                     </div>
                   )}
                 </div>

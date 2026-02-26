@@ -2,6 +2,7 @@ import React from 'react';
 import { Eye, Edit, MoreVertical, Package } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { AdminOrderDetail } from '../../services/adminOrderService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface OrderTableProps {
   orders: AdminOrderDetail[];
@@ -10,6 +11,7 @@ interface OrderTableProps {
 }
 
 const OrderTable: React.FC<OrderTableProps> = ({ orders, onView, isLoading }) => {
+  const { formatCurrency } = useCurrency();
   if (isLoading) {
     return (
       <div className="bg-white rounded-3xl border border-gray-100 p-20 flex flex-col items-center justify-center">
@@ -49,7 +51,13 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onView, isLoading }) =>
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 transition-colors group">
                 <td className="px-6 py-4 font-mono font-black text-gray-900 text-sm whitespace-nowrap">
-                  #{order.id}
+                  <button
+                    onClick={() => onView(order)}
+                    className="hover:text-primary underline-offset-2 hover:underline"
+                    title="View order details"
+                  >
+                    #{order.id}
+                  </button>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
@@ -67,7 +75,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onView, isLoading }) =>
                 </td>
                 <td className="px-6 py-4">
                   <span className="text-sm font-black text-gray-900">
-                    ${order.total.toLocaleString()}
+                    {formatCurrency(order.total)}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center">

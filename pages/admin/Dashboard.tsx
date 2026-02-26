@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DollarSign, Package, ShoppingBag, Clock, TrendingUp, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface DashboardStats {
   totalProducts: number;
@@ -10,6 +11,7 @@ interface DashboardStats {
 }
 
 const AdminDashboardPage: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalOrders: 0,
@@ -112,7 +114,7 @@ const AdminDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Total Revenue" 
-          value={`$${stats.revenue.toLocaleString()}`} 
+          value={formatCurrency(stats.revenue)} 
           icon={DollarSign} 
           color="bg-green-500" 
           trend={12.5}
@@ -167,7 +169,7 @@ const AdminDashboardPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-black text-gray-900">${order.total_amount.toLocaleString()}</p>
+                      <p className="text-sm font-black text-gray-900">{formatCurrency(order.total_amount)}</p>
                       <p className={`text-[10px] font-bold uppercase tracking-wide ${
                         order.status === 'Pending' ? 'text-amber-500' : 
                         order.status === 'Delivered' ? 'text-green-500' : 'text-blue-500'

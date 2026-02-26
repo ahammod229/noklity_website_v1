@@ -21,10 +21,12 @@ import {
 import { supabase } from '../../lib/supabase';
 import OrderTable from '../../components/admin/OrderTable';
 import { Order } from '../../types';
+import { useCurrency } from '../../hooks/useCurrency';
 
 // Extended type for Admin purposes matching the UI needs
 export interface AdminOrderDetail extends Order {
   paymentStatus: 'Paid' | 'Pending' | 'Failed';
+  paymentMethod: string;
   phone: string;
   shippingAddress: {
     street: string;
@@ -40,6 +42,13 @@ export interface AdminOrderDetail extends Order {
     quantity: number;
     image: string;
   }>;
+  paymentSubmission?: {
+    transactionReference: string | null;
+    documentType: string | null;
+    documentPath: string | null;
+    status: string;
+    createdAt: string;
+  } | null;
 }
 
 interface AdminOrdersProps {
@@ -47,6 +56,7 @@ interface AdminOrdersProps {
 }
 
 const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
+  const { formatCurrency } = useCurrency();
   const [orders, setOrders] = useState<AdminOrderDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +76,13 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
         .select(`
           *,
           user:profiles(email),
+          payment_submissions(
+            transaction_reference,
+            document_type,
+            document_path,
+            status,
+            created_at
+          ),
           order_items(
             quantity,
             price,
@@ -79,6 +96,11 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
       if (data) {
         const mappedOrders: AdminOrderDetail[] = data.map((order: any) => {
           const shipping = order.shipping_address || {};
+          const paymentStatus = order.payment_status === 'paid'
+            ? 'Paid'
+            : order.payment_status === 'failed'
+              ? 'Failed'
+              : 'Pending';
           
           return {
             id: order.id,
@@ -93,8 +115,8 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
             total: order.total_amount,
             status: order.status,
             itemsCount: order.order_items.length,
-            // Mock payment status logic for MVP (assuming COD is Pending, else Paid)
-            paymentStatus: order.payment_method === 'cod' && order.status !== 'Delivered' ? 'Pending' : 'Paid',
+            paymentStatus,
+            paymentMethod: order.payment_method || 'N/A',
             shippingAddress: {
               street: shipping.address || '',
               city: shipping.city || '',
@@ -108,7 +130,16 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               price: item.price,
               quantity: item.quantity,
               image: item.product?.image_url || ''
-            }))
+            })),
+            paymentSubmission: order.payment_submissions?.[0]
+              ? {
+                  transactionReference: order.payment_submissions[0].transaction_reference,
+                  documentType: order.payment_submissions[0].document_type,
+                  documentPath: order.payment_submissions[0].document_path,
+                  status: order.payment_submissions[0].status,
+                  createdAt: order.payment_submissions[0].created_at
+                }
+              : null
           };
         });
         setOrders(mappedOrders);
@@ -150,12 +181,82 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
     return matchesSearch && matchesStatus;
   });
 
+  const handlePrintOrder = (order: AdminOrderDetail) => {
+    const itemsRows = order.items
+      .map((item) => `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${formatCurrency(item.price)}</td></tr>`)
+      .join('');
+
+    const html = `
+      <html>
+        <head>
+          <title>Order ${order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111; padding: 24px; }
+            h1, h2 { margin: 0 0 8px 0; }
+            p { margin: 4px 0; font-size: 13px; }
+            .box { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ddd; padding: 6px; font-size: 12px; text-align: left; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>Order Details</h1>
+          <p><strong>Order ID:</strong> ${order.id}</p>
+          <p><strong>Date:</strong> ${order.date}</p>
+          <p><strong>Status:</strong> ${order.status}</p>
+          <p><strong>Payment:</strong> ${order.paymentMethod} (${order.paymentStatus})</p>
+
+          <div class="box">
+            <h2>Customer</h2>
+            <p>${order.customerName}</p>
+            <p>${order.email}</p>
+            <p>${order.phone}</p>
+          </div>
+
+          <div class="box">
+            <h2>Shipping Address</h2>
+            <p>${order.shippingAddress.street}</p>
+            <p>${order.shippingAddress.city}, ${order.shippingAddress.state} ${order.shippingAddress.zip}</p>
+            <p>${order.shippingAddress.country}</p>
+          </div>
+
+          <div class="box">
+            <h2>Items</h2>
+            <table>
+              <thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+              <tbody>${itemsRows}</tbody>
+            </table>
+          </div>
+
+          <h2 style="margin-top: 16px;">Total: ${formatCurrency(order.total)}</h2>
+        </body>
+      </html>`;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) return;
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   const stats = [
     { label: 'Total Orders', value: orders.length.toString(), icon: ShoppingBag, color: 'text-gray-900', bg: 'bg-gray-100' },
     { label: 'Pending', value: orders.filter(o => o.status === 'Pending').length.toString(), icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50' },
     { label: 'Delivered', value: orders.filter(o => o.status === 'Delivered').length.toString(), icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Cancelled', value: orders.filter(o => o.status === 'Cancelled').length.toString(), icon: XCircle, color: 'text-primary', bg: 'bg-red-50' },
   ];
+
+  const openPaymentProof = async (path: string) => {
+    const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 60 * 30);
+    if (error || !data?.signedUrl) {
+      alert('Unable to open payment proof file.');
+      return;
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -264,6 +365,13 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                   </button>
                 )}
                 <button 
+                  onClick={() => handlePrintOrder(selectedOrder)}
+                  className="p-3 bg-white text-gray-700 hover:bg-gray-100 rounded-full shadow-sm border border-gray-100 transition-all flex items-center gap-2 px-6"
+                >
+                  <Download className="w-5 h-5" />
+                  <span className="text-xs font-black uppercase tracking-widest">Print</span>
+                </button>
+                <button 
                   onClick={() => setSelectedOrder(null)}
                   className="p-3 bg-white text-gray-400 hover:text-gray-900 rounded-full shadow-sm border border-gray-100 transition-all"
                 >
@@ -295,7 +403,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                             <p className="font-bold text-gray-900 text-sm mb-1">{item.name}</p>
                             <div className="flex justify-between items-center">
                               <p className="text-xs text-gray-500 font-bold">Qty: {item.quantity}</p>
-                              <p className="font-black text-gray-900">${item.price.toLocaleString()}</p>
+                              <p className="font-black text-gray-900">{formatCurrency(item.price)}</p>
                             </div>
                           </div>
                         </div>
@@ -307,15 +415,15 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Order Calculations</h3>
                      <div className="flex justify-between text-sm font-bold">
                        <span className="text-gray-500">Subtotal</span>
-                       <span className="text-gray-900">${(selectedOrder.total - 15).toLocaleString()}</span>
+                       <span className="text-gray-900">{formatCurrency(selectedOrder.total - 15)}</span>
                      </div>
                      <div className="flex justify-between text-sm font-bold">
                        <span className="text-gray-500">Shipping</span>
-                       <span className="text-gray-900">$15.00</span>
+                       <span className="text-gray-900">{formatCurrency(15)}</span>
                      </div>
                      <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
                        <span className="text-lg font-black text-gray-900">Total Charged</span>
-                       <span className="text-2xl font-black text-primary">${selectedOrder.total.toLocaleString()}</span>
+                       <span className="text-2xl font-black text-primary">{formatCurrency(selectedOrder.total)}</span>
                      </div>
                   </section>
                 </div>
@@ -361,7 +469,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
 
                   <section className="p-6 bg-white rounded-[1.5rem] border border-gray-100 shadow-sm">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <CreditCard className="w-3.5 h-3.5" /> Payment Status
+                      <CreditCard className="w-3.5 h-3.5" /> Payment
                     </h3>
                     <div className="flex flex-col gap-3">
                        <div className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase text-center ${
@@ -369,6 +477,21 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                        }`}>
                          {selectedOrder.paymentStatus}
                        </div>
+                       <p className="text-xs font-bold text-gray-700 text-center">{selectedOrder.paymentMethod}</p>
+                       {selectedOrder.paymentSubmission?.transactionReference && (
+                        <p className="text-[11px] text-gray-500 text-center">
+                          Ref: <span className="font-bold text-gray-700">{selectedOrder.paymentSubmission.transactionReference}</span>
+                        </p>
+                       )}
+                       {selectedOrder.paymentSubmission?.documentPath && (
+                        <button
+                          type="button"
+                          onClick={() => openPaymentProof(selectedOrder.paymentSubmission!.documentPath!)}
+                          className="text-xs font-black uppercase tracking-widest text-primary hover:underline"
+                        >
+                          View Payment Proof
+                        </button>
+                       )}
                     </div>
                   </section>
                 </div>

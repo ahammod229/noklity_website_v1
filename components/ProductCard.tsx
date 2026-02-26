@@ -3,6 +3,7 @@ import React from 'react';
 import { Product } from '../types';
 import { ShoppingCart, Star, Heart } from 'lucide-react';
 import { useWishlist } from '../contexts/WishlistContext';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ProductCardProps {
   product: Product;
@@ -13,6 +14,7 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToCart, onClick }) => {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { formatCurrency } = useCurrency();
   
   const discountPercentage = product.originalPrice 
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
@@ -103,29 +105,48 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
           <span className="text-xs text-gray-500 uppercase font-semibold tracking-wide">{product.category}</span>
         </div>
 
+        {product.brand && (
+          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-black mb-1">{product.brand}</p>
+        )}
+
         <h3 className="text-[15px] font-bold text-gray-900 mb-3 leading-snug group-hover:text-primary transition-colors line-clamp-2 min-h-[42px]">
           {product.name}
         </h3>
 
-        <div className="mt-auto pt-2 flex items-end justify-between border-t border-gray-50">
+        <div className="mt-auto pt-2 border-t border-gray-50">
+          <div className="flex items-center justify-between pt-3">
           <div className="flex flex-col pt-3">
             {product.originalPrice && (
                 <span className="text-xs text-gray-400 line-through font-medium mb-0.5">
-                    ${product.originalPrice.toLocaleString()}
+                    {formatCurrency(product.originalPrice)}
                 </span>
             )}
             <span className={`font-extrabold text-gray-900 tracking-tight ${product.originalPrice ? 'text-primary text-xl' : 'text-lg'}`}>
-              ${product.price.toLocaleString()}
+              {formatCurrency(product.price)}
             </span>
           </div>
-          
-          {/* Mobile Cart Button */}
-          <button 
-            onClick={handleCartClick}
-            className="md:hidden w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 active:bg-primary active:text-white transition-colors"
-          >
-            <ShoppingCart className="w-4 h-4" />
-          </button>
+            <span className={`text-[10px] px-2 py-1 rounded-full font-black uppercase tracking-wider ${Number(product.stock || 0) > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {Number(product.stock || 0) > 0 ? 'In Stock' : 'Out of Stock'}
+            </span>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick?.(product);
+              }}
+              className="flex-1 h-10 rounded-lg border border-gray-200 text-gray-700 font-bold text-sm hover:border-primary hover:text-primary"
+            >
+              View Details
+            </button>
+            <button 
+              onClick={handleCartClick}
+              className="h-10 px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-primary hover:text-white transition-colors"
+            >
+              <ShoppingCart className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

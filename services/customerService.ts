@@ -25,11 +25,46 @@ export interface Customer {
   }>;
 }
 
+const ADMIN_EMAIL_ALLOWLIST = (
+  ((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_ADMIN_EMAILS) || '') as string
+)
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAllowlistedAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  return ADMIN_EMAIL_ALLOWLIST.includes(email.toLowerCase());
+};
+
+const assertAdmin = async () => {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    throw new Error('Unauthorized');
+  }
+
+  if (isAllowlistedAdminEmail(authData.user.email)) {
+    return;
+  }
+
+  const { data: me, error: meError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
+    .single();
+
+  if (meError || me?.role !== 'admin') {
+    throw new Error('Admin access required');
+  }
+};
+
 /**
  * Fetches all registered customers with aggregated order statistics.
  */
 export const getCustomers = async (): Promise<Customer[]> => {
   try {
+    await assertAdmin();
+
     // 1. Fetch profiles
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
@@ -108,6 +143,8 @@ export const getCustomers = async (): Promise<Customer[]> => {
  */
 export const updateCustomerStatus = async (id: string, status: 'Active' | 'Blocked'): Promise<boolean> => {
   try {
+    await assertAdmin();
+
     const dbStatus = status === 'Blocked' ? 'blocked' : 'active';
     const { error } = await supabase
       .from('profiles')

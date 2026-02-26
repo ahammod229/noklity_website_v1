@@ -1,47 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import InvoiceLayout from '../components/InvoiceLayout';
 import { ChevronLeft, Printer, Download, Package, Loader2, AlertCircle } from 'lucide-react';
-import { getInvoiceNumber, downloadInvoicePDF } from '../services/invoiceService';
+import { getInvoiceByOrderId, getInvoiceNumber, downloadInvoicePDF, InvoiceData } from '../services/invoiceService';
 
 interface InvoicePageProps {
   orderId?: string;
   onNavigate: (view: any, param?: any) => void;
 }
 
-const MOCK_INVOICE_DATA = {
-  id: 'ORD-7782',
-  date: 'October 12, 2024',
-  paymentStatus: 'Paid',
-  customer: {
-    name: 'Alex Morgan',
-    email: 'alex@example.com',
-    phone: '+1 (555) 123-4567'
-  },
-  shippingAddress: '123 Performance Blvd, Speedway City, CA 90210, United States',
-  items: [
-    { sku: 'BR-GT-001', name: 'Brembo GT Braking System Kit', qty: 1, unitPrice: 1250.00, total: 1250.00 },
-    { sku: 'KN-HF-108', name: 'K&N High-Flow Air Filter', qty: 2, unitPrice: 65.99, total: 131.98 }
-  ],
-  subtotal: 1381.98,
-  discount: 0.00,
-  shipping: 25.00,
-  tax: 110.56,
-  total: 1517.54
-};
-
 const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<InvoiceData | null>(null);
 
   useEffect(() => {
-    // Simulate API fetch
-    const timer = setTimeout(() => {
-      if (orderId === 'not-found') {
-        setError("Order record not found.");
+    const loadInvoice = async () => {
+      if (!orderId) {
+        setError('Order record not found.');
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const invoice = await getInvoiceByOrderId(orderId);
+      if (!invoice) {
+        setError('Order record not found.');
+      } else {
+        setData(invoice);
       }
       setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
+    };
+
+    loadInvoice();
   }, [orderId]);
 
   if (loading) {
@@ -73,7 +63,10 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
     );
   }
 
-  const data = MOCK_INVOICE_DATA;
+  if (!data) {
+    return null;
+  }
+
   const invoiceNum = getInvoiceNumber(data.id);
 
   return (
@@ -127,6 +120,10 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Shipping Address</h3>
               <p className="text-sm text-gray-900 font-bold leading-relaxed">{data.shippingAddress}</p>
             </div>
+          </div>
+
+          <div className="mb-8 text-sm font-bold text-gray-600">
+            Payment Method: <span className="text-gray-900">{data.paymentMethod}</span>
           </div>
 
           {/* Items Table */}

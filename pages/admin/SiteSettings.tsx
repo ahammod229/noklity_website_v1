@@ -1,21 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Loader2, Upload, X, Globe, MessageCircle, Mail, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { clearPublicSiteConfigCache } from '../../services/siteConfigService';
 
 interface SiteConfig {
   header_logo_light: string;
   header_logo_dark: string;
+  footer_logo: string;
+  favicon_url: string;
+  site_url: string;
+  site_name: string;
+  site_tagline: string;
+  meta_description: string;
+  meta_keywords: string;
   footer_text: string;
   support_email: string;
   whatsapp_number: string;
+  facebook_url: string;
+  instagram_url: string;
+  youtube_url: string;
+  currency_code: string;
+  currency_locale: string;
 }
 
 const DEFAULT_CONFIG: SiteConfig = {
   header_logo_light: '',
   header_logo_dark: '',
+  footer_logo: '',
+  favicon_url: '',
+  site_url: 'https://noklity.com',
+  site_name: 'NOKLITY',
+  site_tagline: 'Premium Automotive Performance Parts',
+  meta_description: 'NOKLITY provides premium automotive performance products.',
+  meta_keywords: 'automotive, performance parts, brakes, exhaust, engine',
   footer_text: '© 2024 NOKLITY Automotive. All rights reserved.',
   support_email: 'support@noklity.com',
-  whatsapp_number: '+15551234567'
+  whatsapp_number: '+15551234567',
+  facebook_url: '',
+  instagram_url: '',
+  youtube_url: '',
+  currency_code: 'BDT',
+  currency_locale: 'en-BD'
 };
 
 const SiteSettings: React.FC = () => {
@@ -70,6 +95,7 @@ const SiteSettings: React.FC = () => {
         .upsert(upsertData, { onConflict: 'key' });
 
       if (error) throw error;
+      clearPublicSiteConfigCache();
       alert('Settings saved successfully!');
     } catch (err) {
       console.error('Error saving settings:', err);
@@ -204,6 +230,34 @@ const SiteSettings: React.FC = () => {
             value={config.header_logo_dark} 
             uploadKey="header_logo_dark" 
           />
+          <ImageUploadField
+            label="Footer Logo"
+            value={config.footer_logo}
+            uploadKey="footer_logo"
+          />
+          <ImageUploadField
+            label="Favicon"
+            value={config.favicon_url}
+            uploadKey="favicon_url"
+          />
+          <InputField
+            label="Site URL"
+            value={config.site_url}
+            onChange={(v: string) => setConfig(p => ({ ...p, site_url: v }))}
+            icon={Globe}
+          />
+          <InputField
+            label="Site Name"
+            value={config.site_name}
+            onChange={(v: string) => setConfig(p => ({ ...p, site_name: v }))}
+            icon={Globe}
+          />
+          <InputField
+            label="Tagline"
+            value={config.site_tagline}
+            onChange={(v: string) => setConfig(p => ({ ...p, site_tagline: v }))}
+            icon={Globe}
+          />
         </div>
 
         {/* Contact Info */}
@@ -228,6 +282,28 @@ const SiteSettings: React.FC = () => {
           />
 
           <div className="space-y-2">
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">Currency</label>
+            <select
+              value={config.currency_code}
+              onChange={(e) => {
+                const code = e.target.value;
+                const localeMap: Record<string, string> = {
+                  BDT: 'en-BD',
+                  USD: 'en-US',
+                  INR: 'en-IN'
+                };
+                setConfig((p) => ({ ...p, currency_code: code, currency_locale: localeMap[code] || 'en-BD' }));
+              }}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+            >
+              <option value="BDT">Bangladesh Taka (BDT)</option>
+              <option value="USD">US Dollar (USD)</option>
+              <option value="INR">Indian Rupee (INR)</option>
+            </select>
+            <p className="text-[10px] text-gray-400 font-semibold">Default recommended: Bangladesh Taka (BDT)</p>
+          </div>
+
+          <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">Footer Copyright Text</label>
             <textarea 
               rows={3}
@@ -236,6 +312,42 @@ const SiteSettings: React.FC = () => {
               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">Meta Description</label>
+            <textarea
+              rows={3}
+              value={config.meta_description}
+              onChange={(e) => setConfig(p => ({ ...p, meta_description: e.target.value }))}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+            />
+          </div>
+
+          <InputField
+            label="Meta Keywords"
+            value={config.meta_keywords}
+            onChange={(v: string) => setConfig(p => ({ ...p, meta_keywords: v }))}
+            icon={Globe}
+          />
+
+          <InputField
+            label="Facebook URL"
+            value={config.facebook_url}
+            onChange={(v: string) => setConfig(p => ({ ...p, facebook_url: v }))}
+            icon={Globe}
+          />
+          <InputField
+            label="Instagram URL"
+            value={config.instagram_url}
+            onChange={(v: string) => setConfig(p => ({ ...p, instagram_url: v }))}
+            icon={Globe}
+          />
+          <InputField
+            label="YouTube URL"
+            value={config.youtube_url}
+            onChange={(v: string) => setConfig(p => ({ ...p, youtube_url: v }))}
+            icon={Globe}
+          />
         </div>
       </div>
     </div>

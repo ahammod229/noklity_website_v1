@@ -6,13 +6,15 @@ interface PaymentFailedProps {
   onLoginClick: () => void;
   cartItemCount: number;
   onCartClick: () => void;
-  onNavigate: (view: any) => void;
+  onNavigate: (view: any, param?: any) => void;
+  orderId?: string;
 }
 
 const PaymentFailed: React.FC<PaymentFailedProps> = ({ 
-  onNavigate 
+  onNavigate,
+  orderId
 }) => {
-  const transactionId = `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+  const displayReference = orderId || 'Unavailable';
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
@@ -42,8 +44,8 @@ const PaymentFailed: React.FC<PaymentFailedProps> = ({
                   <div>
                     <h3 className="text-sm font-black text-gray-900 mb-1 uppercase tracking-wider">Troubleshooting</h3>
                     <ul className="text-xs text-gray-600 space-y-1 list-disc ml-4">
-                      <li>Verify your card details and CVV</li>
-                      <li>Check your bank's daily transaction limit</li>
+                      <li>Verify your payment account number/details</li>
+                      <li>Check your account balance or transfer limit</li>
                       <li>Ensure stable internet connection</li>
                     </ul>
                   </div>
@@ -51,7 +53,7 @@ const PaymentFailed: React.FC<PaymentFailedProps> = ({
                 
                 <div className="pt-4 border-t border-red-100 mt-4 flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   <span>Reference ID</span>
-                  <span className="text-gray-900">{transactionId}</span>
+                  <span className="text-gray-900">{displayReference}</span>
                 </div>
             </div>
 
