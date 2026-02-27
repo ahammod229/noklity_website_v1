@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import InvoiceLayout from '../components/InvoiceLayout';
 import { ChevronLeft, Printer, Download, Package, Loader2, AlertCircle } from 'lucide-react';
 import { getInvoiceByOrderId, getInvoiceNumber, downloadInvoicePDF, InvoiceData } from '../services/invoiceService';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface InvoicePageProps {
   orderId?: string;
@@ -9,6 +10,7 @@ interface InvoicePageProps {
 }
 
 const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
+  const { formatCurrency } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InvoiceData | null>(null);
@@ -151,8 +153,8 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
                     </td>
                     <td className="py-5 px-4 text-xs font-mono font-bold text-gray-400">{item.sku}</td>
                     <td className="py-5 px-4 text-sm font-bold text-gray-900 text-center">{item.qty}</td>
-                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-right">${item.unitPrice.toLocaleString()}</td>
-                    <td className="py-5 px-4 text-sm font-black text-gray-900 text-right">${item.total.toLocaleString()}</td>
+                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-right">{formatCurrency(item.unitPrice)}</td>
+                    <td className="py-5 px-4 text-sm font-black text-gray-900 text-right">{formatCurrency(item.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -164,25 +166,25 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
             <div className="w-full md:w-80 space-y-3">
               <div className="flex justify-between text-sm font-bold">
                 <span className="text-gray-400 uppercase tracking-widest">Subtotal</span>
-                <span className="text-gray-900">${data.subtotal.toLocaleString()}</span>
+                <span className="text-gray-900">{formatCurrency(data.subtotal)}</span>
               </div>
               {data.discount > 0 && (
                 <div className="flex justify-between text-sm font-bold">
                   <span className="text-gray-400 uppercase tracking-widest">Discount</span>
-                  <span className="text-primary">-${data.discount.toLocaleString()}</span>
+                  <span className="text-primary">-{formatCurrency(data.discount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm font-bold">
                 <span className="text-gray-400 uppercase tracking-widest">Shipping</span>
-                <span className="text-gray-900">${data.shipping.toFixed(2)}</span>
+                <span className="text-gray-900">{formatCurrency(data.shipping)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold pb-4 border-b border-gray-100">
                 <span className="text-gray-400 uppercase tracking-widest">Tax (VAT 8%)</span>
-                <span className="text-gray-900">${data.tax.toFixed(2)}</span>
+                <span className="text-gray-900">{formatCurrency(data.tax)}</span>
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-lg font-black text-gray-900 uppercase tracking-tighter">Grand Total</span>
-                <span className="text-3xl font-black text-primary tracking-tighter">${data.total.toLocaleString()}</span>
+                <span className="text-3xl font-black text-primary tracking-tighter">{formatCurrency(data.total)}</span>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { markPaymentFailed, verifyPaymentStatus } from '../services/paymentServi
 import { supabase } from '../lib/supabase';
 import AddressForm from '../components/account/AddressForm';
 import { useCurrency } from '../hooks/useCurrency';
+import { getPublicSiteConfig } from '../services/siteConfigService';
 import { 
   ChevronLeft, 
   MapPin, 
@@ -44,6 +45,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
+  const [allowGuestCheckout, setAllowGuestCheckout] = useState(true);
   
   const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nogad' | 'bank_transfer'>('bkash');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -67,6 +69,16 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
     fetchAddresses();
     fetchPaymentMethods();
   }, [user?.id]);
+
+  useEffect(() => {
+    getPublicSiteConfig()
+      .then((config) => {
+        setAllowGuestCheckout(config.allowGuestCheckout);
+      })
+      .catch(() => {
+        setAllowGuestCheckout(true);
+      });
+  }, []);
 
   const fetchAddresses = async () => {
     setLoadingAddresses(true);
@@ -246,6 +258,25 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
             className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95"
           >
             Start Shopping
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user && !allowGuestCheckout) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-10 rounded-[2rem] shadow-lg border border-gray-100 text-center max-w-md">
+          <h2 className="text-2xl font-black text-gray-900 mb-2">Login Required</h2>
+          <p className="text-gray-500 font-medium mb-6">
+            Guest checkout is disabled. Please login or create an account to continue.
+          </p>
+          <button
+            onClick={() => onNavigate('login')}
+            className="w-full h-12 rounded-xl bg-primary text-white font-black hover:bg-red-700"
+          >
+            Go to Login
           </button>
         </div>
       </div>

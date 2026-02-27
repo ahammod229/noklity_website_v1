@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { DollarSign, Package, Users, TrendingUp, ArrowUpRight, Zap, Loader2, Heart } from 'lucide-react';
+import { Package, Users, TrendingUp, ArrowUpRight, Zap, Loader2, Heart } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Product } from '../../types';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface DashboardStats {
   totalProducts: number;
   totalOrders: number;
   flashSaleCount: number;
   activeCustomers: number;
+  revenue: number;
 }
 
 // Mock Data for Wishlist Insights
@@ -44,11 +46,17 @@ const TOP_WISHLISTED = [
   },
 ];
 
-const StatCard = ({ title, value, change, icon: Icon, color, loading }: any) => (
+const StatCard = ({ title, value, change, icon: Icon, color, loading, badgeText }: any) => (
   <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
     <div className="flex justify-between items-start mb-4">
         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
-            <Icon className="w-6 h-6 text-white" />
+            {badgeText ? (
+              <span className={`font-black text-white leading-none ${String(badgeText).length > 2 ? 'text-[10px]' : 'text-lg'}`}>
+                {badgeText}
+              </span>
+            ) : (
+              <Icon className="w-6 h-6 text-white" />
+            )}
         </div>
         <span className="flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
             {change}
@@ -63,11 +71,13 @@ const StatCard = ({ title, value, change, icon: Icon, color, loading }: any) => 
 );
 
 const DashboardOverview: React.FC = () => {
+  const { formatCurrency, currencySymbol } = useCurrency();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalOrders: 0,
     flashSaleCount: 0,
-    activeCustomers: 0
+    activeCustomers: 0,
+    revenue: 0
   });
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,19 +101,30 @@ const DashboardOverview: React.FC = () => {
         .select('*', { count: 'exact', head: true })
         .eq('is_flash_sale', true);
 
-      // 3. Get Recent Products
+      // 3. Get Revenue
+      const { data: orderRows } = await supabase
+        .from('orders')
+        .select('total_amount');
+
+      // 4. Get Recent Products
       const { data: recentData } = await supabase
         .from('products')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
 
+      const totalRevenue = (orderRows || []).reduce(
+        (sum: number, row: any) => sum + Number(row?.total_amount || 0),
+        0
+      );
+
       // Mock other stats for now as we don't have orders/users tables fully populated
       setStats({
         totalProducts: productCount || 0,
         totalOrders: 356, // Mock
         flashSaleCount: flashCount || 0,
-        activeCustomers: 2892 // Mock
+        activeCustomers: 2892, // Mock
+        revenue: totalRevenue
       });
 
       if (recentData) {
@@ -153,9 +174,9 @@ const DashboardOverview: React.FC = () => {
         />
         <StatCard 
             title="Total Revenue" 
-            value="$48,250" 
+            value={formatCurrency(stats.revenue)} 
             change="+12.5%" 
-            icon={DollarSign} 
+            badgeText={currencySymbol}
             color="bg-green-500"
             loading={false} 
         />
@@ -196,7 +217,7 @@ const DashboardOverview: React.FC = () => {
                                         <p className="text-xs text-gray-500">{product.category}</p>
                                     </div>
                                 </div>
-                                <span className="font-bold text-gray-900 text-sm">${product.price.toLocaleString()}</span>
+                                <span className="font-bold text-gray-900 text-sm">{formatCurrency(Number(product.price || 0))}</span>
                             </div>
                         ))
                     ) : (

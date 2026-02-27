@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, ShoppingCart } from 'lucide-react';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface WishlistCardProps {
   image: string;
@@ -22,6 +23,7 @@ const WishlistCard: React.FC<WishlistCardProps> = ({
   onAddToCart,
   onRemove
 }) => {
+  const { formatCurrency } = useCurrency();
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl hover:border-gray-200 transition-all duration-300 group flex flex-col h-full">
       {/* Image Section */}
@@ -58,7 +60,7 @@ const WishlistCard: React.FC<WishlistCardProps> = ({
         <div className="mt-auto">
           <div className="flex items-center justify-between mb-4">
             <span className="text-lg font-extrabold text-gray-900">
-              ${price.toLocaleString()}
+              {formatCurrency(price)}
             </span>
             {stock !== undefined && stock < 5 && (
                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">

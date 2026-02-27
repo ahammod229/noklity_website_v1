@@ -1,6 +1,7 @@
 import React from 'react';
-import { Eye, ShieldX, CheckCircle, Mail, Phone, ExternalLink } from 'lucide-react';
+import { Eye, ShieldX, CheckCircle } from 'lucide-react';
 import { Customer } from '../../services/customerService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface CustomerTableProps {
   customers: Customer[];
@@ -10,6 +11,7 @@ interface CustomerTableProps {
 }
 
 const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onView, onToggleStatus, isLoading }) => {
+  const { formatCurrency } = useCurrency();
   if (isLoading) {
     return (
       <div className="bg-white rounded-[2rem] border border-gray-100 p-24 flex flex-col items-center justify-center">
@@ -34,6 +36,13 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onView, onTogg
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
+            {customers.length === 0 && (
+              <tr>
+                <td className="px-8 py-12 text-center text-sm font-semibold text-gray-500" colSpan={6}>
+                  No customers found for current filters.
+                </td>
+              </tr>
+            )}
             {customers.map((customer) => (
               <tr key={customer.id} className="hover:bg-gray-50 transition-colors group">
                 <td className="px-8 py-5">
@@ -52,7 +61,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onView, onTogg
                 </td>
                 <td className="px-8 py-5">
                   <span className="text-sm font-black text-gray-900">
-                    ${customer.totalSpent.toLocaleString()}
+                    {formatCurrency(customer.totalSpent)}
                   </span>
                 </td>
                 <td className="px-8 py-5">

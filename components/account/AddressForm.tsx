@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, MapPin, Phone, User, Globe, Building2, Loader2 } from 'lucide-react';
 import { Address } from '../../services/addressService';
+import { COUNTRY_OPTIONS } from '../../constants/countries';
 
 interface AddressFormProps {
   initialData?: Address;
@@ -18,7 +19,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
     city: initialData?.city || '',
     state: initialData?.state || '',
     zip: initialData?.zip || '',
-    country: initialData?.country || 'United States',
+    country: initialData?.country || 'Bangladesh',
     isDefault: initialData?.isDefault || false
   });
 
@@ -173,10 +174,11 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none"
                 >
-                  <option value="United States">United States</option>
-                  <option value="Canada">Canada</option>
-                  <option value="United Kingdom">United Kingdom</option>
-                  <option value="Australia">Australia</option>
+                  {COUNTRY_OPTIONS.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

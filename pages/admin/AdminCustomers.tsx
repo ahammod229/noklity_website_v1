@@ -8,20 +8,24 @@ import {
   UserPlus, 
   ShieldCheck, 
   UserX, 
-  FileText,
   Download,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import CustomerTable from '../../components/admin/CustomerTable';
 import CustomerDetails from '../../components/admin/CustomerDetails';
 import { getCustomers, updateCustomerStatus, Customer } from '../../services/customerService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 const AdminCustomers: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -29,8 +33,15 @@ const AdminCustomers: React.FC = () => {
 
   const fetchCustomers = async () => {
     setLoading(true);
+    setMessage(null);
     const data = await getCustomers();
     setCustomers(data);
+    if (data.length === 0) {
+      setMessage({
+        type: 'error',
+        text: 'No customers found or admin permission is missing. Confirm your admin account is set correctly in profiles.'
+      });
+    }
     setLoading(false);
   };
 
@@ -44,6 +55,9 @@ const AdminCustomers: React.FC = () => {
       if (selectedCustomer?.id === id) {
         setSelectedCustomer(prev => prev ? { ...prev, status } : null);
       }
+      setMessage({ type: 'success', text: `Customer status updated to ${status}.` });
+    } else {
+      setMessage({ type: 'error', text: 'Failed to update customer status.' });
     }
   };
 
@@ -55,12 +69,78 @@ const AdminCustomers: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const totalMembers = customers.length;
+  const activeUsers = customers.filter((c) => c.status === 'Active').length;
+  const blockedUsers = customers.filter((c) => c.status === 'Blocked').length;
+  const totalSpent = customers.reduce((sum, c) => sum + c.totalSpent, 0);
+  const growthRate = totalMembers > 0 ? (activeUsers / totalMembers) * 100 : 0;
+
   const stats = [
-    { label: 'Total Members', value: '1,248', icon: Users, color: 'text-primary', bg: 'bg-red-50', change: '+12%' },
-    { label: 'Active Users', value: '1,192', icon: ShieldCheck, color: 'text-green-600', bg: 'bg-green-50', change: '+8%' },
-    { label: 'Blocked Accounts', value: '56', icon: UserX, color: 'text-gray-400', bg: 'bg-gray-100', change: '0%' },
-    { label: 'Growth rate', value: '14.2%', icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50', change: '+2.1%' },
+    { label: 'Total Members', value: totalMembers.toLocaleString(), icon: Users, color: 'text-primary', bg: 'bg-red-50', change: `${activeUsers} active` },
+    { label: 'Active Users', value: activeUsers.toLocaleString(), icon: ShieldCheck, color: 'text-green-600', bg: 'bg-green-50', change: `${growthRate.toFixed(1)}%` },
+    { label: 'Blocked Accounts', value: blockedUsers.toLocaleString(), icon: UserX, color: 'text-gray-400', bg: 'bg-gray-100', change: `${blockedUsers > 0 ? 'Needs review' : 'Healthy'}` },
+    { label: 'Total Revenue', value: formatCurrency(totalSpent), icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50', change: `${customers.reduce((sum, c) => sum + c.ordersCount, 0)} orders` },
   ];
+
+  const handleExportCsv = async () => {
+    if (filteredCustomers.length === 0) {
+      setMessage({ type: 'error', text: 'No customer rows to export.' });
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const headers = [
+        'id',
+        'name',
+        'email',
+        'phone',
+        'status',
+        'orders_count',
+        'total_spent',
+        'joined_date',
+        'last_order_date',
+        'address'
+      ];
+
+      const escapeCsv = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const rows = filteredCustomers.map((customer) => ([
+        customer.id,
+        customer.name,
+        customer.email,
+        customer.phone,
+        customer.status,
+        customer.ordersCount,
+        customer.totalSpent.toFixed(2),
+        customer.joinedDate,
+        customer.lastOrderDate,
+        customer.address
+      ].map(escapeCsv).join(',')));
+
+      const content = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: 'Customer CSV exported successfully.' });
+    } catch (error) {
+      console.error('CSV export failed', error);
+      setMessage({ type: 'error', text: 'Failed to export CSV.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleAddCustomer = () => {
+    const signupUrl = `${window.location.origin}/signup`;
+    window.open(signupUrl, '_blank', 'noopener,noreferrer');
+    setMessage({ type: 'success', text: 'Opened signup page in a new tab. New customers can register there.' });
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -72,16 +152,37 @@ const AdminCustomers: React.FC = () => {
           <p className="text-gray-500 font-medium">Oversee registered accounts and analyze purchasing behavior.</p>
         </div>
         <div className="flex items-center gap-3">
-           <button className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm">
+           <button
+             onClick={handleExportCsv}
+             disabled={exporting}
+             className="flex items-center gap-2 px-6 py-4 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm disabled:opacity-60"
+           >
              <Download className="w-4 h-4" />
-             Export CSV
+             {exporting ? 'Exporting...' : 'Export CSV'}
            </button>
-           <button className="flex items-center gap-2 px-8 py-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200">
+           <button
+             onClick={handleAddCustomer}
+             className="flex items-center gap-2 px-8 py-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200"
+           >
              <UserPlus className="w-4 h-4" />
              Add Customer
            </button>
+           <button
+             onClick={fetchCustomers}
+             disabled={loading}
+             className="flex items-center gap-2 px-5 py-4 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm disabled:opacity-60"
+           >
+             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+             Refresh
+           </button>
         </div>
       </div>
+
+      {message && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          {message.text}
+        </div>
+      )}
 
       {/* Stats Cluster */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">

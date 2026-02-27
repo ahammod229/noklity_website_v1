@@ -21,11 +21,11 @@ import Invoice from './pages/Invoice';
 import Profile from './pages/account/Profile';
 import Addresses from './pages/account/Addresses';
 import Notifications from './pages/account/Notifications';
+import Security from './pages/account/Security';
 import ProductDetailsPage from './pages/ProductDetails';
 import AuthModal from './components/AuthModal';
 import CartDrawer from './components/CartDrawer';
 import Toast, { ToastType } from './components/Toast';
-import AccountLayout from './components/account/AccountLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Product } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -33,6 +33,7 @@ import { CartProvider, useCart } from './contexts/CartContext';
 import { WishlistProvider, useWishlist } from './contexts/WishlistContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
+import { getPublicSiteConfig } from './services/siteConfigService';
 
 // Inner App component to use Auth, Cart, and Wishlist Context
 const AppContent: React.FC = () => {
@@ -70,6 +71,7 @@ const AppContent: React.FC = () => {
     if (path === '/profile') return 'profile';
     if (path === '/addresses') return 'addresses';
     if (path === '/notifications') return 'notifications';
+    if (path === '/security') return 'security';
     if (path.startsWith('/product/')) return 'product-details';
     if (path.startsWith('/orders/')) {
         if (path.endsWith('/invoice')) return 'invoice';
@@ -100,6 +102,41 @@ const AppContent: React.FC = () => {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const applyBranding = async () => {
+      try {
+        const config = await getPublicSiteConfig();
+        if (!mounted) return;
+        if (config.siteName) {
+          document.title = config.siteName;
+        }
+        if (config.faviconUrl) {
+          let favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
+          if (!favicon) {
+            favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            document.head.appendChild(favicon);
+          }
+          favicon.href = config.faviconUrl;
+        }
+      } catch {
+        // Keep default browser title/icon on config failure.
+      }
+    };
+
+    applyBranding();
+    const handleUpdated = () => {
+      applyBranding();
+    };
+    window.addEventListener('site-config-updated', handleUpdated as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('site-config-updated', handleUpdated as EventListener);
+    };
   }, []);
 
   const navigate = (view: AppView, param?: string) => {
@@ -302,16 +339,17 @@ const AppContent: React.FC = () => {
       );
     }
 
-    if (['security'].includes(currentView)) {
-        return (
-          <ProtectedRoute onNavigate={navigate}>
-            <AccountLayout activeTab={currentView} onNavigate={navigate} onCartClick={() => setIsCartOpen(true)} onLoginClick={handleLogout} cartItemCount={cartCount} title={currentView.charAt(0).toUpperCase() + currentView.slice(1)}>
-                <div className="bg-white p-12 rounded-[3rem] text-center border border-gray-100">
-                    <p className="text-gray-500 font-bold">This section is coming soon.</p>
-                </div>
-            </AccountLayout>
-          </ProtectedRoute>
-        )
+    if (currentView === 'security') {
+      return (
+        <ProtectedRoute onNavigate={navigate}>
+          <Security
+            onLoginClick={handleLogout}
+            cartItemCount={cartCount}
+            onCartClick={() => setIsCartOpen(true)}
+            onNavigate={navigate}
+          />
+        </ProtectedRoute>
+      );
     }
 
     return (

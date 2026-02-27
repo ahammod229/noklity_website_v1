@@ -14,7 +14,7 @@ interface FinanceLedgerRow {
 }
 
 const Finance: React.FC = () => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, convertToBase, currencyCode, baseCurrencyCode } = useCurrency();
   const [history, setHistory] = useState<FinanceLedgerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,7 +91,9 @@ const Finance: React.FC = () => {
       return;
     }
 
-    if (type === 'withdrawal' && amount > availableBalance) {
+    const amountInBase = convertToBase(amount);
+
+    if (type === 'withdrawal' && amountInBase > availableBalance) {
       setError('Withdrawal amount cannot exceed available balance.');
       return;
     }
@@ -99,7 +101,7 @@ const Finance: React.FC = () => {
     setSaving(true);
     const { error: insertError } = await supabase.from('finance_ledger').insert({
       type,
-      amount,
+      amount: amountInBase,
       note: note.trim() || null
     });
     setSaving(false);
@@ -151,6 +153,9 @@ const Finance: React.FC = () => {
 
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
         <h3 className="text-lg font-black text-gray-900 mb-4">Actions</h3>
+        <p className="text-xs text-gray-500 font-semibold mb-3">
+          Enter amounts in {currencyCode}. Stored in base currency: {baseCurrencyCode}.
+        </p>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="flex gap-3">
             <input
@@ -287,4 +292,3 @@ const StatCard: React.FC<{
 };
 
 export default Finance;
-

@@ -17,6 +17,7 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({ fullName: '', phone: '' });
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -40,16 +41,26 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+    setMessage(null);
+
+    if (!formData.fullName.trim()) {
+      setMessage({ type: 'error', text: 'Full name is required.' });
+      return;
+    }
     
     try {
       setIsSaving(true);
       const success = await updateProfile(formData);
       if (success) {
-        setProfile({ ...profile, ...formData });
+        setProfile({ ...profile, ...formData, fullName: formData.fullName.trim() });
         setIsEditing(false);
+        setMessage({ type: 'success', text: 'Profile updated successfully.' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
       }
     } catch (error) {
       console.error("Failed to update profile", error);
+      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
     } finally {
       setIsSaving(false);
     }
@@ -84,6 +95,17 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
       title="My Profile"
     >
       <div className="space-y-8 animate-in fade-in duration-500">
+        {message && (
+          <div
+            className={`rounded-xl px-4 py-3 text-sm font-bold border ${
+              message.type === 'success'
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-red-50 text-red-700 border-red-200'
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
         
         {/* Profile Info Card */}
         <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden group">
@@ -161,7 +183,11 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
                 <div className="md:col-span-2 flex justify-end gap-3 mt-4 animate-in slide-in-from-top-2">
                   <button 
                     type="button"
-                    onClick={() => { setIsEditing(false); if(profile) setFormData({ fullName: profile.fullName, phone: profile.phone }); }}
+                    onClick={() => {
+                      setIsEditing(false);
+                      setMessage(null);
+                      if (profile) setFormData({ fullName: profile.fullName, phone: profile.phone });
+                    }}
                     className="px-6 py-3 border border-gray-200 text-gray-500 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-2"
                   >
                     <X className="w-4 h-4" /> Cancel
@@ -201,16 +227,21 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
               <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl">
                 <div>
                   <p className="text-sm font-bold text-gray-900">Password</p>
-                  <p className="text-xs text-gray-500">Last changed 3 months ago</p>
+                  <p className="text-xs text-gray-500">Change your password securely</p>
                 </div>
-                <button className="px-4 py-2 border border-gray-200 text-gray-700 bg-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm">Change</button>
+                <button
+                  onClick={() => onNavigate('security')}
+                  className="px-4 py-2 border border-gray-200 text-gray-700 bg-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm"
+                >
+                  Change
+                </button>
               </div>
               <div className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl">
                 <div>
                   <p className="text-sm font-bold text-gray-900">2-Factor Auth</p>
                   <p className="text-xs text-gray-500">Adds extra layer of security</p>
                 </div>
-                <div className="w-10 h-5 bg-gray-200 rounded-full relative cursor-pointer">
+                <div className="w-10 h-5 bg-gray-200 rounded-full relative cursor-not-allowed" title="2FA setup will be available in next release">
                   <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm"></div>
                 </div>
               </div>
@@ -226,7 +257,12 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
                       <p className="text-xs text-gray-500">{profile.lastLogin}</p>
                     </div>
                  </div>
-                 <button className="text-[11px] font-black text-red-500 hover:underline uppercase tracking-widest mt-2">Log out of all devices</button>
+                 <button
+                   onClick={() => onNavigate('security')}
+                   className="text-[11px] font-black text-red-500 hover:underline uppercase tracking-widest mt-2"
+                 >
+                   Log out of all devices
+                 </button>
                </div>
             </div>
           </div>

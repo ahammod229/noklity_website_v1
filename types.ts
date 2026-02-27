@@ -458,6 +458,70 @@ export interface Database {
         };
         Relationships: [];
       };
+      hero_banners: {
+        Row: {
+          id: string;
+          badge_text: string;
+          title: string;
+          highlight_text: string | null;
+          description: string | null;
+          image_url: string;
+          primary_button_text: string;
+          secondary_button_text: string;
+          target_type: 'none' | 'product' | 'category' | 'url';
+          target_product_id: string | null;
+          target_category: string | null;
+          target_url: string | null;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          badge_text?: string;
+          title: string;
+          highlight_text?: string | null;
+          description?: string | null;
+          image_url: string;
+          primary_button_text?: string;
+          secondary_button_text?: string;
+          target_type?: 'none' | 'product' | 'category' | 'url';
+          target_product_id?: string | null;
+          target_category?: string | null;
+          target_url?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          badge_text?: string;
+          title?: string;
+          highlight_text?: string | null;
+          description?: string | null;
+          image_url?: string;
+          primary_button_text?: string;
+          secondary_button_text?: string;
+          target_type?: 'none' | 'product' | 'category' | 'url';
+          target_product_id?: string | null;
+          target_category?: string | null;
+          target_url?: string | null;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hero_banners_target_product_id_fkey"
+            columns: ["target_product_id"]
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          }
+        ];
+      };
       finance_ledger: {
         Row: {
           id: string;

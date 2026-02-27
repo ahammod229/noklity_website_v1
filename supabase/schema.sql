@@ -213,7 +213,7 @@ create table if not exists public.user_addresses (
   city text not null,
   state text not null,
   postal_code text not null,
-  country text not null default 'United States',
+  country text not null default 'Bangladesh',
   label text default 'Home',
   is_default boolean default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -521,12 +521,55 @@ values
   ('meta_keywords', 'automotive, performance parts, brakes, exhaust, engine'),
   ('footer_text', '© 2024 NOKLITY Automotive. All rights reserved.'),
   ('support_email', 'support@noklity.com'),
+  ('support_phone', '+1 (555) 123-4567'),
+  ('support_address', '123 Performance Blvd, Speedway City, CA 90210'),
   ('whatsapp_number', '+15551234567'),
   ('facebook_url', ''),
+  ('twitter_url', ''),
   ('instagram_url', ''),
   ('youtube_url', ''),
+  ('link_bar_image_url', ''),
+  ('link_bar_image_link', ''),
   ('currency_code', 'BDT'),
-  ('currency_locale', 'en-BD')
+  ('currency_locale', 'en-BD'),
+  ('base_currency_code', 'BDT'),
+  ('exchange_rate_usd', '121.5'),
+  ('exchange_rate_inr', '1.45'),
+  ('allow_self_signup', 'true'),
+  ('require_email_verification', 'true'),
+  ('allow_guest_checkout', 'true'),
+  ('default_user_role', 'user'),
+  ('admin_2fa_required', 'false'),
+  ('enforce_strong_password', 'true'),
+  ('password_min_length', '8'),
+  ('session_timeout_minutes', '120'),
+  ('max_login_attempts', '5'),
+  ('notification_email', 'support@noklity.com'),
+  ('notify_new_order', 'true'),
+  ('notify_payment_update', 'true'),
+  ('notify_new_customer', 'false'),
+  ('notify_support_ticket', 'true'),
+  ('default_tax_rate', '8'),
+  ('default_shipping_fee', '15'),
+  ('invoice_prefix', 'INV'),
+  ('payment_auto_confirm', 'false'),
+  ('public_api_enabled', 'false'),
+  ('enable_cors', 'true'),
+  ('api_rate_limit_per_minute', '60'),
+  ('webhook_url', ''),
+  ('auto_backup_enabled', 'true'),
+  ('backup_frequency', 'daily'),
+  ('backup_retention_days', '30'),
+  ('timezone', 'Asia/Dhaka'),
+  ('date_format', 'DD/MM/YYYY'),
+  ('maintenance_mode', 'false'),
+  ('maintenance_message', 'We are currently performing maintenance. Please check back soon.'),
+  ('custom_head_script', ''),
+  ('custom_footer_script', ''),
+  ('primary_color', '#e11d48'),
+  ('accent_color', '#0f172a'),
+  ('border_radius_px', '12'),
+  ('compact_sidebar', 'false')
 on conflict (key) do nothing;
 
 -- Payment submissions ---------------------------------------------------------
@@ -714,6 +757,88 @@ values
   ('Exhaust', 'exhaust', 'Wind'),
   ('Electronics', 'electronics', 'Cpu')
 on conflict (slug) do nothing;
+
+-- Hero banners ---------------------------------------------------------------
+create table if not exists public.hero_banners (
+  id uuid default gen_random_uuid() primary key,
+  badge_text text not null default 'Premium Selection',
+  title text not null,
+  highlight_text text,
+  description text,
+  image_url text not null,
+  primary_button_text text not null default 'Shop Now',
+  secondary_button_text text not null default 'View Catalog',
+  target_type text not null default 'none' check (target_type in ('none', 'product', 'category', 'url')),
+  target_product_id uuid references public.products(id) on delete set null,
+  target_category text,
+  target_url text,
+  is_active boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+drop trigger if exists set_hero_banners_updated_at on public.hero_banners;
+create trigger set_hero_banners_updated_at
+before update on public.hero_banners
+for each row execute procedure public.set_updated_at();
+
+alter table public.hero_banners enable row level security;
+
+drop policy if exists "Public can view active hero banners" on public.hero_banners;
+drop policy if exists "Admins can view all hero banners" on public.hero_banners;
+drop policy if exists "Admins can insert hero banners" on public.hero_banners;
+drop policy if exists "Admins can update hero banners" on public.hero_banners;
+drop policy if exists "Admins can delete hero banners" on public.hero_banners;
+
+create policy "Public can view active hero banners"
+on public.hero_banners for select
+using (is_active = true);
+
+create policy "Admins can view all hero banners"
+on public.hero_banners for select
+using (public.is_admin());
+
+create policy "Admins can insert hero banners"
+on public.hero_banners for insert
+with check (public.is_admin());
+
+create policy "Admins can update hero banners"
+on public.hero_banners for update
+using (public.is_admin())
+with check (public.is_admin());
+
+create policy "Admins can delete hero banners"
+on public.hero_banners for delete
+using (public.is_admin());
+
+insert into public.hero_banners (
+  badge_text,
+  title,
+  highlight_text,
+  description,
+  image_url,
+  primary_button_text,
+  secondary_button_text,
+  target_type,
+  is_active,
+  sort_order
+)
+select
+  'Premium Selection',
+  'Genuine',
+  'Performance',
+  'Unlock your vehicle''s true potential with components engineered for speed, durability, and precision.',
+  'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=2940&auto=format&fit=crop',
+  'Shop Now',
+  'View Catalog',
+  'none',
+  true,
+  0
+where not exists (
+  select 1
+  from public.hero_banners
+);
 
 -- Payment methods -------------------------------------------------------------
 create table if not exists public.payment_methods (

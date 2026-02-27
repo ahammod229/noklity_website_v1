@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DollarSign, Package, ShoppingBag, Clock, TrendingUp, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { Package, ShoppingBag, Clock, TrendingUp, ArrowUpRight, Activity } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCurrency } from '../../hooks/useCurrency';
 
@@ -11,7 +11,7 @@ interface DashboardStats {
 }
 
 const AdminDashboardPage: React.FC = () => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyCode, currencySymbol } = useCurrency();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalOrders: 0,
@@ -73,7 +73,7 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
+  const StatCard = ({ title, value, icon: Icon, color, trend, badgeText }: any) => (
     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
       <div>
         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
@@ -90,7 +90,16 @@ const AdminDashboardPage: React.FC = () => {
         )}
       </div>
       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform`}>
-        <Icon className="w-7 h-7 text-white" strokeWidth={2} />
+        {badgeText ? (
+          <span
+            className={`font-black text-white uppercase tracking-wider leading-none ${String(badgeText).length > 2 ? 'text-[10px]' : 'text-xl'}`}
+            title={`Currency: ${currencyCode}`}
+          >
+            {badgeText}
+          </span>
+        ) : (
+          <Icon className="w-7 h-7 text-white" strokeWidth={2} />
+        )}
       </div>
     </div>
   );
@@ -115,7 +124,7 @@ const AdminDashboardPage: React.FC = () => {
         <StatCard 
           title="Total Revenue" 
           value={formatCurrency(stats.revenue)} 
-          icon={DollarSign} 
+          badgeText={currencySymbol || currencyCode}
           color="bg-green-500" 
           trend={12.5}
         />

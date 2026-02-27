@@ -49,7 +49,12 @@ const Home: React.FC<HomeProps> = ({
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <main className="flex-grow space-y-4">
-        {!activeCategory && <Hero />}
+        {!activeCategory && (
+          <Hero
+            onProductClick={onProductClick}
+            onSelectCategory={onSelectCategory}
+          />
+        )}
         
         <CategoryGrid 
           selectedCategory={activeCategory} 
@@ -65,7 +70,7 @@ const Home: React.FC<HomeProps> = ({
         )}
         
         {/* Featured / Catalog Section */}
-        <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-[600px]">
+        <section id="products-section" className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-[600px]">
           <div className="flex flex-col md:flex-row justify-between items-end mb-10">
             <div>
               <span className="text-primary font-bold uppercase tracking-widest text-xs mb-2 block">

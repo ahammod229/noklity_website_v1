@@ -40,6 +40,16 @@ const TABS: TabConfig[] = [
     fields: [
       { key: 'site_name', label: 'Site Name', type: 'text' },
       { key: 'support_email', label: 'Contact Email', type: 'email' },
+      { key: 'support_phone', label: 'Support Phone', type: 'text' },
+      { key: 'support_address', label: 'Support Address', type: 'textarea' },
+      { key: 'site_tagline', label: 'Site Tagline', type: 'textarea' },
+      { key: 'footer_text', label: 'Footer Text', type: 'text' },
+      { key: 'whatsapp_number', label: 'WhatsApp Number', type: 'text' },
+      { key: 'facebook_url', label: 'Facebook URL', type: 'text', placeholder: 'https://facebook.com/your-page' },
+      { key: 'instagram_url', label: 'Instagram URL', type: 'text', placeholder: 'https://instagram.com/your-page' },
+      { key: 'youtube_url', label: 'YouTube URL', type: 'text', placeholder: 'https://youtube.com/your-channel' },
+      { key: 'twitter_url', label: 'Twitter/X URL', type: 'text', placeholder: 'https://x.com/your-handle' },
+      { key: 'link_bar_image_link', label: 'Link Bar Image URL Target', type: 'text', placeholder: 'https://your-target-link.com' },
       {
         key: 'currency_code',
         label: 'Currency',
@@ -208,7 +218,21 @@ const TABS: TabConfig[] = [
 const DEFAULT_VALUES: Record<string, string> = {
   site_name: 'NOKLITY',
   support_email: 'support@noklity.com',
+  support_phone: '+1 (555) 123-4567',
+  support_address: '123 Performance Blvd, Speedway City, CA 90210',
+  site_tagline: 'Premium Automotive Performance Parts',
+  footer_text: '© 2024 NOKLITY Automotive. All rights reserved.',
+  whatsapp_number: '+15551234567',
+  facebook_url: '',
+  instagram_url: '',
+  youtube_url: '',
+  twitter_url: '',
+  link_bar_image_url: '',
+  link_bar_image_link: '',
   header_logo_light: '',
+  header_logo_dark: '',
+  footer_logo: '',
+  favicon_url: '',
   currency_code: 'BDT',
   currency_locale: 'en-BD',
   base_currency_code: 'BDT',
@@ -266,6 +290,13 @@ const localeByCurrency: Record<string, string> = {
   INR: 'en-IN'
 };
 
+const BRAND_ASSET_FIELDS: Array<{ key: string; label: string; helper: string }> = [
+  { key: 'header_logo_light', label: 'Header Logo', helper: 'Main logo used in storefront header' },
+  { key: 'footer_logo', label: 'Footer Logo', helper: 'Logo shown in footer branding area' },
+  { key: 'favicon_url', label: 'Favicon', helper: 'Browser tab icon' },
+  { key: 'link_bar_image_url', label: 'Link Bar Image', helper: 'Optional clickable image bar shown in footer links area' }
+];
+
 const AdminSettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [values, setValues] = useState<Record<string, string>>(DEFAULT_VALUES);
@@ -305,22 +336,23 @@ const AdminSettings: React.FC = () => {
     setValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleUploadLogo = async (file?: File) => {
+  const handleUploadAsset = async (settingKey: string, file?: File) => {
     if (!file) return;
     setUploading(true);
     setMessage(null);
 
     try {
       const ext = file.name.split('.').pop() || 'png';
-      const filePath = `branding/site-logo-${Date.now()}.${ext}`;
+      const filePath = `branding/${settingKey}-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-      setFieldValue('header_logo_light', data.publicUrl);
-      if (!values.header_logo_dark) setFieldValue('header_logo_dark', data.publicUrl);
-      if (!values.footer_logo) setFieldValue('footer_logo', data.publicUrl);
+      setFieldValue(settingKey, data.publicUrl);
+      if (settingKey === 'header_logo_light' && !values.header_logo_dark) {
+        setFieldValue('header_logo_dark', data.publicUrl);
+      }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error?.message || 'Logo upload failed.' });
+      setMessage({ type: 'error', text: error?.message || 'Asset upload failed.' });
     } finally {
       setUploading(false);
     }
@@ -335,6 +367,18 @@ const AdminSettings: React.FC = () => {
       keysToSave.add('header_logo_light');
       keysToSave.add('header_logo_dark');
       keysToSave.add('footer_logo');
+      keysToSave.add('favicon_url');
+      keysToSave.add('site_tagline');
+      keysToSave.add('footer_text');
+      keysToSave.add('whatsapp_number');
+      keysToSave.add('support_phone');
+      keysToSave.add('support_address');
+      keysToSave.add('facebook_url');
+      keysToSave.add('instagram_url');
+      keysToSave.add('youtube_url');
+      keysToSave.add('twitter_url');
+      keysToSave.add('link_bar_image_url');
+      keysToSave.add('link_bar_image_link');
       keysToSave.add('currency_locale');
       if (!values.currency_locale) {
         setFieldValue('currency_locale', localeByCurrency[values.currency_code] || 'en-BD');
@@ -517,34 +561,50 @@ const AdminSettings: React.FC = () => {
           )}
 
           {activeTab === 'general' && (
-            <div className="mb-5">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Site Logo</label>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
-                  <Upload className="w-4 h-4" />
-                  {uploading ? 'Uploading...' : 'Choose Logo'}
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={(e) => handleUploadLogo(e.target.files?.[0])}
-                  />
-                </label>
+            <div className="mb-6 rounded-2xl border border-gray-200 p-4 bg-gray-50/50 space-y-4">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Brand Assets</h4>
+              {BRAND_ASSET_FIELDS.map((asset) => (
+                <div key={asset.key} className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">{asset.label}</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                      <Upload className="w-4 h-4" />
+                      {uploading ? 'Uploading...' : 'Choose Image'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => handleUploadAsset(asset.key, e.target.files?.[0])}
+                      />
+                    </label>
+                    <input
+                      type="text"
+                      value={values[asset.key] || ''}
+                      onChange={(e) => setFieldValue(asset.key, e.target.value)}
+                      placeholder={`${asset.label} URL`}
+                      className="min-w-[260px] flex-1 h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">{asset.helper}</p>
+                  {values[asset.key] && (
+                    <img
+                      src={values[asset.key]}
+                      alt={`${asset.label} preview`}
+                      className="w-20 h-20 rounded-xl border border-gray-200 object-cover bg-white"
+                    />
+                  )}
+                </div>
+              ))}
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-gray-700">Header Logo (Dark Mode)</label>
                 <input
                   type="text"
-                  value={values.header_logo_light}
-                  onChange={(e) => setFieldValue('header_logo_light', e.target.value)}
-                  placeholder="Logo URL"
-                  className="min-w-[260px] flex-1 h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-semibold"
+                  value={values.header_logo_dark || ''}
+                  onChange={(e) => setFieldValue('header_logo_dark', e.target.value)}
+                  placeholder="Dark mode logo URL (optional)"
+                  className="w-full h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
                 />
               </div>
-              {values.header_logo_light && (
-                <img
-                  src={values.header_logo_light}
-                  alt="Site logo preview"
-                  className="mt-3 w-20 h-20 rounded-xl border border-gray-200 object-cover bg-white"
-                />
-              )}
             </div>
           )}
 

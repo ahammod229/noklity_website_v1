@@ -11,6 +11,11 @@ export interface UserProfile {
   memberSince: string;
 }
 
+interface ServiceResult {
+  success: boolean;
+  error?: string;
+}
+
 /**
  * Retrieves the current user's profile details.
  */
@@ -66,16 +71,72 @@ export const updateProfile = async (updates: Partial<UserProfile>): Promise<bool
 
     const { error } = await supabase
       .from('profiles')
-      .update(dbUpdates)
-      .eq('id', user.id);
+      .upsert(
+        {
+          id: user.id,
+          email: user.email || '',
+          ...dbUpdates
+        },
+        { onConflict: 'id' }
+      );
 
     if (error) {
       console.error('Error updating profile:', JSON.stringify(error, null, 2));
       return false;
     }
+
+    if (updates.fullName !== undefined) {
+      const { error: authUpdateError } = await supabase.auth.updateUser({
+        data: { full_name: updates.fullName }
+      });
+      if (authUpdateError) {
+        console.warn('Auth metadata update warning:', authUpdateError.message);
+      }
+    }
+
     return true;
   } catch (err) {
     console.error('Unexpected error in updateProfile:', err);
     return false;
+  }
+};
+
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<ServiceResult> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !user.email) {
+      return { success: false, error: 'You must be logged in to change password.' };
+    }
+
+    if (currentPassword.trim()) {
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword
+      });
+      if (reauthError) {
+        return { success: false, error: 'Current password is incorrect.' };
+      }
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      return { success: false, error: error.message || 'Failed to update password.' };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to change password.' };
+  }
+};
+
+export const logoutAllSessions = async (): Promise<ServiceResult> => {
+  try {
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
+    if (error) {
+      return { success: false, error: error.message || 'Failed to log out all sessions.' };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to log out all sessions.' };
   }
 };

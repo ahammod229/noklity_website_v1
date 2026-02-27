@@ -18,7 +18,8 @@ import {
   Search,
   Bell,
   Sun,
-  Wallet
+  Wallet,
+  Image
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { ToastType } from '../components/Toast';
@@ -35,6 +36,7 @@ import ProductReviews from './admin/ProductReviews';
 import PaymentMethods from './admin/PaymentMethods';
 import ApiManagement from './admin/ApiManagement';
 import Finance from './admin/Finance';
+import HeroBanners from './admin/HeroBanners';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -48,6 +50,7 @@ type View =
   | 'products'
   | 'orders'
   | 'categories'
+  | 'hero'
   | 'flash'
   | 'reviews'
   | 'support'
@@ -72,6 +75,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
       case 'finance': return <Finance />;
       case 'orders': return <AdminOrders onNavigate={onNavigate} />;
       case 'categories': return <CategoryManager />;
+      case 'hero': return <HeroBanners />;
       case 'support': return <SupportManager />;
       case 'settings': return <AdminSettings />;
       case 'language': return <AdminLanguage />;
@@ -127,6 +131,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
             label="Categories" 
             active={activeView === 'categories'} 
             onClick={() => setActiveView('categories')} 
+          />
+          <NavItem
+            icon={Image}
+            label="Hero Banners"
+            active={activeView === 'hero'}
+            onClick={() => setActiveView('hero')}
           />
           <NavItem 
             icon={Zap} 

@@ -71,7 +71,6 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                 <td className="px-6 py-4 font-medium text-gray-900">
                 {product.originalPrice ? (
                   <div className="flex flex-col">
-                    <span className="text-red-600">${product.price.toLocaleString()}</span>
                     <span className="text-red-600">{formatCurrency(product.price)}</span>
                     <span className="text-gray-400 line-through text-xs">{formatCurrency(product.originalPrice)}</span>
                   </div>

@@ -29,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [logoSrc, setLogoSrc] = useState('');
+  const [siteName, setSiteName] = useState('NOKLITY');
   const fallbackLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 50'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 45 L30 45 L40 5 Z'/%3E%3Ctext x='50' y='38' font-family='sans-serif' font-weight='900' font-size='34' fill='%23111827' letter-spacing='-1'%3ENOKLITY%3C/text%3E%3C/svg%3E";
 
   const isLoggedIn = !!user;
@@ -44,15 +45,30 @@ const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    getPublicSiteConfig().then((cfg) => {
-      if (!mounted) return;
-      setLogoSrc(cfg.headerLogoLight || '');
-    }).catch(() => {
-      if (!mounted) return;
-      setLogoSrc('');
-    });
+
+    const loadBranding = async () => {
+      try {
+        const cfg = await getPublicSiteConfig();
+        if (!mounted) return;
+        setLogoSrc(cfg.headerLogoLight || cfg.headerLogoDark || '');
+        setSiteName(cfg.siteName || 'NOKLITY');
+      } catch {
+        if (!mounted) return;
+        setLogoSrc('');
+        setSiteName('NOKLITY');
+      }
+    };
+
+    loadBranding();
+
+    const handleConfigUpdated = () => {
+      loadBranding();
+    };
+    window.addEventListener('site-config-updated', handleConfigUpdated as EventListener);
+
     return () => {
       mounted = false;
+      window.removeEventListener('site-config-updated', handleConfigUpdated as EventListener);
     };
   }, []);
 
@@ -65,7 +81,7 @@ const Header: React.FC<HeaderProps> = ({
           <a href="/" className="flex-shrink-0 flex items-center group relative z-50">
             <img 
               src={logoSrc || fallbackLogo} 
-              alt="NOKLITY" 
+              alt={siteName} 
               className="h-[32px] md:h-[36px] w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
@@ -74,7 +90,7 @@ const Header: React.FC<HeaderProps> = ({
             />
             {/* Fallback Text */}
             <span className="hidden font-extrabold text-2xl tracking-tighter uppercase text-gray-900">
-              NOKLITY
+              {siteName}
             </span>
           </a>
 

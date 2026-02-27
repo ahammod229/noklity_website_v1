@@ -2,6 +2,7 @@
 import React from 'react';
 import { X, Mail, Phone, MapPin, ShoppingBag, Wallet, Calendar, ShieldCheck, UserMinus, MessageSquare, Clock } from 'lucide-react';
 import { Customer } from '../../services/customerService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface CustomerDetailsProps {
   customer: Customer;
@@ -10,6 +11,7 @@ interface CustomerDetailsProps {
 }
 
 const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, onToggleStatus }) => {
+  const { formatCurrency } = useCurrency();
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Delivered': return 'text-green-600 bg-green-50 border-green-100';
@@ -68,7 +70,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
                 <Wallet className="w-5 h-5" />
               </div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Life Value</p>
-              <p className="text-xl font-black text-gray-900">${customer.totalSpent.toLocaleString()}</p>
+              <p className="text-xl font-black text-gray-900">{formatCurrency(customer.totalSpent)}</p>
             </div>
           </div>
 
@@ -109,7 +111,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="block text-sm font-black text-gray-900">${order.total.toLocaleString()}</span>
+                        <span className="block text-sm font-black text-gray-900">{formatCurrency(order.total)}</span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getStatusColor(order.status)}`}>
                           {order.status}
                         </span>
