@@ -4,6 +4,8 @@
  * Handles global configuration, branding, and CMS-style settings.
  * Designed to be swapped with real Supabase DB and Storage calls later.
  */
+import tenantFileConfig from '../config/tenant.json';
+import { TenantConfig } from '../types/tenant';
 
 export interface WebsiteSettings {
   branding: {
@@ -43,9 +45,15 @@ export interface WebsiteSettings {
   };
 }
 
+const tenantDefaults = tenantFileConfig as TenantConfig;
+const defaultSiteName = tenantDefaults.brandName || 'Storefront';
+const defaultCompanyName = tenantDefaults.companyName || defaultSiteName;
+const defaultSupportEmail = tenantDefaults.supportEmail || 'support@example.com';
+const currentYear = new Date().getFullYear();
+
 const DEFAULT_SETTINGS: WebsiteSettings = {
   branding: {
-    siteName: 'NOKLITY',
+    siteName: defaultSiteName,
     tagline: 'Premium Automotive Performance Parts',
     headerLogo: 'https://images.unsplash.com/photo-1599507591144-667d404d4902?q=80&w=200&auto=format&fit=crop',
     footerLogo: '',
@@ -60,9 +68,9 @@ const DEFAULT_SETTINGS: WebsiteSettings = {
   },
   footer: {
     description: 'Your premium destination for high-performance automotive parts. Engineered for speed, built for durability.',
-    supportEmail: 'support@noklity.com',
-    whatsappNumber: '+880 1713-812668',
-    copyrightText: '© 2024 NOKLITY Automotive. All rights reserved.',
+    supportEmail: defaultSupportEmail,
+    whatsappNumber: tenantDefaults.companyPhone || '',
+    copyrightText: `© ${currentYear} ${defaultCompanyName}. All rights reserved.`,
     showSocialIcons: true,
     showPaymentIcons: true,
   },
@@ -77,9 +85,9 @@ const DEFAULT_SETTINGS: WebsiteSettings = {
     ],
   },
   socialLinks: {
-    facebook: 'https://facebook.com/noklity',
-    instagram: 'https://instagram.com/noklity',
-    youtube: 'https://youtube.com/noklity',
+    facebook: '',
+    instagram: '',
+    youtube: '',
     linkedin: '',
   },
   maintenance: {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, ArrowRight, ShoppingBag, Calendar, CreditCard, DollarSign } from 'lucide-react';
 import { useCurrency } from '../hooks/useCurrency';
+import { useTenantConfig } from '../contexts/TenantConfigContext';
 
 interface OrderSuccessProps {
   onNavigate: (view: any) => void;
@@ -8,6 +9,7 @@ interface OrderSuccessProps {
 
 const OrderSuccess: React.FC<OrderSuccessProps> = ({ onNavigate }) => {
   const { formatCurrency } = useCurrency();
+  const { config } = useTenantConfig();
   // Mock Data
   const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -31,7 +33,7 @@ const OrderSuccess: React.FC<OrderSuccessProps> = ({ onNavigate }) => {
             
             {/* Headings */}
             <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Order Placed Successfully</h1>
-            <p className="text-gray-500 mb-10 font-medium">Thank you for shopping with NOKLITY</p>
+            <p className="text-gray-500 mb-10 font-medium">Thank you for shopping with {config.brandName}</p>
 
             {/* Order Summary Card */}
             <div className="bg-gray-50 rounded-2xl p-6 mb-10 border border-gray-100 text-left">

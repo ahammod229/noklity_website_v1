@@ -1,14 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAddresses, addAddress, Address } from '../services/addressService';
 import { createOrder } from '../services/orderService';
-import { markPaymentFailed, verifyPaymentStatus } from '../services/paymentService';
+import { markPaymentFailed, startBkashPaymentSession, verifyPaymentStatus } from '../services/paymentService';
 import { supabase } from '../lib/supabase';
 import AddressForm from '../components/account/AddressForm';
 import { useCurrency } from '../hooks/useCurrency';
-import { getPublicSiteConfig } from '../services/siteConfigService';
+import { useTenantConfig } from '../contexts/TenantConfigContext';
 import { 
   ChevronLeft, 
   MapPin, 
@@ -16,6 +16,7 @@ import {
   CreditCard, 
   Landmark, 
   Smartphone, 
+  Mail,
   CheckCircle, 
   Loader2, 
   ShieldCheck, 
@@ -35,8 +36,12 @@ interface CheckoutProps {
 const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const { cart, clearCart } = useCart();
   const { user } = useAuth();
+  const { canUseFeature } = useTenantConfig();
   const { formatCurrency } = useCurrency();
   const isGuestCheckout = !user;
+  const guestCheckoutEnabled = canUseFeature('checkout_guest');
+  const [guestEmail, setGuestEmail] = useState(() => localStorage.getItem('noklity_guest_email') || '');
+  const isGuestEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim());
   
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -45,7 +50,6 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
-  const [allowGuestCheckout, setAllowGuestCheckout] = useState(true);
   
   const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nogad' | 'bank_transfer'>('bkash');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -55,8 +59,13 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [checkoutMessage, setCheckoutMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const configuredCodeSet = new Set(paymentMethods.map((m) => m.code));
+  const featurePaymentEnabled: Record<'bkash' | 'nogad' | 'bank_transfer', boolean> = {
+    bkash: canUseFeature('payment_bkash'),
+    nogad: canUseFeature('payment_nogad'),
+    bank_transfer: canUseFeature('payment_bank_transfer')
+  };
   const checkoutMethods = (['bkash', 'nogad', 'bank_transfer'] as const).filter((code) =>
-    configuredCodeSet.size === 0 ? true : configuredCodeSet.has(code)
+    featurePaymentEnabled[code] && (configuredCodeSet.size === 0 ? true : configuredCodeSet.has(code))
   );
 
   // Calculations
@@ -64,6 +73,15 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const shippingCost = cart.length > 0 ? 15.00 : 0;
   const tax = subtotal * 0.08; // 8% Tax Mock
   const total = subtotal + shippingCost + tax;
+  const stockIssues = useMemo(
+    () =>
+      cart.filter((item) => {
+        if (typeof item.stock !== 'number') return false;
+        return item.stock <= 0 || item.quantity > item.stock;
+      }),
+    [cart]
+  );
+  const hasStockIssues = stockIssues.length > 0;
 
   useEffect(() => {
     fetchAddresses();
@@ -71,14 +89,25 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   }, [user?.id]);
 
   useEffect(() => {
-    getPublicSiteConfig()
-      .then((config) => {
-        setAllowGuestCheckout(config.allowGuestCheckout);
-      })
-      .catch(() => {
-        setAllowGuestCheckout(true);
-      });
-  }, []);
+    if (user?.email) {
+      setGuestEmail(user.email);
+      return;
+    }
+    const stored = localStorage.getItem('noklity_guest_email');
+    if (stored) setGuestEmail(stored);
+  }, [user?.email]);
+
+  useEffect(() => {
+    if (!checkoutMethods.includes(paymentMethod)) {
+      setPaymentMethod(checkoutMethods[0] || 'bkash');
+    }
+  }, [checkoutMethods, paymentMethod]);
+
+  useEffect(() => {
+    if (isGuestCheckout && !guestCheckoutEnabled) {
+      setCheckoutMessage({ type: 'error', text: 'Guest checkout is disabled. Please sign in to continue.' });
+    }
+  }, [isGuestCheckout, guestCheckoutEnabled]);
 
   const fetchAddresses = async () => {
     setLoadingAddresses(true);
@@ -136,7 +165,32 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
   const handlePlaceOrder = async () => {
     setCheckoutMessage(null);
+    if (isGuestCheckout && !guestCheckoutEnabled) {
+      setCheckoutMessage({ type: 'error', text: 'Guest checkout is disabled. Please sign in to place an order.' });
+      return;
+    }
+    if (hasStockIssues) {
+      const preview = stockIssues
+        .slice(0, 2)
+        .map((item) => item.name)
+        .join(', ');
+      setCheckoutMessage({
+        type: 'error',
+        text: preview
+          ? `Stock issue detected for: ${preview}. Please update cart before placing order.`
+          : 'Some items are out of stock. Please update cart before placing order.'
+      });
+      return;
+    }
+    if (!checkoutMethods.includes(paymentMethod)) {
+      setCheckoutMessage({ type: 'error', text: 'Selected payment method is not available for this plan.' });
+      return;
+    }
     if (!selectedAddressId) return;
+    if (isGuestCheckout && !isGuestEmailValid) {
+      setCheckoutMessage({ type: 'error', text: 'Please enter a valid email address to continue as guest.' });
+      return;
+    }
     if (paymentMethod === 'bank_transfer' && !selectedBankCode) {
       setCheckoutMessage({ type: 'error', text: 'Please select a bank for bank transfer.' });
       return;
@@ -151,12 +205,17 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
       const selectedAddr = addresses.find(a => a.id === selectedAddressId);
       
       if (!selectedAddr) throw new Error("Invalid address selected");
+      const checkoutEmail = (user?.email || guestEmail).trim();
+      if (!checkoutEmail) {
+        throw new Error('A valid email is required to place the order.');
+      }
+      localStorage.setItem('noklity_guest_email', checkoutEmail);
 
       const result = await createOrder({
         items: cart,
         shipping: {
           fullName: selectedAddr.fullName,
-          email: user?.email || '',
+          email: checkoutEmail,
           phone: selectedAddr.phone,
           address: selectedAddr.street,
           city: selectedAddr.city,
@@ -168,8 +227,22 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
       });
       
       if (result.success && result.orderId) {
-        if (paymentMethod === 'bkash' || paymentMethod === 'nogad') {
-          const paymentResult = await verifyPaymentStatus(result.orderId, paymentMethod);
+        if (paymentMethod === 'bkash') {
+          const bkashResult = await startBkashPaymentSession(result.orderId, total);
+          if (!bkashResult.success || !bkashResult.bkashURL) {
+            setCheckoutMessage({
+              type: 'error',
+              text: bkashResult.error || 'Unable to initiate bKash payment. Please try again.'
+            });
+            return;
+          }
+
+          window.location.assign(bkashResult.bkashURL);
+          return;
+        }
+
+        if (paymentMethod === 'nogad') {
+          const paymentResult = await verifyPaymentStatus(result.orderId, 'nogad');
           if (!paymentResult.success) {
             await markPaymentFailed(result.orderId, paymentResult.error);
             onNavigate('payment-failed', result.orderId);
@@ -224,9 +297,9 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
       } else {
         onNavigate('payment-failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Order failed", error);
-      setCheckoutMessage({ type: 'error', text: 'Failed to place order. Please try again.' });
+      setCheckoutMessage({ type: 'error', text: error?.message || 'Failed to place order. Please try again.' });
     } finally {
       setIsProcessingOrder(false);
     }
@@ -258,25 +331,6 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
             className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95"
           >
             Start Shopping
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user && !allowGuestCheckout) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="bg-white p-10 rounded-[2rem] shadow-lg border border-gray-100 text-center max-w-md">
-          <h2 className="text-2xl font-black text-gray-900 mb-2">Login Required</h2>
-          <p className="text-gray-500 font-medium mb-6">
-            Guest checkout is disabled. Please login or create an account to continue.
-          </p>
-          <button
-            onClick={() => onNavigate('login')}
-            className="w-full h-12 rounded-xl bg-primary text-white font-black hover:bg-red-700"
-          >
-            Go to Login
           </button>
         </div>
       </div>
@@ -370,6 +424,34 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                 )}
             </section>
 
+            {isGuestCheckout && (
+              <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Contact Email</h2>
+                    <p className="text-xs text-gray-500 font-semibold">Order updates and invoice will be sent here.</p>
+                  </div>
+                </div>
+                <input
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={`w-full h-12 px-4 rounded-xl border bg-white font-semibold ${
+                    guestEmail.trim().length > 0 && !isGuestEmailValid
+                      ? 'border-red-300 text-red-700'
+                      : 'border-gray-200'
+                  }`}
+                />
+                {guestEmail.trim().length > 0 && !isGuestEmailValid && (
+                  <p className="mt-2 text-xs font-bold text-red-600">Please enter a valid email address.</p>
+                )}
+              </section>
+            )}
+
             {/* 2. Payment Method */}
             <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
                 <div className="flex items-center gap-3 mb-6">
@@ -380,6 +462,11 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                 </div>
 
                 <div className="space-y-3">
+                    {checkoutMethods.length === 0 && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                        No payment methods are enabled for this plan. Please update plan/feature settings.
+                      </div>
+                    )}
                     {checkoutMethods.includes('bkash') && (
                     <label 
                         className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${
@@ -588,7 +675,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
                 <button 
                     onClick={handlePlaceOrder}
-                    disabled={isProcessingOrder || !selectedAddressId}
+                    disabled={isProcessingOrder || !selectedAddressId || (isGuestCheckout && !isGuestEmailValid) || hasStockIssues}
                     className="w-full mt-6 bg-primary text-white font-black py-4 rounded-xl hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                     {isProcessingOrder ? (
@@ -608,6 +695,20 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                     <div className="mt-3 flex items-center justify-center gap-1.5 text-amber-600 text-xs font-bold bg-amber-50 py-2 rounded-lg">
                         <AlertCircle className="w-3.5 h-3.5" />
                         Please select a shipping address
+                    </div>
+                )}
+                {isGuestCheckout && !isGuestEmailValid && (
+                    <div className="mt-3 flex items-center justify-center gap-1.5 text-amber-700 text-xs font-bold bg-amber-50 py-2 rounded-lg">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Please enter a valid email for guest checkout
+                    </div>
+                )}
+                {hasStockIssues && (
+                    <div className="mt-3 flex items-start gap-1.5 text-red-700 text-xs font-bold bg-red-50 border border-red-200 py-2 px-3 rounded-lg">
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>
+                            Some cart items are out of stock or quantity exceeds available stock. Please adjust cart items before ordering.
+                        </span>
                     </div>
                 )}
                 {checkoutMessage && (

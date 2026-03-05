@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Star, X, Check, Filter } from 'lucide-react';
 import { SearchFilters as FilterType } from '../services/searchService';
 
@@ -27,6 +27,11 @@ const DEFAULT_CATEGORIES = [
 
 const RATINGS = [5, 4, 3, 2];
 
+const arraysEqual = (a: string[], b: string[]) => {
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+};
+
 const SearchFilters: React.FC<SearchFiltersProps> = ({ 
   onFilterChange, 
   onClearFilters,
@@ -38,30 +43,46 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
   const [priceRange, setPriceRange] = useState({ min: 0, max: 5000 });
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [minRating, setMinRating] = useState<number | undefined>(undefined);
+  const lastEmittedRef = useRef<string>('');
 
   // Sync with facets or initial filters if provided
   useEffect(() => {
     if (initialFilters) {
-      if (initialFilters.category) setSelectedCats(initialFilters.category);
-      if (initialFilters.minPrice !== undefined) setPriceRange(prev => ({ ...prev, min: initialFilters.minPrice! }));
-      if (initialFilters.maxPrice !== undefined) setPriceRange(prev => ({ ...prev, max: initialFilters.maxPrice! }));
-      if (initialFilters.rating !== undefined) setMinRating(initialFilters.rating);
+      const nextCategories = initialFilters.category || [];
+      setSelectedCats((prev) => (arraysEqual(prev, nextCategories) ? prev : nextCategories));
+      setPriceRange((prev) => {
+        const nextMin = initialFilters.minPrice ?? prev.min;
+        const nextMax = initialFilters.maxPrice ?? prev.max;
+        if (prev.min === nextMin && prev.max === nextMax) return prev;
+        return { min: nextMin, max: nextMax };
+      });
+      setMinRating((prev) => (prev === initialFilters.rating ? prev : initialFilters.rating));
     }
-  }, [initialFilters]);
+  }, [
+    initialFilters?.minPrice,
+    initialFilters?.maxPrice,
+    initialFilters?.rating,
+    JSON.stringify(initialFilters?.category || [])
+  ]);
 
   // Effect to trigger update when local state changes
   useEffect(() => {
+    const payload: FilterType = {
+      category: selectedCats.length > 0 ? selectedCats : undefined,
+      minPrice: priceRange.min,
+      maxPrice: priceRange.max,
+      rating: minRating
+    };
+    const payloadKey = JSON.stringify(payload);
+    if (lastEmittedRef.current === payloadKey) return;
+
     const timer = setTimeout(() => {
-      onFilterChange({
-        category: selectedCats.length > 0 ? selectedCats : undefined,
-        minPrice: priceRange.min,
-        maxPrice: priceRange.max,
-        rating: minRating
-      });
+      lastEmittedRef.current = payloadKey;
+      onFilterChange(payload);
     }, 500); // Debounce updates
 
     return () => clearTimeout(timer);
-  }, [priceRange, selectedCats, minRating]);
+  }, [priceRange, selectedCats, minRating, onFilterChange]);
 
   const toggleCategory = (cat: string) => {
     if (selectedCats.includes(cat)) {

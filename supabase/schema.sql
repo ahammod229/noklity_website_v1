@@ -35,10 +35,15 @@ create table if not exists public.profiles (
   email text unique,
   full_name text,
   phone text,
+  avatar_url text,
+  notification_settings jsonb not null default '{}'::jsonb,
   role text not null default 'user' check (role in ('user', 'admin')),
   status text not null default 'active' check (status in ('active', 'blocked')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists notification_settings jsonb not null default '{}'::jsonb;
 
 alter table public.profiles enable row level security;
 
@@ -245,7 +250,7 @@ using (auth.uid() = user_id);
 -- Orders --------------------------------------------------------------------
 create table if not exists public.orders (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete set null,
   total_amount numeric(10,2) not null check (total_amount >= 0),
   status text not null default 'Pending' check (status in ('Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled')),
   payment_method text not null check (payment_method in ('bkash', 'nogad', 'bank_transfer', 'cod', 'card', 'wallet')),
@@ -359,8 +364,13 @@ set search_path = public
 as $$
 declare
   new_order_id uuid;
+  current_user_id uuid;
   item jsonb;
+  requested_qty integer;
+  product_row record;
 begin
+  current_user_id := auth.uid();
+
   if payment_method not in ('bkash', 'nogad', 'bank_transfer', 'cod', 'card', 'wallet') then
     raise exception 'Unsupported payment method: %', payment_method;
   end if;
@@ -374,7 +384,7 @@ begin
     payment_status
   )
   values (
-    auth.uid(),
+    current_user_id,
     total_amount,
     'Pending',
     shipping_address,
@@ -385,24 +395,55 @@ begin
 
   for item in select * from jsonb_array_elements(order_items)
   loop
+    requested_qty := greatest((item->>'quantity')::integer, 0);
+
+    if requested_qty < 1 then
+      raise exception 'Invalid quantity for product %', (item->>'product_id');
+    end if;
+
+    select id, title, stock, status, is_active
+      into product_row
+    from public.products
+    where id = (item->>'product_id')::uuid
+    for update;
+
+    if not found then
+      raise exception 'Product not found: %', (item->>'product_id');
+    end if;
+
+    if coalesce(product_row.is_active, true) = false or coalesce(product_row.status, 'active') <> 'active' then
+      raise exception 'Product is unavailable: %', coalesce(product_row.title, (item->>'product_id'));
+    end if;
+
+    if coalesce(product_row.stock, 0) < requested_qty then
+      raise exception 'Insufficient stock for % (available %, requested %)',
+        coalesce(product_row.title, (item->>'product_id')),
+        coalesce(product_row.stock, 0),
+        requested_qty;
+    end if;
+
     insert into public.order_items (order_id, product_id, quantity, price)
     values (
       new_order_id,
       (item->>'product_id')::uuid,
-      (item->>'quantity')::integer,
+      requested_qty,
       (item->>'price')::numeric
     );
 
     update public.products
-    set stock = greatest(stock - (item->>'quantity')::integer, 0)
+    set stock = stock - requested_qty
     where id = (item->>'product_id')::uuid;
   end loop;
 
-  delete from public.cart_items where user_id = auth.uid();
+  if current_user_id is not null then
+    delete from public.cart_items where user_id = current_user_id;
+  end if;
 
   return new_order_id;
 end;
 $$;
+
+grant execute on function public.create_order(jsonb, numeric, jsonb, text) to anon, authenticated;
 
 -- Cart ----------------------------------------------------------------------
 create table if not exists public.cart_items (
@@ -515,6 +556,7 @@ values
   ('footer_logo', ''),
   ('favicon_url', ''),
   ('site_url', 'https://noklity.com'),
+  ('site_url_name', 'noklity.com'),
   ('site_name', 'NOKLITY'),
   ('site_tagline', 'Premium Automotive Performance Parts'),
   ('meta_description', 'NOKLITY provides premium automotive performance products.'),
@@ -530,11 +572,36 @@ values
   ('youtube_url', ''),
   ('link_bar_image_url', ''),
   ('link_bar_image_link', ''),
+  ('newsletter_enabled', 'true'),
+  ('newsletter_badge_text', 'Exclusive Club'),
+  ('newsletter_title', 'Join the Noklity Club'),
+  ('newsletter_description', 'Get exclusive access to limited edition drops, installation guides, and 10% off your first order.'),
+  ('newsletter_input_placeholder', 'Enter your email'),
+  ('newsletter_button_text', 'Join'),
+  ('newsletter_background_image_url', ''),
   ('currency_code', 'BDT'),
   ('currency_locale', 'en-BD'),
   ('base_currency_code', 'BDT'),
   ('exchange_rate_usd', '121.5'),
   ('exchange_rate_inr', '1.45'),
+  ('company_about_title', 'About'),
+  ('company_about_content', 'NOKLITY is a premium automotive parts platform focused on performance, reliability, and customer-first service.'),
+  ('company_contact_title', 'Contact'),
+  ('company_contact_content', 'Need help? Contact us by email, phone, WhatsApp, or create a support ticket from the Help page.'),
+  ('company_support_title', 'Support'),
+  ('company_support_content', 'For technical issues, order updates, and account help, please use our support center. Our team responds as fast as possible.'),
+  ('company_shipping_policy_title', 'Shipping Policy'),
+  ('company_shipping_policy_content', 'Orders are processed after payment verification. Delivery time depends on location and shipping method.'),
+  ('company_return_policy_title', 'Return Policy'),
+  ('company_return_policy_content', 'Returns are accepted for eligible products in original condition within the allowed return window.'),
+  ('legal_privacy_policy_title', 'Privacy Policy'),
+  ('legal_privacy_policy_content', 'We collect only the data required to operate your account, process orders, and improve service quality.'),
+  ('legal_terms_of_service_title', 'Terms of Service'),
+  ('legal_terms_of_service_content', 'By using this website, you agree to follow our store policies, payment terms, and applicable local laws.'),
+  ('legal_payment_policy_title', 'Payment Policy'),
+  ('legal_payment_policy_content', 'Supported payment methods are managed from admin settings. Orders are confirmed after successful payment verification.'),
+  ('legal_refund_policy_title', 'Refund Policy'),
+  ('legal_refund_policy_content', 'Approved refunds are issued to the original payment channel within the applicable processing period.'),
   ('allow_self_signup', 'true'),
   ('require_email_verification', 'true'),
   ('allow_guest_checkout', 'true'),
@@ -569,7 +636,23 @@ values
   ('primary_color', '#e11d48'),
   ('accent_color', '#0f172a'),
   ('border_radius_px', '12'),
-  ('compact_sidebar', 'false')
+  ('compact_sidebar', 'false'),
+  ('tenant_brand_name', 'NOKLITY'),
+  ('tenant_brand_logo_url', ''),
+  ('tenant_primary_color', '#e11d48'),
+  ('tenant_secondary_color', '#0f172a'),
+  ('tenant_support_email', 'support@noklity.com'),
+  ('tenant_company_name', 'NOKLITY Automotive'),
+  ('tenant_company_address', '123 Performance Blvd, Speedway City, CA 90210'),
+  ('tenant_company_phone', '+1 (555) 123-4567'),
+  ('tenant_domain', 'noklity.com'),
+  ('tenant_allowed_hosts', 'localhost,127.0.0.1,noklity.com,www.noklity.com'),
+  ('tenant_timezone', 'Asia/Dhaka'),
+  ('tenant_currency', 'BDT'),
+  ('tenant_plan_name', 'Enterprise'),
+  ('tenant_feature_flags', '{"catalog_public":true,"checkout_guest":true,"payment_bkash":true,"payment_nogad":true,"payment_bank_transfer":true,"support_tickets":true,"hero_banners":true,"flash_sales":true,"product_reviews":true,"media_control":true,"customer_management":true,"multi_currency":true,"advanced_analytics":true,"api_management":true,"custom_pages":true}'),
+  ('tenant_license_key', 'NXL-ENTERPRISE-TRIAL0001-0001'),
+  ('tenant_license_status', 'active')
 on conflict (key) do nothing;
 
 -- Payment submissions ---------------------------------------------------------
@@ -698,6 +781,71 @@ create policy "Admins can delete assets"
 on storage.objects for delete
 using (
   bucket_id = 'assets'
+  and public.is_admin()
+);
+
+-- Storage bucket for customer profile avatars -------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'avatars',
+  'avatars',
+  true,
+  2097152,
+  array['image/png', 'image/jpeg', 'image/webp']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Public can view avatars" on storage.objects;
+drop policy if exists "Users can upload own avatars" on storage.objects;
+drop policy if exists "Users can update own avatars" on storage.objects;
+drop policy if exists "Users can delete own avatars" on storage.objects;
+drop policy if exists "Admins can manage avatars" on storage.objects;
+
+create policy "Public can view avatars"
+on storage.objects for select
+using (bucket_id = 'avatars');
+
+create policy "Users can upload own avatars"
+on storage.objects for insert
+with check (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+create policy "Users can update own avatars"
+on storage.objects for update
+using (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+  and (storage.foldername(name))[1] = auth.uid()::text
+)
+with check (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+create policy "Users can delete own avatars"
+on storage.objects for delete
+using (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+  and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+create policy "Admins can manage avatars"
+on storage.objects for all
+using (
+  bucket_id = 'avatars'
+  and public.is_admin()
+)
+with check (
+  bucket_id = 'avatars'
   and public.is_admin()
 );
 

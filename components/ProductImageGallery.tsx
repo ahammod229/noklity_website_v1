@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ProductImageGalleryProps {
   mainImage: string;
@@ -8,6 +9,7 @@ interface ProductImageGalleryProps {
 }
 
 const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, images = [], productName }) => {
+  const { theme } = useTheme();
   const uniqueImages = Array.from(new Set([mainImage, ...images].filter(Boolean)));
   const galleryImages = uniqueImages.length > 0 ? uniqueImages : [mainImage];
 
@@ -25,16 +27,18 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
   return (
     <div className="flex flex-col gap-4">
       {/* Main Image Area */}
-      <div 
-        className="relative w-full aspect-square bg-gray-50 rounded-lg overflow-hidden border border-gray-100 group cursor-crosshair"
+      <div
+        className="product-image-surface relative w-full aspect-square rounded-lg overflow-hidden border border-gray-100 group cursor-crosshair"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onMouseMove={handleMouseMove}
       >
-        <img 
-          src={galleryImages[activeImage]} 
+        <img
+          src={galleryImages[activeImage]}
           alt={productName}
-          className={`w-full h-full object-contain mix-blend-multiply transition-transform duration-200 ${isHovered ? 'scale-150' : 'scale-100'}`}
+          className={`w-full h-full object-contain transition-transform duration-200 ${
+            theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
+          } ${isHovered ? 'scale-150' : 'scale-100'}`}
           style={{
             transformOrigin: isHovered ? `${cursorPos.x}% ${cursorPos.y}%` : 'center center'
           }}
@@ -52,13 +56,19 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
           <button
             key={idx}
             onClick={() => setActiveImage(idx)}
-            className={`w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-gray-50 rounded-lg border-2 overflow-hidden transition-all ${
+            className={`product-image-thumb-surface w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 rounded-lg border-2 overflow-hidden transition-all ${
               activeImage === idx 
               ? 'border-primary ring-1 ring-primary/20' 
               : 'border-transparent hover:border-gray-200'
             }`}
           >
-            <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-contain mix-blend-multiply p-1" />
+            <img
+              src={img}
+              alt={`View ${idx + 1}`}
+              className={`w-full h-full object-contain p-1 ${
+                theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
+              }`}
+            />
           </button>
         ))}
       </div>

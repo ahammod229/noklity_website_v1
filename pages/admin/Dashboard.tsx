@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Package, ShoppingBag, Clock, TrendingUp, ArrowUpRight, Activity } from 'lucide-react';
+import { Package, ShoppingBag, Clock, TrendingUp, LineChart, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCurrency } from '../../hooks/useCurrency';
+import { formatShortOrderId } from '../../utils/orderId';
 
 interface DashboardStats {
   totalProducts: number;
@@ -9,6 +10,39 @@ interface DashboardStats {
   pendingOrders: number;
   revenue: number;
 }
+
+interface RevenueRow {
+  total_amount: number | string | null;
+  created_at: string | null;
+  status: string | null;
+}
+
+interface StatusGraphItem {
+  label: string;
+  count: number;
+  colorClass: string;
+}
+
+const buildSparklinePath = (points: number[], width: number, height: number) => {
+  if (!points.length) return '';
+  if (points.length === 1) return `M 0 ${height / 2}`;
+
+  const maxValue = Math.max(...points, 1);
+  const minValue = Math.min(...points, 0);
+  const range = Math.max(1, maxValue - minValue);
+  const stepX = width / (points.length - 1);
+
+  return points
+    .map((value, index) => {
+      const x = index * stepX;
+      const normalized = (value - minValue) / range;
+      const y = height - normalized * height;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+};
+
+const SPARKLINE_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const AdminDashboardPage: React.FC = () => {
   const { formatCurrency, currencyCode, currencySymbol } = useCurrency();
@@ -20,6 +54,15 @@ const AdminDashboardPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [weeklyOrderTrend, setWeeklyOrderTrend] = useState<number[]>(new Array(7).fill(0));
+  const [weeklyRevenueTrend, setWeeklyRevenueTrend] = useState<number[]>(new Array(7).fill(0));
+  const [statusGraph, setStatusGraph] = useState<StatusGraphItem[]>([
+    { label: 'Pending', count: 0, colorClass: 'bg-amber-500' },
+    { label: 'Processing', count: 0, colorClass: 'bg-sky-500' },
+    { label: 'Shipped', count: 0, colorClass: 'bg-violet-500' },
+    { label: 'Delivered', count: 0, colorClass: 'bg-emerald-500' },
+    { label: 'Cancelled', count: 0, colorClass: 'bg-rose-500' }
+  ]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -36,7 +79,7 @@ const AdminDashboardPage: React.FC = () => {
       
       // 2. Fetch Revenue (Sum total_amount)
       // Note: For large datasets, use an RPC or Edge Function. Client-side sum is okay for MVP.
-      const revenuePromise = supabase.from('orders').select('total_amount');
+      const revenuePromise = supabase.from('orders').select('total_amount,created_at,status');
 
       // 3. Fetch Recent Orders
       const recentOrdersPromise = supabase
@@ -53,7 +96,51 @@ const AdminDashboardPage: React.FC = () => {
         recentOrdersPromise
       ]);
 
-      const totalRevenue = revenueRes.data?.reduce((sum, order) => sum + (Number(order.total_amount) || 0), 0) || 0;
+      const revenueRows = (revenueRes.data || []) as RevenueRow[];
+      const totalRevenue = revenueRows.reduce((sum, order) => sum + (Number(order.total_amount) || 0), 0);
+
+      const now = new Date();
+      const dayStart = new Date(now);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const sevenDayTrend = Array.from({ length: 7 }, () => 0);
+      const sevenDayRevenueTrend = Array.from({ length: 7 }, () => 0);
+      const statusCounts: Record<string, number> = {
+        Pending: 0,
+        Processing: 0,
+        Shipped: 0,
+        Delivered: 0,
+        Cancelled: 0
+      };
+      revenueRows.forEach((order) => {
+        const statusLabel = String(order.status || 'Pending');
+        if (statusLabel in statusCounts) {
+          statusCounts[statusLabel] += 1;
+        }
+
+        if (!order.created_at) return;
+        const created = new Date(order.created_at);
+        if (!Number.isFinite(created.getTime())) return;
+
+        const createdDayStart = new Date(created);
+        createdDayStart.setHours(0, 0, 0, 0);
+        const diffDays = Math.floor((dayStart.getTime() - createdDayStart.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays >= 0 && diffDays < 7) {
+          const bucketIndex = 6 - diffDays;
+          sevenDayTrend[bucketIndex] += 1;
+          sevenDayRevenueTrend[bucketIndex] += Number(order.total_amount) || 0;
+        }
+      });
+      setWeeklyOrderTrend(sevenDayTrend);
+      setWeeklyRevenueTrend(sevenDayRevenueTrend);
+      setStatusGraph([
+        { label: 'Pending', count: statusCounts.Pending, colorClass: 'bg-amber-500' },
+        { label: 'Processing', count: statusCounts.Processing, colorClass: 'bg-sky-500' },
+        { label: 'Shipped', count: statusCounts.Shipped, colorClass: 'bg-violet-500' },
+        { label: 'Delivered', count: statusCounts.Delivered, colorClass: 'bg-emerald-500' },
+        { label: 'Cancelled', count: statusCounts.Cancelled, colorClass: 'bg-rose-500' }
+      ]);
 
       setStats({
         totalProducts: productsRes.count || 0,
@@ -72,6 +159,19 @@ const AdminDashboardPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const chartWidth = 320;
+  const chartHeight = 72;
+  const sparklinePath = buildSparklinePath(weeklyOrderTrend, chartWidth, chartHeight);
+  const revenueSparklinePath = buildSparklinePath(weeklyRevenueTrend, chartWidth, chartHeight);
+  const maxTrend = Math.max(...weeklyOrderTrend, 0);
+  const totalWeeklyOrders = weeklyOrderTrend.reduce((sum, value) => sum + value, 0);
+  const totalWeeklyRevenue = weeklyRevenueTrend.reduce((sum, value) => sum + value, 0);
+  const maxStatusCount = Math.max(...statusGraph.map((item) => item.count), 1);
+  const lastDayOrders = weeklyOrderTrend[weeklyOrderTrend.length - 1] || 0;
+  const previousDayOrders = weeklyOrderTrend[weeklyOrderTrend.length - 2] || 0;
+  const trendDelta = lastDayOrders - previousDayOrders;
+  const trendDeltaLabel = trendDelta > 0 ? `+${trendDelta}` : `${trendDelta}`;
 
   const StatCard = ({ title, value, icon: Icon, color, trend, badgeText }: any) => (
     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
@@ -174,7 +274,7 @@ const AdminDashboardPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900">{order.user?.full_name || 'Guest User'}</p>
-                        <p className="text-xs text-gray-400 font-mono">#{order.id.slice(0,8)}</p>
+                        <p className="text-xs text-gray-400 font-mono">{formatShortOrderId(order.id)}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -196,48 +296,139 @@ const AdminDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Insights */}
+        {/* Graph Insights */}
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10"></div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-white/10 rounded-lg">
-                  <Activity className="w-5 h-5 text-green-400" />
-                </div>
-                <h4 className="font-bold text-lg">System Health</h4>
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <LineChart className="w-5 h-5 text-primary" />
+                <h4 className="font-black text-gray-900">7-Day Order Activity</h4>
               </div>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-400">Database Status</span>
-                  <span className="flex items-center gap-2 font-bold text-green-400">
-                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                    Operational
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-400">Storage Usage</span>
-                  <span className="font-bold">45%</span>
-                </div>
-                <div className="w-full bg-gray-700 h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div className="bg-primary h-full rounded-full w-[45%]"></div>
-                </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                {totalWeeklyOrders} orders
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-2">
+              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-20" role="img" aria-label="Weekly order trend graph">
+                <defs>
+                  <linearGradient id="ordersTrendStrokeLight" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#ef4444" />
+                    <stop offset="100%" stopColor="#22c55e" />
+                  </linearGradient>
+                  <linearGradient id="ordersTrendFillLight" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="rgba(239,68,68,0.2)" />
+                    <stop offset="100%" stopColor="rgba(239,68,68,0)" />
+                  </linearGradient>
+                </defs>
+                {[0.25, 0.5, 0.75].map((line) => (
+                  <line
+                    key={`order-line-${line}`}
+                    x1={0}
+                    y1={chartHeight * line}
+                    x2={chartWidth}
+                    y2={chartHeight * line}
+                    stroke="rgba(148,163,184,0.3)"
+                    strokeDasharray="4 6"
+                    strokeWidth="1"
+                  />
+                ))}
+                {sparklinePath && (
+                  <>
+                    <path d={`${sparklinePath} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`} fill="url(#ordersTrendFillLight)" />
+                    <path d={sparklinePath} fill="none" stroke="url(#ordersTrendStrokeLight)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </>
+                )}
+              </svg>
+              <div className="mt-2 grid grid-cols-7 gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                {SPARKLINE_LABELS.map((label, index) => (
+                  <span key={`${label}-${index}`} className="text-center">{label}</span>
+                ))}
               </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between text-[10px] font-bold">
+              <span className="text-gray-500">Peak: {maxTrend} orders/day</span>
+              <span className={trendDelta >= 0 ? 'text-green-600' : 'text-red-600'}>
+                Today vs yesterday: {trendDeltaLabel}
+              </span>
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
-             <div className="flex items-center gap-3 mb-4">
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" />
-                <h4 className="font-black text-gray-900">Trending Product</h4>
-             </div>
-             <div className="p-4 bg-gray-50 rounded-2xl flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-xl shadow-sm border border-gray-100 flex-shrink-0"></div>
-                <div>
-                   <p className="text-xs font-bold text-gray-900 line-clamp-1">Brembo GT Braking Kit</p>
-                   <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">12 Sales today</p>
-                </div>
-             </div>
+                <h4 className="font-black text-gray-900">7-Day Revenue Graph</h4>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                {formatCurrency(totalWeeklyRevenue)}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-2">
+              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-20" role="img" aria-label="Weekly revenue trend graph">
+                <defs>
+                  <linearGradient id="revenueTrendStrokeLight" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#0ea5e9" />
+                    <stop offset="100%" stopColor="#8b5cf6" />
+                  </linearGradient>
+                  <linearGradient id="revenueTrendFillLight" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="rgba(14,165,233,0.22)" />
+                    <stop offset="100%" stopColor="rgba(14,165,233,0)" />
+                  </linearGradient>
+                </defs>
+                {[0.25, 0.5, 0.75].map((line) => (
+                  <line
+                    key={`revenue-line-${line}`}
+                    x1={0}
+                    y1={chartHeight * line}
+                    x2={chartWidth}
+                    y2={chartHeight * line}
+                    stroke="rgba(148,163,184,0.3)"
+                    strokeDasharray="4 6"
+                    strokeWidth="1"
+                  />
+                ))}
+                {revenueSparklinePath && (
+                  <>
+                    <path d={`${revenueSparklinePath} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`} fill="url(#revenueTrendFillLight)" />
+                    <path d={revenueSparklinePath} fill="none" stroke="url(#revenueTrendStrokeLight)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </>
+                )}
+              </svg>
+              <div className="mt-2 grid grid-cols-7 gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                {SPARKLINE_LABELS.map((label, index) => (
+                  <span key={`revenue-${label}-${index}`} className="text-center">{label}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-gray-500" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">Order Status Graph</span>
+              </div>
+              <div className="space-y-3">
+                {statusGraph.map((statusItem) => {
+                  const widthPercent = statusItem.count === 0 ? 0 : Math.max(8, (statusItem.count / maxStatusCount) * 100);
+                  return (
+                    <div key={statusItem.label}>
+                      <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-gray-600">
+                        <span>{statusItem.label}</span>
+                        <span>{statusItem.count}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${statusItem.colorClass}`}
+                          style={{ width: `${widthPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 

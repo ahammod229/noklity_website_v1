@@ -1,0 +1,39 @@
+{
+  "brandName": "NOKLITY",
+  "brandLogoUrl": "",
+  "primaryColor": "#e11d48",
+  "secondaryColor": "#0f172a",
+  "supportEmail": "support@noklity.com",
+  "companyName": "NOKLITY Automotive",
+  "companyAddress": "123 Performance Blvd, Speedway City, CA 90210",
+  "companyPhone": "+1 (555) 123-4567",
+  "domain": "noklity.com",
+  "allowedHosts": [
+    "localhost",
+    "127.0.0.1",
+    "noklity.com",
+    "www.noklity.com"
+  ],
+  "timezone": "Asia/Dhaka",
+  "currency": "BDT",
+  "planName": "Enterprise",
+  "licenseKey": "NXL-ENTERPRISE-TRIAL0001-0001",
+  "licenseStatus": "active",
+  "featureFlags": {
+    "catalog_public": true,
+    "checkout_guest": true,
+    "payment_bkash": true,
+    "payment_nogad": true,
+    "payment_bank_transfer": true,
+    "support_tickets": true,
+    "hero_banners": true,
+    "flash_sales": true,
+    "product_reviews": true,
+    "media_control": true,
+    "customer_management": true,
+    "multi_currency": true,
+    "advanced_analytics": true,
+    "api_management": true,
+    "custom_pages": true
+  }
+}

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
 import { Product } from '../../types';
 import { supabase } from '../../lib/supabase';
+import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 
 export interface ProductFormData {
   name: string;
@@ -228,13 +229,18 @@ const ProductForm: React.FC<ProductFormProps> = ({
     setFormMessage(null);
 
     try {
+      const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.productPrimary);
+      if (validation.shouldBlock) {
+        setFormMessage({ type: 'error', text: validation.message });
+        return;
+      }
       const ext = file.name.split('.').pop() || 'jpg';
       const filePath = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
       if (error) throw error;
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
       setFormData((prev) => ({ ...prev, image: data.publicUrl }));
-      setFormMessage({ type: 'success', text: 'Primary image uploaded.' });
+      setFormMessage({ type: 'success', text: validation.message });
     } catch (error) {
       console.error('Primary image upload failed:', error);
       setFormMessage({ type: 'error', text: 'Primary image upload failed. Check admin storage permissions.' });
@@ -250,8 +256,19 @@ const ProductForm: React.FC<ProductFormProps> = ({
     setFormMessage(null);
 
     try {
+      const filesArray = Array.from(files);
+      let nonPerfectCount = 0;
+      for (const file of filesArray) {
+        const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.productGallery);
+        if (validation.shouldBlock) {
+          setFormMessage({ type: 'error', text: `${file.name}: ${validation.message}` });
+          return;
+        }
+        if (!validation.isPerfect) nonPerfectCount += 1;
+      }
+
       const uploadedUrls: string[] = [];
-      for (const file of Array.from(files)) {
+      for (const file of filesArray) {
         const ext = file.name.split('.').pop() || 'jpg';
         const filePath = `products/gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { error } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
@@ -267,7 +284,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
         return { ...prev, images: nextImages };
       });
 
-      setFormMessage({ type: 'success', text: `${uploadedUrls.length} gallery image(s) uploaded.` });
+      setFormMessage({
+        type: 'success',
+        text:
+          nonPerfectCount > 0
+            ? `${uploadedUrls.length} gallery image(s) uploaded. ${nonPerfectCount} image(s) are usable but not exact recommended size.`
+            : `${uploadedUrls.length} gallery image(s) uploaded with perfect size.`
+      });
     } catch (error) {
       console.error('Gallery image upload failed:', error);
       setFormMessage({ type: 'error', text: 'Gallery upload failed. Check admin storage permissions.' });
@@ -391,6 +414,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
               <div className="space-y-6">
                 <div>
                   <label className="block mb-2 text-sm font-extrabold">Primary Image</label>
+                  <p className="text-xs text-slate-300 mb-2">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.productPrimary)}</p>
                   <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
                     <div className="relative">
                       <ImageIcon className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
@@ -412,6 +436,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
                 <div>
                   <label className="block mb-2 text-sm font-extrabold">Product Gallery</label>
+                  <p className="text-xs text-slate-300 mb-2">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.productGallery)}</p>
                   <label className={`w-full min-h-[140px] rounded-2xl border-2 border-dashed border-slate-500/80 bg-slate-800/50 flex flex-col items-center justify-center text-slate-300 text-lg p-6 cursor-pointer ${uploadingGallery ? 'opacity-70 pointer-events-none' : ''}`}>
                     <Upload className="w-7 h-7 mb-3" />
                     {uploadingGallery ? 'Uploading images...' : 'Click to upload multiple images (JPG/PNG)'}

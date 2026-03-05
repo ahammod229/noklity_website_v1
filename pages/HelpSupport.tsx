@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Mail, MessageCircle, ChevronDown, ChevronUp, HelpCircle, ArrowRight } from 'lucide-react';
+import { getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 
 interface HelpSupportProps {
   onLoginClick: () => void;
@@ -10,25 +11,6 @@ interface HelpSupportProps {
   onWishlistClick: () => void;
 }
 
-const FAQS = [
-  {
-    question: "How do I place an order?",
-    answer: "Simply browse our catalog, add items to your cart, and proceed to checkout. You can create an account or checkout as a guest."
-  },
-  {
-    question: "How long does delivery take?",
-    answer: "Standard shipping takes 3-5 business days. Express shipping options are available at checkout for 1-2 day delivery."
-  },
-  {
-    question: "Can I return a product?",
-    answer: "Yes, we accept returns within 30 days of purchase for unused items in original packaging. Please contact support to initiate a return."
-  },
-  {
-    question: "How do I contact support?",
-    answer: "You can reach us via email at support@noklity.com or chat with us on WhatsApp using the options above."
-  }
-];
-
 const HelpSupport: React.FC<HelpSupportProps> = ({
   onLoginClick,
   cartItemCount,
@@ -37,6 +19,27 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
   onWishlistClick
 }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const config = getPublicSiteConfigSnapshot();
+  const supportEmail = config.supportEmail || 'support@example.com';
+  const supportPhone = config.whatsappNumber || '';
+  const faqs = [
+    {
+      question: 'How do I place an order?',
+      answer: 'Simply browse our catalog, add items to your cart, and proceed to checkout. You can create an account or checkout as a guest.'
+    },
+    {
+      question: 'How long does delivery take?',
+      answer: 'Standard shipping takes 3-5 business days. Express shipping options are available at checkout for 1-2 day delivery.'
+    },
+    {
+      question: 'Can I return a product?',
+      answer: 'Yes, we accept returns within 30 days of purchase for unused items in original packaging. Please contact support to initiate a return.'
+    },
+    {
+      question: 'How do I contact support?',
+      answer: `You can reach us via email at ${supportEmail} or chat with us on WhatsApp using the options above.`
+    }
+  ];
 
   const toggleFaq = (index: number) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -71,8 +74,8 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">Email Us</h3>
                     <p className="text-gray-500 mb-6">Get support via email</p>
-                    <a href="mailto:support@noklity.com" className="inline-flex items-center text-primary font-bold hover:underline">
-                        support@noklity.com <ArrowRight className="w-4 h-4 ml-2" />
+                    <a href={`mailto:${supportEmail}`} className="inline-flex items-center text-primary font-bold hover:underline">
+                        {supportEmail} <ArrowRight className="w-4 h-4 ml-2" />
                     </a>
                     <div className="mt-6 pt-6 border-t border-gray-50">
                         <button className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-colors">
@@ -89,7 +92,7 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">WhatsApp Chat</h3>
                     <p className="text-gray-500 mb-6">Chat with our support team</p>
                     <span className="inline-flex items-center text-green-600 font-bold">
-                        +880 1713-812668
+                        {supportPhone}
                     </span>
                     <div className="mt-6 pt-6 border-t border-gray-50">
                         <button className="w-full bg-green-500 text-white font-bold py-3 rounded-xl hover:bg-green-600 transition-colors">
@@ -103,7 +106,7 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
             <div className="max-w-3xl mx-auto mb-24">
                 <h2 className="text-3xl font-bold text-gray-900 mb-10 text-center">Frequently Asked Questions</h2>
                 <div className="space-y-4">
-                    {FAQS.map((faq, index) => (
+                    {faqs.map((faq, index) => (
                         <div key={index} className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-all duration-300 hover:border-gray-300">
                             <button
                                 onClick={() => toggleFaq(index)}

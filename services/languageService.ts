@@ -54,7 +54,7 @@ const DEFAULT_CONFIG: LanguageConfig = {
       common: {
         emptyCart: "Your cart is empty",
         noOrders: "No orders yet",
-        thankYou: "Thank you for choosing NOKLITY Performance!"
+        thankYou: "Thank you for choosing our store!"
       }
     },
     bn: {
@@ -73,7 +73,7 @@ const DEFAULT_CONFIG: LanguageConfig = {
       common: {
         emptyCart: "আপনার কার্ট খালি",
         noOrders: "এখনও কোন অর্ডার নেই",
-        thankYou: "NOKLITY পারফরম্যান্স বেছে নেওয়ার জন্য আপনাকে ধন্যবাদ!"
+        thankYou: "আমাদের স্টোর বেছে নেওয়ার জন্য আপনাকে ধন্যবাদ!"
       }
     }
   }

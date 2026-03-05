@@ -143,10 +143,10 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
   };
 
   return (
-    <section className="pt-4 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section className="pt-2 pb-5 sm:pt-4 sm:pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div
         onClick={handlePrimaryAction}
-        className="relative rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden h-[480px] sm:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
+        className="relative rounded-2xl sm:rounded-[2.5rem] overflow-hidden h-[360px] sm:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
       >
         {isLoading ? (
           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
@@ -160,20 +160,20 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                 alt={activeBanner.title}
                 className="w-full h-full object-cover object-center transform transition-transform duration-[20s] group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-gray-950/90 via-gray-900/50 to-transparent" />
             </div>
 
-            <div className="relative h-full flex items-center px-6 md:px-12 lg:px-16">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 md:p-10 rounded-3xl max-w-lg w-full text-white shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="relative h-full flex items-end sm:items-center px-3 sm:px-6 md:px-12 lg:px-16 pb-4 sm:pb-0">
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl max-w-[98%] sm:max-w-lg w-full text-white shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
                 <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-primary/40 rounded-full blur-[60px] pointer-events-none" />
 
                 <div className="relative z-10">
-                  <div className="inline-flex items-center gap-2 bg-primary px-3 py-1.5 rounded-full mb-6 shadow-lg shadow-red-900/20 border border-white/10">
+                  <div className="inline-flex items-center gap-2 bg-primary px-2.5 sm:px-3 py-1.5 rounded-full mb-3 sm:mb-6 shadow-lg shadow-red-900/20 border border-white/10">
                     <Zap className="w-3.5 h-3.5 text-white fill-white animate-pulse" />
                     <span className="text-white text-[11px] font-extrabold tracking-widest uppercase">{activeBanner.badge_text}</span>
                   </div>
 
-                  <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.05] mb-6 drop-shadow-sm">
+                  <h1 className="text-[2.2rem] sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.05] mb-3 sm:mb-6 drop-shadow-sm">
                     {activeBanner.title}
                     {activeBanner.highlight_text ? (
                       <>
@@ -183,18 +183,18 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                     ) : null}
                   </h1>
 
-                  <p className="text-gray-200 text-sm md:text-base mb-8 leading-relaxed font-medium opacity-90 max-w-sm">
+                  <p className="text-gray-200 text-xs sm:text-sm md:text-base mb-4 sm:mb-8 leading-relaxed font-medium opacity-90 max-w-sm">
                     {activeBanner.description || 'Explore premium parts handpicked for your vehicle.'}
                   </p>
 
-                  <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handlePrimaryAction();
                       }}
                       disabled={isNavigating}
-                      className="bg-primary hover:bg-red-600 text-white text-sm font-bold py-4 px-8 rounded-full transition-all duration-300 flex items-center justify-center shadow-xl shadow-red-900/30 hover:shadow-red-600/40 hover:-translate-y-1 disabled:opacity-70 disabled:cursor-not-allowed"
+                      className="w-full sm:w-auto bg-primary hover:bg-red-600 text-white text-sm font-bold py-3.5 sm:py-4 px-6 sm:px-8 rounded-full transition-all duration-300 flex items-center justify-center shadow-xl shadow-red-900/30 hover:shadow-red-600/40 hover:-translate-y-1 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {isNavigating ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : null}
                       {activeBanner.primary_button_text} <ArrowRight className="ml-2 w-4 h-4" />
@@ -204,7 +204,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                         e.stopPropagation();
                         scrollToCatalog();
                       }}
-                      className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-bold py-4 px-8 rounded-full transition-all duration-300 backdrop-blur-sm hover:-translate-y-1"
+                      className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-bold py-3.5 sm:py-4 px-6 sm:px-8 rounded-full transition-all duration-300 backdrop-blur-sm hover:-translate-y-1"
                     >
                       {activeBanner.secondary_button_text}
                     </button>
@@ -220,7 +220,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
             </div>
 
             {banners.length > 1 && (
-              <div className="absolute bottom-6 right-6 flex items-center gap-2">
+              <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 flex items-center gap-2">
                 {banners.map((banner, index) => (
                   <button
                     key={banner.id}

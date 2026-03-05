@@ -72,7 +72,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
   const invoiceNum = getInvoiceNumber(data.id);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-50 flex flex-col font-sans print:min-h-0 print:block print:bg-white">
       {/* Top Action Bar - Hidden on print */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 print:hidden">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -103,7 +103,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
         </div>
       </div>
 
-      <main className="flex-grow py-8 md:py-12 px-4 print:p-0">
+      <main className="flex-grow py-8 md:py-12 px-4 print:flex-none print:p-0">
         <InvoiceLayout 
           orderId={data.id} 
           date={data.date} 
@@ -111,7 +111,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
           paymentStatus={data.paymentStatus}
         >
           {/* Billing Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12 print:gap-5 print:mb-6">
             <div>
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Billed To</h3>
               <p className="text-sm font-black text-gray-900 mb-1">{data.customer.name}</p>
@@ -124,12 +124,12 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
             </div>
           </div>
 
-          <div className="mb-8 text-sm font-bold text-gray-600">
+          <div className="mb-8 text-sm font-bold text-gray-600 print:mb-4 print:text-xs">
             Payment Method: <span className="text-gray-900">{data.paymentMethod}</span>
           </div>
 
           {/* Items Table */}
-          <div className="mb-12 overflow-x-auto">
+          <div className="mb-12 overflow-x-auto print:mb-6">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b-2 border-gray-900 bg-gray-50">
@@ -143,7 +143,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
               <tbody className="divide-y divide-gray-100">
                 {data.items.map((item, idx) => (
                   <tr key={idx}>
-                    <td className="py-5 px-4">
+                    <td className="py-5 px-4 print:py-3">
                       <div className="flex items-center gap-3">
                         <div className="hidden sm:block w-8 h-8 bg-gray-50 rounded border border-gray-100 flex-shrink-0">
                            <Package className="w-full h-full p-1.5 text-gray-300" />
@@ -151,10 +151,10 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
                         <span className="text-sm font-bold text-gray-900">{item.name}</span>
                       </div>
                     </td>
-                    <td className="py-5 px-4 text-xs font-mono font-bold text-gray-400">{item.sku}</td>
-                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-center">{item.qty}</td>
-                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-right">{formatCurrency(item.unitPrice)}</td>
-                    <td className="py-5 px-4 text-sm font-black text-gray-900 text-right">{formatCurrency(item.total)}</td>
+                    <td className="py-5 px-4 text-xs font-mono font-bold text-gray-400 print:py-3">{item.sku}</td>
+                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-center print:py-3">{item.qty}</td>
+                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-right print:py-3">{formatCurrency(item.unitPrice)}</td>
+                    <td className="py-5 px-4 text-sm font-black text-gray-900 text-right print:py-3">{formatCurrency(item.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -162,7 +162,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
           </div>
 
           {/* Summary */}
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-end print:break-inside-avoid">
             <div className="w-full md:w-80 space-y-3">
               <div className="flex justify-between text-sm font-bold">
                 <span className="text-gray-400 uppercase tracking-widest">Subtotal</span>

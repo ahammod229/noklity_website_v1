@@ -1,7 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, ArrowRight, ShoppingBag, Calendar, CreditCard, DollarSign, Package } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShoppingBag, Calendar, CreditCard, Package } from 'lucide-react';
 import { getOrderById } from '../services/orderService';
+import { useCart } from '../contexts/CartContext';
+import { getShortOrderId } from '../utils/orderId';
 
 interface PaymentSuccessProps {
   onLoginClick: () => void;
@@ -15,10 +17,19 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
   onNavigate,
   orderId
 }) => {
+  const { clearCart } = useCart();
   // Use passed ID or fallback
-  const displayId = orderId || `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+  const displayId = orderId
+    ? getShortOrderId(orderId)
+    : String(Math.floor(1000000000000 + Math.random() * 9000000000000));
   const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const [paymentMethod, setPaymentMethod] = useState('Pending Confirmation');
+
+  useEffect(() => {
+    clearCart().catch(() => {
+      // ignore
+    });
+  }, [clearCart]);
 
   useEffect(() => {
     const loadOrder = async () => {

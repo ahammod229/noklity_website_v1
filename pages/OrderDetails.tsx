@@ -19,6 +19,7 @@ import { getOrderById, OrderDetail } from '../services/orderService';
 import { downloadInvoicePDF } from '../services/invoiceService';
 import { supabase } from '../lib/supabase';
 import { useCurrency } from '../hooks/useCurrency';
+import { formatShortOrderId } from '../utils/orderId';
 
 interface OrderDetailsProps {
   onLoginClick: () => void;
@@ -191,7 +192,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
         {/* Header Section */}
         <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-black text-gray-900">Order #{order.id.slice(0, 8).toUpperCase()}</h1>
+                <h1 className="text-3xl font-black text-gray-900">Order {formatShortOrderId(order.id)}</h1>
                 {isCancelled && (
                     <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border border-red-200">
                         Cancelled

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NOKLITY | Premium Automotive Parts</title>
+    <title>Storefront</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
@@ -15,19 +15,53 @@
               sans: ['Inter', 'sans-serif'],
             },
             colors: {
-              primary: '#DC2626',
-              secondary: '#111827',
-              accent: '#F3F4F6',
+              primary: 'rgb(var(--color-primary-rgb) / <alpha-value>)',
+              secondary: 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
+              accent: 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
+              background: 'rgb(var(--background-current-rgb) / <alpha-value>)',
+              foreground: 'rgb(var(--text-current-rgb) / <alpha-value>)',
+              popover: 'rgb(var(--surface-current-rgb) / <alpha-value>)',
+              'popover-foreground': 'rgb(var(--text-current-rgb) / <alpha-value>)',
+              border: 'rgb(var(--border-current-rgb) / <alpha-value>)',
             }
           }
         }
       }
     </script>
+    <script>
+      (function applyInitialTheme() {
+        try {
+          var stored = window.localStorage.getItem('noklity-theme-mode');
+          var theme = stored === 'dark' ? 'dark' : 'light';
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+          document.documentElement.setAttribute('data-theme', theme);
+          document.documentElement.style.colorScheme = theme;
+        } catch (error) {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.style.colorScheme = 'light';
+        }
+      })();
+    </script>
+    <script>
+      (function applyInitialTenantBranding() {
+        try {
+          var raw = window.localStorage.getItem('noklity_tenant_config_v1');
+          if (!raw) return;
+          var parsed = JSON.parse(raw);
+          if (parsed && parsed.brandName) {
+            document.title = String(parsed.brandName);
+          }
+        } catch (error) {
+          // Keep static fallback title.
+        }
+      })();
+    </script>
     <style>
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #ffffff;
-        color: #111827;
+        background-color: var(--noklity-bg, #ffffff);
+        color: var(--noklity-text, #111827);
       }
     </style>
   <script type="importmap">

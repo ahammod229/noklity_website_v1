@@ -3,6 +3,7 @@ import { Eye, Edit, MoreVertical, Package } from 'lucide-react';
 import OrderStatusBadge from './OrderStatusBadge';
 import { AdminOrderDetail } from '../../services/adminOrderService';
 import { useCurrency } from '../../hooks/useCurrency';
+import { formatShortOrderId } from '../../utils/orderId';
 
 interface OrderTableProps {
   orders: AdminOrderDetail[];
@@ -56,7 +57,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onView, isLoading }) =>
                     className="hover:text-primary underline-offset-2 hover:underline"
                     title="View order details"
                   >
-                    #{order.id}
+                    {formatShortOrderId(order.id)}
                   </button>
                 </td>
                 <td className="px-6 py-4">

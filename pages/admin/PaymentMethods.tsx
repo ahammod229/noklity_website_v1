@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Upload, Pencil, Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 
 interface PaymentMethod {
   id: string;
@@ -101,12 +102,16 @@ const PaymentMethods: React.FC = () => {
   }, []);
 
   const uploadLogoToStorage = async (file: File) => {
+    const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.paymentLogo);
+    if (validation.shouldBlock) {
+      throw new Error(validation.message);
+    }
     const ext = file.name.split('.').pop() || 'png';
     const filePath = `payments/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const { error } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
     if (error) throw error;
     const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-    return data.publicUrl;
+    return { url: data.publicUrl, infoMessage: validation.message };
   };
 
   const addMethod = async () => {
@@ -235,9 +240,9 @@ const PaymentMethods: React.FC = () => {
     setMessage(null);
     setUploadingLogo(true);
     try {
-      const url = await uploadLogoToStorage(file);
+      const { url, infoMessage } = await uploadLogoToStorage(file);
       setForm((prev) => ({ ...prev, logo_url: url }));
-      setMessage({ type: 'success', text: 'Logo uploaded successfully.' });
+      setMessage({ type: 'success', text: infoMessage });
     } catch (error: any) {
       setMessage({
         type: 'error',
@@ -253,9 +258,9 @@ const PaymentMethods: React.FC = () => {
     setMessage(null);
     setUploadingEditLogo(true);
     try {
-      const url = await uploadLogoToStorage(file);
+      const { url, infoMessage } = await uploadLogoToStorage(file);
       setEditForm((prev) => ({ ...prev, logo_url: url }));
-      setMessage({ type: 'success', text: 'Edit logo uploaded successfully.' });
+      setMessage({ type: 'success', text: infoMessage });
     } catch (error: any) {
       setMessage({
         type: 'error',
@@ -298,6 +303,7 @@ const PaymentMethods: React.FC = () => {
           {uploadingLogo ? 'Uploading logo...' : 'Upload Logo'}
           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAddLogoUpload(e.target.files?.[0])} />
         </label>
+        <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.paymentLogo)}</p>
         <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Instructions" value={form.instructions} onChange={(e) => setForm((p) => ({ ...p, instructions: e.target.value }))} />
         {form.type === 'bank_transfer' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -334,6 +340,7 @@ const PaymentMethods: React.FC = () => {
             {uploadingEditLogo ? 'Uploading edit logo...' : 'Upload Edit Logo'}
             <input type="file" className="hidden" accept="image/*" onChange={(e) => handleEditLogoUpload(e.target.files?.[0])} />
           </label>
+          <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.paymentLogo)}</p>
 
           <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Instructions" value={editForm.instructions} onChange={(e) => setEditForm((p) => ({ ...p, instructions: e.target.value }))} />
 

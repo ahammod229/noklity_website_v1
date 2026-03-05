@@ -1,24 +1,57 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# NOKLITY Storefront (White-Label Productized)
 
-# Run and deploy your AI Studio app
+React + Vite + Supabase ecommerce storefront and admin panel, productized for reusable white-label deployments.
 
-This contains everything you need to run your app locally.
+## What was added
+- Unified tenant configuration (`file + DB + env`) with runtime cache.
+- Plan and feature-flag enforcement (`Basic`, `Pro`, `Enterprise`).
+- License-aware plan fallback (`Basic` fallback when invalid).
+- Admin settings for branding, company info, pages, plans, and feature toggles.
+- Single-tenant deployment model (safe default).
+- Optional multi-tenant scaffold (not fully activated).
 
-View your app in AI Studio: https://ai.studio/apps/drive/1rGeRHOn6xEaUblyESC6kzazHoKz2BibQ
+## Quick start
+1. Install and bootstrap:
+   - `npm run setup:single-tenant`
+2. Fill `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/.env.local`
+3. Run schema in Supabase:
+   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/supabase/schema.sql`
+4. Start:
+   - `npm run dev`
 
-## Run Locally
+## Useful commands
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
+- `npm run test:productization`
+- `npm run test:smoke`
+- `npm run test`
 
-**Prerequisites:**  Node.js
+## Docker
+- Build and run:
+  - `docker compose up --build`
+- App is available at:
+  - `http://localhost:3000`
 
+## Productization docs
+- Implementation summary:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/IMPLEMENTATION_SUMMARY.md`
+- New customer setup:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/NEW_CUSTOMER_SETUP.md`
+- White-label customization:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/WHITE_LABEL_CUSTOMIZATION.md`
+- Plan & feature flags:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/PLAN_FEATURE_FLAGS.md`
+- Upgrade guide:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/UPGRADE_GUIDE.md`
 
-1. Install dependencies:
-   `npm install`
-2. Set Supabase credentials in `.env.local`:
-   - `VITE_SUPABASE_URL=https://<project-ref>.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY=<anon-or-publishable-key>`
-   - Optional: `VITE_ADMIN_EMAILS=admin1@example.com,admin2@example.com`
-3. In Supabase SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql) once for your new project.
-4. Run the app:
-   `npm run dev`
+## bKash setup
+- Deploy edge functions:
+  - `supabase functions deploy bkash-create-payment`
+  - `supabase functions deploy bkash-callback`
+- Configure required function secrets (`BKASH_*`, `STORE_FRONTEND_URL`).
+
+## Important notes
+- Never commit `.env.local`, API keys, or service-role keys.
+- Super admin is controlled via `VITE_SUPER_ADMIN_EMAILS`.
+- Current production-safe mode is single-tenant per deployment.

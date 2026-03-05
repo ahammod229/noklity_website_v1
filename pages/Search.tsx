@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProductCard from '../components/ProductCard';
 import SearchFilters from '../components/SearchFilters';
 import { searchProducts, SearchFilters as FilterType } from '../services/searchService';
 import { Product } from '../types';
-import { Search as SearchIcon, SlidersHorizontal, ArrowLeft, ArrowDownUp, PackageX } from 'lucide-react';
+import { SlidersHorizontal, ArrowLeft, ArrowDownUp, PackageX } from 'lucide-react';
 
 interface SearchPageProps {
   onLoginClick: () => void;
@@ -20,36 +20,57 @@ const Search: React.FC<SearchPageProps> = ({
   onAddToCart,
   initialQuery = ""
 }) => {
-  const [query, setQuery] = useState(initialQuery);
+  const getQueryFromUrl = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get('q') || '').trim();
+  }, []);
+
+  const [query, setQuery] = useState(() => (initialQuery || getQueryFromUrl()).trim());
   const [results, setResults] = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<FilterType>({ sortBy: 'relevance' });
   const [facets, setFacets] = useState<{ categories: {name: string, count: number}[], priceRange: {min: number, max: number} } | undefined>(undefined);
 
-  // Initial Search
-  useEffect(() => {
-    performSearch();
-  }, [query, filters]);
+  const performSearch = useCallback(async () => {
+    if (initialLoading) {
+      setInitialLoading(true);
+    } else {
+      setIsSearching(true);
+    }
 
-  const performSearch = async () => {
-    setLoading(true);
     const data = await searchProducts(query, filters);
     setResults(data.products);
     setTotalCount(data.totalCount);
-    
-    // Only set facets on initial load or if we want them to update dynamically with queries
-    // Usually facets are based on the query result set before filters, 
-    // the mock service handles this.
     setFacets(data.facets);
-    
-    setLoading(false);
-  };
+    setInitialLoading(false);
+    setIsSearching(false);
+  }, [filters, initialLoading, query]);
 
-  const handleFilterChange = (newFilters: FilterType) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-  };
+  // Initial and reactive search
+  useEffect(() => {
+    performSearch();
+  }, [performSearch]);
+
+  useEffect(() => {
+    const syncQueryFromUrl = () => {
+      const nextQuery = getQueryFromUrl();
+      setQuery((prev) => (prev === nextQuery ? prev : nextQuery));
+    };
+    window.addEventListener('popstate', syncQueryFromUrl);
+    return () => window.removeEventListener('popstate', syncQueryFromUrl);
+  }, [getQueryFromUrl]);
+
+  const handleFilterChange = useCallback((newFilters: FilterType) => {
+    setFilters((prev) => {
+      const next = { ...prev, ...newFilters };
+      const prevKey = JSON.stringify(prev);
+      const nextKey = JSON.stringify(next);
+      return prevKey === nextKey ? prev : next;
+    });
+  }, []);
 
   const handleClearFilters = () => {
     setFilters({ sortBy: 'relevance' });
@@ -94,7 +115,6 @@ const Search: React.FC<SearchPageProps> = ({
                         onCloseMobile={() => setIsMobileFiltersOpen(false)}
                         onFilterChange={handleFilterChange}
                         onClearFilters={handleClearFilters}
-                        initialFilters={filters}
                         facets={facets}
                     />
                 </div>
@@ -136,14 +156,22 @@ const Search: React.FC<SearchPageProps> = ({
                     </div>
 
                     {/* Results Grid */}
-                    {loading ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {initialLoading ? (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
                             {[1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="bg-gray-100 rounded-[2rem] h-[420px] animate-pulse"></div>
                             ))}
                         </div>
                     ) : results.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <div className="relative">
+                          {isSearching && (
+                            <div className="absolute inset-0 z-10 rounded-2xl bg-white/55 backdrop-blur-[1px] flex items-start justify-center pt-8 pointer-events-none">
+                              <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-black text-gray-600 uppercase tracking-widest">
+                                Updating
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
                             {results.map(product => (
                                 <ProductCard 
                                     key={product.id}
@@ -153,6 +181,7 @@ const Search: React.FC<SearchPageProps> = ({
                                     onClick={() => onNavigate('product-details', product.id)}
                                 />
                             ))}
+                          </div>
                         </div>
                     ) : (
                         /* Empty State */
@@ -182,7 +211,7 @@ const Search: React.FC<SearchPageProps> = ({
                     )}
 
                     {/* Pagination Mock */}
-                    {!loading && results.length > 0 && (
+                    {!initialLoading && results.length > 0 && (
                         <div className="mt-16 flex justify-center">
                             <nav className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
                                 <button className="px-6 py-3 bg-white text-gray-400 rounded-xl text-xs font-black uppercase tracking-widest cursor-not-allowed">Prev</button>

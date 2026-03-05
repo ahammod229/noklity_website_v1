@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { XCircle, RefreshCw, LifeBuoy, ArrowLeft, AlertCircle, ShoppingCart } from 'lucide-react';
+import { getShortOrderId } from '../utils/orderId';
 
 interface PaymentFailedProps {
   onLoginClick: () => void;
@@ -14,7 +15,7 @@ const PaymentFailed: React.FC<PaymentFailedProps> = ({
   onNavigate,
   orderId
 }) => {
-  const displayReference = orderId || 'Unavailable';
+  const displayReference = orderId ? getShortOrderId(orderId) : 'Unavailable';
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">

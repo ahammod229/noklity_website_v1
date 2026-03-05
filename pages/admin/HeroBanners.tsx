@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ImagePlus, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 
 type TargetType = 'none' | 'product' | 'category' | 'url';
 
@@ -134,13 +135,18 @@ const HeroBanners: React.FC = () => {
     setMessage(null);
     setUploadingImage(true);
     try {
+      const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.heroBanner);
+      if (validation.shouldBlock) {
+        setMessage({ type: 'error', text: validation.message });
+        return;
+      }
       const ext = file.name.split('.').pop() || 'jpg';
       const path = `hero-banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error } = await supabase.storage.from('assets').upload(path, file, { upsert: false });
       if (error) throw error;
       const { data } = supabase.storage.from('assets').getPublicUrl(path);
       setForm((prev) => ({ ...prev, image_url: data.publicUrl }));
-      setMessage({ type: 'success', text: 'Hero image uploaded.' });
+      setMessage({ type: 'success', text: validation.message });
     } catch (error: any) {
       setMessage({ type: 'error', text: toFriendlyError(error?.message || 'Hero image upload failed') });
     } finally {
@@ -292,6 +298,7 @@ const HeroBanners: React.FC = () => {
           {uploadingImage ? 'Uploading...' : 'Upload Hero Image'}
           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleUploadImage(e.target.files?.[0])} />
         </label>
+        <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.heroBanner)}</p>
 
         <textarea
           rows={3}

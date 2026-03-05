@@ -26,6 +26,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
   const { formatCurrency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const maxStock = typeof product?.stock === 'number' ? Math.max(0, Number(product.stock)) : 20;
+  const isOutOfStock = maxStock <= 0;
   
   // Reset scroll when product opens
   useEffect(() => {
@@ -41,6 +43,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
   const compatibilityList = product.compatibility || [];
 
   const handleAddToCart = async () => {
+    if (isOutOfStock) return;
     setIsProcessing(true);
     // In a real app, pass quantity and variant
     await onAddToCart(product, quantity);
@@ -49,6 +52,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
   };
 
   const handleBuyNow = async () => {
+    if (isOutOfStock) return;
     setIsProcessing(true);
     await onAddToCart(product, quantity);
     // Redirect logic handled by parent via onNavigate typically, 
@@ -104,7 +108,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
                 <QuantitySelector 
                   quantity={quantity} 
                   setQuantity={setQuantity} 
-                  maxStock={product.stock || 20}
+                  maxStock={maxStock}
                 />
                 <p className={`text-sm font-bold ${Number(product.stock || 0) > 0 ? 'text-green-700' : 'text-red-700'}`}>
                   {Number(product.stock || 0) > 0 ? `${product.stock} item(s) in stock` : 'Out of stock'}
@@ -149,19 +153,19 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
                 <div className="hidden lg:flex gap-4 pt-4">
                   <button 
                     onClick={handleBuyNow}
-                    disabled={isProcessing}
+                    disabled={isProcessing || isOutOfStock}
                     className="flex-1 bg-primary hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <Zap className="w-5 h-5 fill-current" />
-                    Buy Now
+                    {isOutOfStock ? 'Out of Stock' : 'Buy Now'}
                   </button>
                   <button 
                     onClick={handleAddToCart}
-                    disabled={isProcessing}
+                    disabled={isProcessing || isOutOfStock}
                     className="flex-1 bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    Add to Cart
+                    {isOutOfStock ? 'Unavailable' : 'Add to Cart'}
                   </button>
                 </div>
               </div>
@@ -181,17 +185,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose, onAdd
         <div className="flex gap-3">
           <button 
             onClick={handleBuyNow}
-            disabled={isProcessing}
+            disabled={isProcessing || isOutOfStock}
             className="flex-1 bg-primary text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform disabled:opacity-70"
           >
-            Buy Now
+            {isOutOfStock ? 'Out of Stock' : 'Buy Now'}
           </button>
           <button 
             onClick={handleAddToCart}
-            disabled={isProcessing}
+            disabled={isProcessing || isOutOfStock}
             className="flex-1 bg-gray-900 text-white font-bold py-3.5 rounded-xl shadow-md active:scale-95 transition-transform disabled:opacity-70"
           >
-            Add to Cart
+            {isOutOfStock ? 'Unavailable' : 'Add to Cart'}
           </button>
         </div>
       </div>

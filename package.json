@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "setup:single-tenant": "bash scripts/setup-single-tenant.sh",
+    "test:productization": "node scripts/productization-check.mjs",
+    "test:smoke": "npm run build",
+    "test": "npm run test:productization && npm run test:smoke"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
+    "framer-motion": "^12.34.3",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

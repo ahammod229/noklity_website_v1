@@ -71,11 +71,11 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
   }, []);
 
   return (
-    <section className="py-16 bg-gray-50 border-y border-gray-100">
+    <section className="py-10 sm:py-16 bg-gray-50 border-y border-gray-100">
       <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-10">
+        <div className="flex justify-between items-center mb-6 sm:mb-10">
           <div>
-             <h2 className="text-2xl font-bold text-gray-900">Categories</h2>
+             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Categories</h2>
           </div>
           <button 
             onClick={() => onSelectCategory?.('')}
@@ -85,7 +85,7 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
           </button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
           {categories.map((cat) => {
             const IconComponent = IconMap[cat.icon] || CircleDashed;
             const isSelected = selectedCategory === cat.name;
@@ -94,13 +94,13 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
               <div 
                 key={cat.id} 
                 onClick={() => onSelectCategory?.(cat.name)}
-                className={`group cursor-pointer bg-white rounded-xl border p-6 flex flex-col items-center justify-center transition-all duration-300
+                className={`group cursor-pointer bg-white rounded-xl border p-4 sm:p-6 flex flex-col items-center justify-center transition-all duration-300
                   ${isSelected 
                     ? 'border-primary shadow-lg ring-1 ring-primary transform -translate-y-1' 
                     : 'border-gray-200/60 hover:shadow-lg hover:border-primary/20 hover:-translate-y-1'
                   }`}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 transition-all duration-300 overflow-hidden
+                <div className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center mb-3 sm:mb-4 transition-all duration-300 overflow-hidden
                   ${isSelected
                     ? 'bg-primary text-white'
                     : 'bg-gray-50 text-gray-600 group-hover:bg-primary group-hover:text-white'
@@ -108,10 +108,10 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
                   {cat.logoUrl ? (
                     <img src={cat.logoUrl} alt={cat.name} className="w-full h-full object-cover" />
                   ) : (
-                    <IconComponent className="w-7 h-7" strokeWidth={1.5} />
+                    <IconComponent className="w-5 h-5 sm:w-7 sm:h-7" strokeWidth={1.5} />
                   )}
                 </div>
-                <h3 className={`font-bold text-sm transition-colors ${isSelected ? 'text-primary' : 'text-gray-900 group-hover:text-primary'}`}>
+                <h3 className={`font-bold text-xs sm:text-sm transition-colors text-center ${isSelected ? 'text-primary' : 'text-gray-900 group-hover:text-primary'}`}>
                   {cat.name}
                 </h3>
                 <span className="text-[10px] uppercase font-bold text-gray-400 mt-1">{cat.count} items</span>

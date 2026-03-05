@@ -1,8 +1,11 @@
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, Mail, Phone, MapPin, ShoppingBag, Wallet, Calendar, ShieldCheck, UserMinus, MessageSquare, Clock } from 'lucide-react';
 import { Customer } from '../../services/customerService';
 import { useCurrency } from '../../hooks/useCurrency';
+import { getPublicSiteConfigSnapshot } from '../../services/siteConfigService';
+import { getTenantConfigSnapshot } from '../../services/tenantConfigService';
+import { formatShortOrderId } from '../../utils/orderId';
 
 interface CustomerDetailsProps {
   customer: Customer;
@@ -12,6 +15,82 @@ interface CustomerDetailsProps {
 
 const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, onToggleStatus }) => {
   const { formatCurrency } = useCurrency();
+  const [contactMessage, setContactMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const config = getPublicSiteConfigSnapshot();
+  const tenantConfig = getTenantConfigSnapshot();
+
+  const customerSummary = useMemo(() => {
+    return [
+      `Customer: ${customer.name}`,
+      `Customer ID: ${customer.id}`,
+      `Status: ${customer.status}`,
+      `Total Orders: ${customer.ordersCount}`,
+      `Total Spend: ${formatCurrency(customer.totalSpent)}`,
+      `Last Order: ${customer.lastOrderDate}`,
+      `Address: ${customer.address}`
+    ].join('\n');
+  }, [
+    customer.address,
+    customer.id,
+    customer.lastOrderDate,
+    customer.name,
+    customer.ordersCount,
+    customer.status,
+    customer.totalSpent,
+    formatCurrency
+  ]);
+
+  const getSafePhoneForWhatsApp = (phone: string) => {
+    if (!phone || phone.toLowerCase() === 'n/a') return '';
+    const cleaned = phone.replace(/[^\d+]/g, '').trim();
+    if (!cleaned) return '';
+    if (cleaned.startsWith('+')) return cleaned.slice(1);
+    if (cleaned.startsWith('00')) return cleaned.slice(2);
+    return cleaned;
+  };
+
+  const handleSendEmail = () => {
+    if (!customer.email || customer.email.toLowerCase() === 'n/a') {
+      setContactMessage({ type: 'error', text: 'This customer does not have a valid email address.' });
+      return;
+    }
+
+    const subject = `${config.siteName || tenantConfig.brandName || 'Storefront'} - Customer Support Update`;
+    const body = [
+      `Hello ${customer.name},`,
+      '',
+      'We are contacting you regarding your account/order details.',
+      '',
+      customerSummary,
+      '',
+      `Best regards,`,
+      `${config.siteName || tenantConfig.brandName || 'Storefront'} Support Team`
+    ].join('\n');
+
+    const mailto = `mailto:${encodeURIComponent(customer.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    setContactMessage({ type: 'success', text: 'Email composer opened with customer details.' });
+  };
+
+  const handleSendWhatsApp = () => {
+    const phone = getSafePhoneForWhatsApp(customer.phone);
+    if (!phone) {
+      setContactMessage({ type: 'error', text: 'Customer phone number is missing or invalid for WhatsApp.' });
+      return;
+    }
+
+    const text = [
+      `Hello ${customer.name},`,
+      '',
+      `This is ${config.siteName || tenantConfig.brandName || 'Storefront'} support.`,
+      '',
+      customerSummary
+    ].join('\n');
+    const waUrl = `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    setContactMessage({ type: 'success', text: 'WhatsApp chat opened with prefilled customer details.' });
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Delivered': return 'text-green-600 bg-green-50 border-green-100';
@@ -39,6 +118,16 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+          {contactMessage && (
+            <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${
+              contactMessage.type === 'error'
+                ? 'bg-red-50 text-red-700 border border-red-200'
+                : 'bg-green-50 text-green-700 border border-green-200'
+            }`}>
+              {contactMessage.text}
+            </div>
+          )}
+
           
           {/* Profile Basic */}
           <section className="flex flex-col items-center text-center">
@@ -104,7 +193,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
                   {customer.recentOrders.map((order) => (
                     <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-gray-900">Order #{order.id.slice(0, 8).toUpperCase()}</span>
+                        <span className="text-xs font-bold text-gray-900">Order {formatShortOrderId(order.id)}</span>
                         <div className="flex items-center gap-2 mt-1">
                           <Clock className="w-3 h-3 text-gray-400" />
                           <span className="text-[10px] font-bold text-gray-500">{order.date}</span>
@@ -125,10 +214,16 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
 
           {/* Communication CTA */}
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 p-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all">
+            <button
+              onClick={handleSendEmail}
+              className="flex items-center justify-center gap-2 p-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all"
+            >
               <Mail className="w-4 h-4" /> Send Email
             </button>
-            <button className="flex items-center justify-center gap-2 p-4 bg-green-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-green-700 transition-all">
+            <button
+              onClick={handleSendWhatsApp}
+              className="flex items-center justify-center gap-2 p-4 bg-green-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-green-700 transition-all"
+            >
               <MessageSquare className="w-4 h-4" /> WhatsApp
             </button>
           </div>

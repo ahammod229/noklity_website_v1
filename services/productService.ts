@@ -1,6 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import { Product } from '../types';
+import { canUseFeature } from './tenantConfigService';
 
 // Helper to map DB row to Product type
 const mapProduct = (row: any): Product => ({
@@ -41,6 +42,10 @@ const mapProduct = (row: any): Product => ({
 
 export const getProducts = async (category?: string | null): Promise<Product[]> => {
   try {
+    if (!(await canUseFeature('catalog_public'))) {
+      return [];
+    }
+
     let query = supabase
       .from('products')
       .select('*')
@@ -72,6 +77,10 @@ export const getProducts = async (category?: string | null): Promise<Product[]> 
 
 export const getProductById = async (id: string): Promise<Product | null> => {
   try {
+    if (!(await canUseFeature('catalog_public'))) {
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -96,6 +105,10 @@ export const getProductById = async (id: string): Promise<Product | null> => {
 
 export const getFlashSaleProducts = async (): Promise<Product[]> => {
   try {
+    if (!(await canUseFeature('flash_sales'))) {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*')

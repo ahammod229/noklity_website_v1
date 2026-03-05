@@ -1,6 +1,8 @@
 
 import { supabase } from '../lib/supabase';
 import { CartItem, Order } from '../types';
+import { getTenantConfig } from './tenantConfigService';
+import { getShortOrderId } from '../utils/orderId';
 
 export interface OrderData {
   items: CartItem[];
@@ -50,13 +52,102 @@ const mapPaymentMethodLabel = (paymentMethod: string) => {
  */
 export const createOrder = async (orderData: OrderData): Promise<{ success: boolean; orderId: string }> => {
   try {
-    let { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session?.user?.id) {
-      const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-      if (anonError || !anonData.user) {
-        throw new Error('Unable to continue as guest. Please sign in and try again.');
+    const tenantConfig = await getTenantConfig();
+    const featureMap = tenantConfig.featureFlags;
+    if (!featureMap.catalog_public) {
+      throw new Error('Ordering is currently unavailable for this plan.');
+    }
+    if (orderData.paymentMethod === 'bkash' && !featureMap.payment_bkash) {
+      throw new Error('bKash payment is disabled for this plan.');
+    }
+    if (orderData.paymentMethod === 'nogad' && !featureMap.payment_nogad) {
+      throw new Error('Nogad payment is disabled for this plan.');
+    }
+    if (orderData.paymentMethod === 'bank_transfer' && !featureMap.payment_bank_transfer) {
+      throw new Error('Bank transfer is disabled for this plan.');
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData.session?.user;
+    const isGuestCheckout = !currentUser?.id;
+    if (isGuestCheckout && !featureMap.checkout_guest) {
+      throw new Error('Guest checkout is disabled. Please sign in to place an order.');
+    }
+
+    const quantityByProduct = new Map<string, { name: string; quantity: number }>();
+    for (const item of orderData.items) {
+      const current = quantityByProduct.get(item.id);
+      if (current) {
+        current.quantity += Number(item.quantity || 0);
+      } else {
+        quantityByProduct.set(item.id, {
+          name: item.name || 'Product',
+          quantity: Number(item.quantity || 0)
+        });
       }
-      sessionData = { session: anonData.session };
+    }
+
+    const productIds = Array.from(quantityByProduct.keys());
+    if (productIds.length === 0) {
+      throw new Error('Cart is empty. Please add products before checkout.');
+    }
+
+    const { data: productRows, error: productError } = await supabase
+      .from('products')
+      .select('id,title,stock,status,is_active')
+      .in('id', productIds);
+
+    if (productError) {
+      throw new Error(`Unable to validate stock: ${productError.message}`);
+    }
+
+    const productMap = new Map<string, any>();
+    for (const row of productRows || []) {
+      productMap.set(String(row.id), row);
+    }
+
+    const stockIssues: string[] = [];
+    for (const [productId, payload] of quantityByProduct.entries()) {
+      const row = productMap.get(productId);
+      const productName = row?.title || payload.name;
+      const requestedQty = Math.max(0, Number(payload.quantity || 0));
+      const availableStock = Math.max(0, Number(row?.stock || 0));
+      const inactive = row?.is_active === false || (row?.status && row?.status !== 'active');
+
+      if (!row || inactive || availableStock <= 0) {
+        stockIssues.push(`${productName} is out of stock.`);
+        continue;
+      }
+
+      if (requestedQty < 1) {
+        stockIssues.push(`${productName} has an invalid quantity.`);
+        continue;
+      }
+
+      if (availableStock < requestedQty) {
+        stockIssues.push(`${productName} has only ${availableStock} item(s) left.`);
+      }
+    }
+
+    if (stockIssues.length > 0) {
+      throw new Error(stockIssues.slice(0, 3).join(' '));
+    }
+
+    // Ensure profile row exists for authenticated users before order insert.
+    if (currentUser?.id) {
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: currentUser.id,
+          email: currentUser.email || `${currentUser.id}@customer.local`,
+          full_name: (currentUser.user_metadata?.full_name as string) || null,
+          role: 'user',
+          status: 'active'
+        },
+        { onConflict: 'id' }
+      );
+      if (profileError) {
+        throw new Error(`Unable to prepare customer profile: ${profileError.message}`);
+      }
     }
 
     const formattedItems = orderData.items.map(item => ({
@@ -117,7 +208,7 @@ export const getOrders = async (): Promise<any[]> => {
       
       return {
         id: order.id,
-        displayId: `ORD-${order.id.slice(0, 8).toUpperCase()}`,
+        displayId: getShortOrderId(order.id),
         date: new Date(order.created_at).toLocaleDateString(),
         total: order.total_amount,
         status: order.status,
@@ -147,13 +238,7 @@ export const getOrders = async (): Promise<any[]> => {
  */
 export const getOrderById = async (id: string): Promise<OrderDetail | null> => {
   try {
-    // If we have "ORD-" prefix from URL, assume the ID is the UUID part if possible, 
-    // but typically the UI passes the UUID as `id` in `getOrders` mapper. 
-    // If `id` passed here is just a UUID, we query directly.
-    
-    // Note: If ID passed is "ORD-XXXX", this query will fail for UUID type. 
-    // The UI `Orders.tsx` passes `order.id` which is the UUID from `getOrders` mapper.
-    
+    // UI shows a short 13-digit display ID, but backend lookups always use UUID.
     const { data, error } = await supabase
       .from('orders')
       .select(`

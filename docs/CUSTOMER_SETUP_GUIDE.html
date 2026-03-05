@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Setup Guide</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      color: #111827;
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 0 20px 40px;
+    }
+    h1, h2, h3 { margin: 0 0 10px; line-height: 1.2; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 22px; margin-top: 28px; }
+    h3 { font-size: 18px; margin-top: 20px; }
+    p { margin: 0 0 10px; }
+    ul, ol { margin: 0 0 12px 22px; }
+    code {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 1px 6px;
+      font-size: 13px;
+    }
+    pre {
+      background: #111827;
+      color: #f9fafb;
+      padding: 14px;
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 8px 0 14px;
+    }
+    .muted { color: #6b7280; }
+    .box {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #f9fafb;
+      margin: 12px 0;
+    }
+    .ok {
+      border-color: #86efac;
+      background: #f0fdf4;
+    }
+    .warn {
+      border-color: #fca5a5;
+      background: #fef2f2;
+    }
+  </style>
+</head>
+<body>
+  <h1>NOKLITY Store - Customer Setup Guide</h1>
+  <p class="muted">Version: White-label single-tenant deployment</p>
+  <p class="muted">Prepared for customer handover</p>
+
+  <div class="box ok">
+    <strong>What this guide does:</strong>
+    <p>Step-by-step instructions to launch your own branded store instance with your own Supabase project, domain, payment setup, and admin control panel.</p>
+  </div>
+
+  <h2>1) Prerequisites</h2>
+  <ul>
+    <li>Node.js 18+ installed</li>
+    <li>A Supabase account and a new project</li>
+    <li>Your domain/subdomain ready (optional for local setup)</li>
+    <li>Admin email(s) and super admin email(s)</li>
+  </ul>
+
+  <h2>2) Project Installation</h2>
+  <ol>
+    <li>Open terminal in project folder.</li>
+    <li>Run setup:</li>
+  </ol>
+  <pre><code>npm run setup:single-tenant</code></pre>
+  <ol start="3">
+    <li>This will install dependencies and create <code>.env.local</code> if missing.</li>
+  </ol>
+
+  <h2>3) Environment Configuration</h2>
+  <p>Edit <code>.env.local</code> and fill at least:</p>
+  <pre><code>VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+VITE_ADMIN_EMAILS=admin@yourdomain.com
+VITE_SUPER_ADMIN_EMAILS=owner@yourdomain.com
+
+VITE_TENANT_BRAND_NAME=YOUR BRAND
+VITE_TENANT_DOMAIN=shop.yourdomain.com
+VITE_TENANT_ALLOWED_HOSTS=localhost,127.0.0.1,shop.yourdomain.com
+VITE_TENANT_PLAN_NAME=Enterprise
+VITE_TENANT_LICENSE_STATUS=active
+VITE_TENANT_LICENSE_KEY=NXL-ENTERPRISE-XXXXXXXX-XXXX</code></pre>
+
+  <div class="box warn">
+    <strong>Security Rule:</strong> Never share or commit secrets. Keep only safe public frontend keys in <code>.env.local</code>.
+  </div>
+
+  <h2>4) Supabase Database Setup</h2>
+  <ol>
+    <li>Open Supabase SQL Editor.</li>
+    <li>Run schema file:</li>
+  </ol>
+  <pre><code>supabase/schema.sql</code></pre>
+  <ol start="3">
+    <li>Run tenant productization migration:</li>
+  </ol>
+  <pre><code>supabase/migrations/20260301_tenant_productization.sql</code></pre>
+  <ol start="4">
+    <li>If profile image upload fails with bucket errors, run:</li>
+  </ol>
+  <pre><code>supabase/avatar_bucket_fix.sql</code></pre>
+
+  <h2>5) Start the Store</h2>
+  <pre><code>npm run dev</code></pre>
+  <p>Open: <code>http://localhost:3000</code></p>
+
+  <h2>6) Admin Initial Configuration</h2>
+  <ol>
+    <li>Login with admin email.</li>
+    <li>Go to <strong>Admin > Settings > General</strong>:
+      <ul>
+        <li>Site name, support info, logos, footer content, social links</li>
+        <li>Currency and exchange rates</li>
+      </ul>
+    </li>
+    <li>Go to <strong>Admin > Settings > Company & Legal Pages</strong>:
+      <ul>
+        <li>Add/Edit/Remove pages (About, Contact, Privacy, Terms, etc.)</li>
+      </ul>
+    </li>
+    <li>Go to <strong>Admin > Settings > Plans & Features</strong> (super admin):
+      <ul>
+        <li>Select plan: Basic / Pro / Enterprise</li>
+        <li>Set license key and status</li>
+        <li>Enable/disable feature flags</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h2>7) Payment Setup (Optional bKash)</h2>
+  <p>Deploy Supabase edge functions:</p>
+  <pre><code>supabase functions deploy bkash-create-payment
+supabase functions deploy bkash-callback</code></pre>
+  <p>Set required function secrets in Supabase:</p>
+  <ul>
+    <li><code>BKASH_PROVIDER</code></li>
+    <li><code>BKASH_BASE_URL</code></li>
+    <li><code>BKASH_USERNAME</code></li>
+    <li><code>BKASH_PASSWORD</code></li>
+    <li><code>BKASH_APP_KEY</code></li>
+    <li><code>BKASH_APP_SECRET</code></li>
+    <li><code>BKASH_CALLBACK_URL</code></li>
+    <li><code>STORE_FRONTEND_URL</code></li>
+  </ul>
+
+  <h2>8) Final Validation Checklist</h2>
+  <ol>
+    <li>Run productization checks:
+      <pre><code>npm run test:productization</code></pre>
+    </li>
+    <li>Run production build:
+      <pre><code>npm run build</code></pre>
+    </li>
+    <li>Check branding appears correctly in header/footer/admin.</li>
+    <li>Verify products, checkout, payment methods, and support ticket flow.</li>
+    <li>Verify disabled plan features are not accessible.</li>
+  </ol>
+
+  <h2>9) Docker Run (Optional)</h2>
+  <pre><code>docker compose up --build</code></pre>
+  <p>Open: <code>http://localhost:3000</code></p>
+
+  <h2>10) Support Handover Notes</h2>
+  <ul>
+    <li>Default deployment model is <strong>single tenant per customer</strong>.</li>
+    <li>Each customer should use separate Supabase project/database.</li>
+    <li>For multi-tenant rollout later, use provided scaffold migration and resolver helper.</li>
+  </ul>
+
+  <div class="box">
+    <strong>Attached internal docs:</strong>
+    <ul>
+      <li><code>docs/NEW_CUSTOMER_SETUP.md</code></li>
+      <li><code>docs/WHITE_LABEL_CUSTOMIZATION.md</code></li>
+      <li><code>docs/PLAN_FEATURE_FLAGS.md</code></li>
+      <li><code>docs/UPGRADE_GUIDE.md</code></li>
+    </ul>
+  </div>
+</body>
+</html>

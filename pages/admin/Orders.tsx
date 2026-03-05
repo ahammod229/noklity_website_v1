@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase';
 import OrderTable from '../../components/admin/OrderTable';
 import { Order } from '../../types';
 import { useCurrency } from '../../hooks/useCurrency';
+import { getShortOrderId, formatShortOrderId } from '../../utils/orderId';
 
 // Extended type for Admin purposes matching the UI needs
 export interface AdminOrderDetail extends Order {
@@ -54,6 +55,33 @@ export interface AdminOrderDetail extends Order {
 interface AdminOrdersProps {
   onNavigate?: (view: any, param?: any) => void;
 }
+
+const ORDER_STATUS_OPTIONS: Order['status'][] = [
+  'Pending',
+  'Processing',
+  'Shipped',
+  'Delivered',
+  'Cancelled'
+];
+
+const normalizeOrderStatus = (status?: string): Order['status'] => {
+  const normalized = String(status || '').trim().toLowerCase();
+
+  switch (normalized) {
+    case 'processing':
+      return 'Processing';
+    case 'shipped':
+      return 'Shipped';
+    case 'delivered':
+      return 'Delivered';
+    case 'cancelled':
+    case 'canceled':
+      return 'Cancelled';
+    case 'pending':
+    default:
+      return 'Pending';
+  }
+};
 
 const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
   const { formatCurrency } = useCurrency();
@@ -113,7 +141,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               day: 'numeric'
             }),
             total: order.total_amount,
-            status: order.status,
+            status: normalizeOrderStatus(order.status),
             itemsCount: order.order_items.length,
             paymentStatus,
             paymentMethod: order.payment_method || 'N/A',
@@ -152,20 +180,22 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
   };
 
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+    const normalizedStatus = normalizeOrderStatus(newStatus);
+
     try {
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus })
+        .update({ status: normalizedStatus })
         .eq('id', orderId);
 
       if (error) throw error;
 
       // Update local state
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus as any } : o));
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: normalizedStatus } : o));
       
       // Update modal state if open
       if (selectedOrder?.id === orderId) {
-        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as any } : null);
+        setSelectedOrder(prev => prev ? { ...prev, status: normalizedStatus } : null);
       }
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -174,8 +204,10 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
   };
 
   const filteredOrders = orders.filter(o => {
+    const shortId = getShortOrderId(o.id);
     const matchesSearch = 
-      o.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      shortId.includes(searchTerm.trim()) ||
       o.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || o.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -189,7 +221,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
     const html = `
       <html>
         <head>
-          <title>Order ${order.id}</title>
+          <title>Order ${getShortOrderId(order.id)}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #111; padding: 24px; }
             h1, h2 { margin: 0 0 8px 0; }
@@ -202,7 +234,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
         </head>
         <body>
           <h1>Order Details</h1>
-          <p><strong>Order ID:</strong> ${order.id}</p>
+          <p><strong>Order ID:</strong> ${getShortOrderId(order.id)}</p>
           <p><strong>Date:</strong> ${order.date}</p>
           <p><strong>Status:</strong> ${order.status}</p>
           <p><strong>Payment:</strong> ${order.paymentMethod} (${order.paymentStatus})</p>
@@ -351,7 +383,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
             
             <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-black text-gray-900 mb-1">Order #{selectedOrder.id.slice(0, 8).toUpperCase()}</h2>
+                <h2 className="text-2xl font-black text-gray-900 mb-1">Order {formatShortOrderId(selectedOrder.id)}</h2>
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Placed on {selectedOrder.date}</p>
               </div>
               <div className="flex gap-2">
@@ -502,15 +534,15 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
             <div className="p-8 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-4">
               <div className="flex-1 flex gap-3">
                  <select 
-                   value={selectedOrder.status}
-                   onChange={(e) => handleUpdateStatus(selectedOrder.id, e.target.value)}
-                   className="flex-1 px-5 py-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest outline-none appearance-none cursor-pointer"
+                   value={normalizeOrderStatus(selectedOrder.status)}
+                   onChange={(e) => handleUpdateStatus(selectedOrder.id, normalizeOrderStatus(e.target.value))}
+                   className="select-accent flex-1 px-5 py-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none appearance-none cursor-pointer border border-accent bg-accent text-white hover:bg-accent focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-colors"
                  >
-                   <option value="Pending">Pending</option>
-                   <option value="Processing">Processing</option>
-                   <option value="Shipped">Shipped</option>
-                   <option value="Delivered">Delivered</option>
-                   <option value="Cancelled">Cancelled</option>
+                   {ORDER_STATUS_OPTIONS.map((status) => (
+                     <option key={status} value={status}>
+                       {status}
+                     </option>
+                   ))}
                  </select>
               </div>
               <button className="flex-1 px-8 py-4 bg-primary text-white font-black rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-500/20">

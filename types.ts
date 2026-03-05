@@ -244,6 +244,8 @@ export interface Database {
           status: 'active' | 'blocked';
           full_name: string | null;
           phone: string | null;
+          avatar_url: string | null;
+          notification_settings: Json | null;
           created_at: string;
         };
         Insert: {
@@ -253,6 +255,8 @@ export interface Database {
           status?: 'active' | 'blocked';
           full_name?: string | null;
           phone?: string | null;
+          avatar_url?: string | null;
+          notification_settings?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -262,6 +266,8 @@ export interface Database {
           status?: 'active' | 'blocked';
           full_name?: string | null;
           phone?: string | null;
+          avatar_url?: string | null;
+          notification_settings?: Json | null;
           created_at?: string;
         };
         Relationships: [];
@@ -321,7 +327,7 @@ export interface Database {
       orders: {
         Row: {
           id: string;
-          user_id: string;
+          user_id: string | null;
           total_amount: number;
           status: string;
           payment_method: 'bkash' | 'nogad' | 'bank_transfer' | 'cod' | 'card' | 'wallet';
@@ -333,7 +339,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          user_id: string;
+          user_id?: string | null;
           total_amount: number;
           status?: string;
           payment_method: 'bkash' | 'nogad' | 'bank_transfer' | 'cod' | 'card' | 'wallet';
@@ -345,7 +351,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          user_id?: string;
+          user_id?: string | null;
           total_amount?: number;
           status?: string;
           payment_method?: 'bkash' | 'nogad' | 'bank_transfer' | 'cod' | 'card' | 'wallet';

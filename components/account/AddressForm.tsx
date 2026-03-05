@@ -84,7 +84,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                   value={formData.fullName}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="e.g. Alex Morgan"
+                  placeholder="e.g. Ahammod Ali"
                 />
               </div>
             </div>
@@ -100,7 +100,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                   value={formData.phone}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+8801712345678"
                 />
               </div>
             </div>
@@ -116,7 +116,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                   value={formData.street}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="e.g. 123 Performance Blvd"
+                  placeholder="e.g. Ambarkhana Main Road"
                 />
               </div>
             </div>
@@ -132,7 +132,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                   value={formData.city}
                   onChange={handleInputChange}
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="Speedway"
+                  placeholder="Sylhet"
                 />
               </div>
             </div>
@@ -146,7 +146,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                 value={formData.state}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                placeholder="e.g. California"
+                placeholder="Sylhet Division"
               />
             </div>
 
@@ -159,7 +159,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
                 value={formData.zip}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                placeholder="90210"
+                placeholder="3100"
               />
             </div>
 

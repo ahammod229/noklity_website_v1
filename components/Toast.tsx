@@ -23,17 +23,27 @@ const Toast: React.FC<ToastProps> = ({ message, type, isVisible, onClose }) => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className={`flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl ${
-        type === 'success' ? 'bg-gray-900 text-white' : 'bg-red-600 text-white'
+    <div
+      className="fixed left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1rem)] max-w-sm sm:w-auto sm:max-w-md bottom-[84px] sm:bottom-6 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      role="status"
+      aria-live="polite"
+    >
+      <div className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl shadow-2xl border ${
+        type === 'success'
+          ? 'bg-gray-900/95 border-gray-800 text-white'
+          : 'bg-red-600/95 border-red-500 text-white'
       }`}>
         {type === 'success' ? (
-          <CheckCircle className="w-5 h-5 text-green-400" />
+          <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
         ) : (
-          <AlertCircle className="w-5 h-5 text-white" />
+          <AlertCircle className="w-4 h-4 text-white shrink-0" />
         )}
-        <span className="text-sm font-bold">{message}</span>
-        <button onClick={onClose} className="ml-4 p-1 hover:bg-white/20 rounded-full transition-colors">
+        <span className="text-xs sm:text-sm font-bold leading-tight truncate">{message}</span>
+        <button
+          onClick={onClose}
+          className="ml-auto p-1 hover:bg-white/20 rounded-full transition-colors shrink-0"
+          aria-label="Close notification"
+        >
           <X className="w-3 h-3" />
         </button>
       </div>

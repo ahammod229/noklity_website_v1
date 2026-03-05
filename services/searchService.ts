@@ -19,6 +19,14 @@ export interface SearchResult {
   };
 }
 
+export interface SearchSuggestion {
+  id: string;
+  name: string;
+  category: string;
+  image: string;
+  price: number;
+}
+
 const mapProduct = (row: any): Product => ({
   id: row.id,
   name: row.title,
@@ -32,6 +40,17 @@ const mapProduct = (row: any): Product => ({
   description: row.description || '',
   isNew: (new Date().getTime() - new Date(row.created_at).getTime()) < (30 * 24 * 60 * 60 * 1000)
 });
+
+const mapSuggestion = (row: any): SearchSuggestion => ({
+  id: row.id,
+  name: row.title || 'Untitled Product',
+  category: row.category || 'Uncategorized',
+  image: row.image_url || '',
+  price: row.discount_price ?? row.price ?? 0
+});
+
+const sanitizeLike = (value: string) =>
+  value.replace(/[%_]/g, '').trim();
 
 /**
  * Searches for products based on query and filters.
@@ -112,5 +131,32 @@ export const searchProducts = async (query: string, filters: SearchFilters = {})
       totalCount: 0, 
       facets: { categories: [], priceRange: { min: 0, max: 0 } } 
     };
+  }
+};
+
+export const getSearchSuggestions = async (query: string, limit = 6): Promise<SearchSuggestion[]> => {
+  const normalized = sanitizeLike(query);
+  if (!normalized) return [];
+
+  try {
+    const likeValue = `%${normalized}%`;
+    const { data, error } = await supabase
+      .from('products')
+      .select('id,title,category,image_url,price,discount_price,is_active,status,stock')
+      .or(`title.ilike.${likeValue},category.ilike.${likeValue},brand.ilike.${likeValue}`)
+      .eq('is_active', true)
+      .eq('status', 'active')
+      .gt('stock', 0)
+      .limit(limit);
+
+    if (error) {
+      console.error('Suggestion search error:', JSON.stringify(error, null, 2));
+      return [];
+    }
+
+    return (data || []).map(mapSuggestion);
+  } catch (error) {
+    console.error('Unexpected suggestion search error:', error);
+    return [];
   }
 };

@@ -5,6 +5,7 @@ import AuthInput from '../components/AuthInput';
 import { Mail, Lock, User, Loader2, CheckCircle } from 'lucide-react';
 import { registerUser } from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTenantConfig } from '../contexts/TenantConfigContext';
 
 interface SignupProps {
   onNavigate: (view: any) => void;
@@ -13,6 +14,7 @@ interface SignupProps {
 
 const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
   const { user } = useAuth();
+  const { config } = useTenantConfig();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -86,7 +88,7 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-6 animate-in zoom-in">
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
-          <p className="text-center text-gray-900 font-bold mb-2 text-lg">Welcome to NOKLITY!</p>
+          <p className="text-center text-gray-900 font-bold mb-2 text-lg">Welcome to {config.brandName}!</p>
           <p className="text-center text-gray-500 text-sm mb-8 leading-relaxed">
             We've sent a confirmation link to <span className="font-bold text-gray-900">{formData.email}</span>. 
             <br />Please verify your email address to log in.
@@ -105,7 +107,7 @@ const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
   return (
     <AuthLayout 
       title="Create Account" 
-      subtitle="Join NOKLITY for exclusive deals"
+      subtitle={`Join ${config.brandName} for exclusive deals`}
       onBack={() => onNavigate('home')}
     >
       <form onSubmit={handleSubmit} className="space-y-4">

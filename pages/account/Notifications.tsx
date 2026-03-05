@@ -38,6 +38,7 @@ const Notifications: React.FC<NotificationsProps> = ({
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPreferences();
@@ -58,10 +59,13 @@ const Notifications: React.FC<NotificationsProps> = ({
   const handleSave = async () => {
     if (!preferences) return;
     setIsSaving(true);
+    setSaveError(null);
     const success = await updateNotificationPreferences(preferences);
     if (success) {
       setShowSavedToast(true);
       setTimeout(() => setShowSavedToast(false), 3000);
+    } else {
+      setSaveError('Failed to save notification settings. Please try again.');
     }
     setIsSaving(false);
   };
@@ -111,6 +115,12 @@ const Notifications: React.FC<NotificationsProps> = ({
             Choose exactly how and when we contact you.
           </p>
         </div>
+
+        {saveError && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 text-red-700 px-5 py-3 text-sm font-semibold">
+            {saveError}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-8">
           

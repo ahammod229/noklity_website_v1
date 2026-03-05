@@ -7,6 +7,7 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
+  avatar_url?: string | null;
   phone?: string;
   role: 'user' | 'admin';
   status?: 'active' | 'blocked';
@@ -57,6 +58,7 @@ const buildFallbackProfile = (authUser: User): UserProfile => {
     id: authUser.id,
     email,
     full_name: authUser.user_metadata?.full_name || 'Member',
+    avatar_url: authUser.user_metadata?.avatar_url || null,
     role: isAllowlistedAdminEmail(email) ? 'admin' : 'user',
     status: 'active'
   };

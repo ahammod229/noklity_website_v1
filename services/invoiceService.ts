@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Json } from '../types';
+import { getShortOrderId } from '../utils/orderId';
 
 export interface InvoiceItem {
   sku: string;
@@ -138,5 +139,5 @@ export const downloadInvoicePDF = async (orderId: string): Promise<void> => {
  * @returns string
  */
 export const getInvoiceNumber = (orderId: string): string => {
-  return `INV-${orderId.replace('ORD-', '')}-${new Date().getFullYear()}`;
+  return `INV-${getShortOrderId(orderId)}-${new Date().getFullYear()}`;
 };

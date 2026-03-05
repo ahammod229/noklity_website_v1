@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Edit2, Trash2, Save, X, Loader2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 
 interface DbCategory {
   id: string;
@@ -110,12 +111,18 @@ const CategoryManager: React.FC = () => {
     setUploading(true);
     setMessage(null);
     try {
+      const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.categoryLogo);
+      if (validation.shouldBlock) {
+        setMessage({ type: 'error', text: validation.message });
+        return;
+      }
       const ext = file.name.split('.').pop() || 'png';
       const filePath = `categories/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
       setForm((prev) => ({ ...prev, logo_url: data.publicUrl }));
+      setMessage({ type: 'success', text: validation.message });
     } catch (error: any) {
       setMessage({ type: 'error', text: toFriendlyError(error?.message || 'Logo upload failed') });
     } finally {
@@ -199,6 +206,7 @@ const CategoryManager: React.FC = () => {
           </label>
           {form.logo_url && <img src={form.logo_url} alt="Category logo" className="w-10 h-10 rounded-lg border border-gray-200 object-cover bg-white" />}
         </div>
+        <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.categoryLogo)}</p>
 
         <div className="flex gap-3">
             <button

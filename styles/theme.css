@@ -1,0 +1,363 @@
+:root {
+  --color-primary-rgb: 225 29 72;
+  --color-primary-hover-rgb: 190 24 93;
+  --color-secondary-rgb: 15 23 42;
+  --color-success-rgb: 22 163 74;
+  --color-warning-rgb: 245 158 11;
+  --color-danger-rgb: 220 38 38;
+
+  --background-light-rgb: 255 255 255;
+  --background-dark-rgb: 11 18 32;
+  --surface-light-rgb: 255 255 255;
+  --surface-dark-rgb: 17 24 39;
+  --text-light-rgb: 17 24 39;
+  --text-dark-rgb: 229 231 235;
+  --muted-text-light-rgb: 107 114 128;
+  --muted-text-dark-rgb: 148 163 184;
+  --border-light-rgb: 229 231 235;
+  --border-dark-rgb: 51 65 85;
+
+  --radius-base: 12px;
+  --background-current-rgb: var(--background-light-rgb);
+  --surface-current-rgb: var(--surface-light-rgb);
+  --text-current-rgb: var(--text-light-rgb);
+  --muted-text-current-rgb: var(--muted-text-light-rgb);
+  --border-current-rgb: var(--border-light-rgb);
+  --noklity-bg: rgb(var(--background-current-rgb));
+  --noklity-text: rgb(var(--text-current-rgb));
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--noklity-bg);
+  color: var(--noklity-text);
+  transition: background-color 200ms ease, color 200ms ease;
+  overflow-x: hidden;
+}
+
+html.dark {
+  --background-current-rgb: var(--background-dark-rgb);
+  --surface-current-rgb: var(--surface-dark-rgb);
+  --text-current-rgb: var(--text-dark-rgb);
+  --muted-text-current-rgb: var(--muted-text-dark-rgb);
+  --border-current-rgb: var(--border-dark-rgb);
+  --noklity-bg: rgb(var(--background-current-rgb));
+  --noklity-text: rgb(var(--text-current-rgb));
+}
+
+.bg-primary {
+  background-color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.bg-primary\/5 {
+  background-color: rgb(var(--color-primary-rgb) / 0.05) !important;
+}
+
+.bg-primary\/10 {
+  background-color: rgb(var(--color-primary-rgb) / 0.1) !important;
+}
+
+.bg-primary\/20 {
+  background-color: rgb(var(--color-primary-rgb) / 0.2) !important;
+}
+
+.bg-primary\/30 {
+  background-color: rgb(var(--color-primary-rgb) / 0.3) !important;
+}
+
+.bg-primary\/40 {
+  background-color: rgb(var(--color-primary-rgb) / 0.4) !important;
+}
+
+.bg-accent {
+  background-color: rgb(var(--color-secondary-rgb) / 1) !important;
+}
+
+.text-accent {
+  color: rgb(var(--color-secondary-rgb) / 1) !important;
+}
+
+.border-accent {
+  border-color: rgb(var(--color-secondary-rgb) / 1) !important;
+}
+
+.bg-success {
+  background-color: rgb(var(--color-success-rgb) / 1) !important;
+}
+
+.text-success {
+  color: rgb(var(--color-success-rgb) / 1) !important;
+}
+
+.border-success {
+  border-color: rgb(var(--color-success-rgb) / 1) !important;
+}
+
+.bg-warning {
+  background-color: rgb(var(--color-warning-rgb) / 1) !important;
+}
+
+.text-warning {
+  color: rgb(var(--color-warning-rgb) / 1) !important;
+}
+
+.border-warning {
+  border-color: rgb(var(--color-warning-rgb) / 1) !important;
+}
+
+.bg-danger {
+  background-color: rgb(var(--color-danger-rgb) / 1) !important;
+}
+
+.text-danger {
+  color: rgb(var(--color-danger-rgb) / 1) !important;
+}
+
+.border-danger {
+  border-color: rgb(var(--color-danger-rgb) / 1) !important;
+}
+
+.text-primary {
+  color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.border-primary {
+  border-color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.border-primary\/10 {
+  border-color: rgb(var(--color-primary-rgb) / 0.1) !important;
+}
+
+.border-primary\/20 {
+  border-color: rgb(var(--color-primary-rgb) / 0.2) !important;
+}
+
+.border-primary\/25 {
+  border-color: rgb(var(--color-primary-rgb) / 0.25) !important;
+}
+
+.border-primary\/30 {
+  border-color: rgb(var(--color-primary-rgb) / 0.3) !important;
+}
+
+.ring-primary {
+  --tw-ring-color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.focus\:ring-primary:focus {
+  --tw-ring-color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.focus\:ring-primary\/20:focus,
+.focus\:ring-primary\/10:focus,
+.focus\:ring-primary\/5:focus {
+  --tw-ring-color: rgb(var(--color-primary-rgb) / 0.2) !important;
+}
+
+.focus\:border-primary:focus {
+  border-color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.hover\:bg-red-700:hover,
+.hover\:bg-red-600:hover {
+  background-color: rgb(var(--color-primary-hover-rgb) / 1) !important;
+}
+
+.hover\:text-primary:hover {
+  color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.hover\:bg-primary\/20:hover {
+  background-color: rgb(var(--color-primary-rgb) / 0.2) !important;
+}
+
+.hover\:border-primary\/20:hover {
+  border-color: rgb(var(--color-primary-rgb) / 0.2) !important;
+}
+
+.hover\:border-primary\/30:hover {
+  border-color: rgb(var(--color-primary-rgb) / 0.3) !important;
+}
+
+.hover\:bg-accent:hover {
+  background-color: rgb(var(--color-secondary-rgb) / 0.92) !important;
+}
+
+.rounded-lg {
+  border-radius: max(0px, calc(var(--radius-base) - 4px));
+}
+
+.rounded-xl {
+  border-radius: var(--radius-base);
+}
+
+.rounded-2xl {
+  border-radius: calc(var(--radius-base) + 4px);
+}
+
+.rounded-3xl {
+  border-radius: calc(var(--radius-base) + 8px);
+}
+
+.bg-white,
+.bg-white\/95,
+.bg-white\/90,
+.bg-white\/80 {
+  background-color: rgb(var(--surface-current-rgb)) !important;
+}
+
+.text-gray-900,
+.text-gray-800,
+.text-gray-700 {
+  color: rgb(var(--text-current-rgb)) !important;
+}
+
+.text-gray-600,
+.text-gray-500,
+.text-gray-400 {
+  color: rgb(var(--muted-text-current-rgb)) !important;
+}
+
+.border-gray-50,
+.border-gray-100,
+.border-gray-200,
+.border-gray-300 {
+  border-color: rgb(var(--border-current-rgb)) !important;
+}
+
+.bg-gray-50,
+.bg-gray-50\/50,
+.bg-gray-50\/60 {
+  background-color: rgb(var(--background-current-rgb)) !important;
+}
+
+.bg-gray-100,
+.bg-gray-100\/50 {
+  background-color: rgb(var(--surface-current-rgb)) !important;
+}
+
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl,
+html.dark .shadow-2xl {
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.45) !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background-color: rgb(var(--surface-current-rgb)) !important;
+  border-color: rgb(var(--border-current-rgb)) !important;
+  color: rgb(var(--text-current-rgb)) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: rgb(var(--muted-text-current-rgb)) !important;
+}
+
+html.dark button {
+  color-scheme: dark;
+}
+
+select.select-accent {
+  background-color: rgb(var(--color-secondary-rgb) / 1) !important;
+  border-color: rgb(var(--color-secondary-rgb) / 1) !important;
+  color: #ffffff !important;
+}
+
+select.select-accent:focus {
+  border-color: rgb(var(--color-primary-rgb) / 1) !important;
+}
+
+.bg-red-50 {
+  background-color: rgb(var(--color-danger-rgb) / 0.12) !important;
+}
+
+.border-red-50,
+.border-red-100,
+.border-red-200 {
+  border-color: rgb(var(--color-danger-rgb) / 0.3) !important;
+}
+
+.text-red-500,
+.text-red-600,
+.text-red-700 {
+  color: rgb(var(--color-danger-rgb) / 1) !important;
+}
+
+.bg-green-50 {
+  background-color: rgb(var(--color-success-rgb) / 0.12) !important;
+}
+
+.border-green-100,
+.border-green-200 {
+  border-color: rgb(var(--color-success-rgb) / 0.28) !important;
+}
+
+.text-green-500,
+.text-green-600,
+.text-green-700 {
+  color: rgb(var(--color-success-rgb) / 1) !important;
+}
+
+.bg-yellow-50 {
+  background-color: rgb(var(--color-warning-rgb) / 0.14) !important;
+}
+
+.border-yellow-100,
+.border-yellow-200 {
+  border-color: rgb(var(--color-warning-rgb) / 0.35) !important;
+}
+
+.text-yellow-500,
+.text-yellow-600,
+.text-yellow-700 {
+  color: rgb(var(--color-warning-rgb) / 1) !important;
+}
+
+html.dark .hover\:bg-gray-50:hover {
+  background-color: rgb(var(--surface-current-rgb) / 0.9) !important;
+}
+
+html.dark .hover\:bg-gray-100:hover {
+  background-color: rgb(var(--surface-current-rgb) / 0.95) !important;
+}
+
+html.dark .ring-white {
+  --tw-ring-color: rgb(var(--surface-dark-rgb)) !important;
+}
+
+.product-image-surface {
+  background-color: rgb(var(--surface-light-rgb));
+}
+
+.product-image-thumb-surface {
+  background-color: rgb(var(--surface-light-rgb));
+}
+
+.product-card-image-surface {
+  background-color: rgb(var(--surface-light-rgb));
+}
+
+html.dark .product-image-surface,
+html.dark .product-image-thumb-surface,
+html.dark .product-card-image-surface {
+  background-color: rgb(var(--surface-light-rgb)) !important;
+}
+
+html.dark .product-card-image-surface:hover {
+  background-color: rgb(var(--surface-light-rgb) / 0.92) !important;
+}
+
+.touch-pan-x {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}

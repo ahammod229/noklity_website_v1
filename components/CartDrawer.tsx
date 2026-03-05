@@ -82,6 +82,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">{item.category}</p>
+                    {typeof item.stock === 'number' && (
+                      <p className={`text-[11px] mt-1 font-bold ${item.stock > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                        {item.stock > 0 ? `${item.stock} in stock` : 'Out of stock'}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="font-bold text-gray-900">{formatCurrency(item.price)}</span>
@@ -96,7 +101,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                       <span className="text-xs font-bold w-3 text-center">{item.quantity}</span>
                       <button 
                         onClick={() => onUpdateQuantity(item.id, 1)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-900"
+                        disabled={typeof item.stock === 'number' ? item.quantity >= item.stock : false}
+                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Plus className="w-3 h-3" />
                       </button>

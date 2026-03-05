@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Mail, MessageCircle, Clock, CheckCircle, AlertCircle, Loader2, Save } from 'lucide-react';
+import { Mail, MessageCircle, Clock, CheckCircle, AlertCircle, Loader2, Save, Send, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getPublicSiteConfigSnapshot } from '../../services/siteConfigService';
+import { getTenantConfigSnapshot } from '../../services/tenantConfigService';
 
 interface Inquiry {
   id: string;
@@ -20,6 +22,9 @@ const SupportManager: React.FC = () => {
   const [tickets, setTickets] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const config = getPublicSiteConfigSnapshot();
+  const tenantConfig = getTenantConfigSnapshot();
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -87,6 +92,66 @@ const SupportManager: React.FC = () => {
     )));
   };
 
+  const sanitizeWhatsAppPhone = (phone?: string | null) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/[^\d+]/g, '').trim();
+    if (!cleaned) return '';
+    if (cleaned.startsWith('+')) return cleaned.slice(1);
+    if (cleaned.startsWith('00')) return cleaned.slice(2);
+    return cleaned;
+  };
+
+  const buildSupportMessage = (ticket: Inquiry) => {
+    const note = (ticket.admin_note || '').trim();
+    return [
+      `Hello ${ticket.name},`,
+      '',
+      `This is ${(config.siteName || tenantConfig.brandName || 'Storefront')} support.`,
+      '',
+      `Ticket Subject: ${ticket.subject}`,
+      `Your Message: ${ticket.message}`,
+      '',
+      note ? `Support Reply: ${note}` : 'Support Reply: We are working on your issue and will update you shortly.',
+      '',
+      'Thank you.'
+    ].join('\n');
+  };
+
+  const markInProgressAfterContact = (ticket: Inquiry) => {
+    if (ticket.status === 'Pending') {
+      void updateTicket(ticket.id, { status: 'In Progress' });
+    }
+  };
+
+  const handleSendEmail = (ticket: Inquiry) => {
+    const email = (ticket.email || '').trim();
+    if (!email || !email.includes('@')) {
+      setActionMessage({ type: 'error', text: `Ticket ${ticket.id.slice(0, 8)} has no valid email address.` });
+      return;
+    }
+
+    const subject = `${config.siteName || tenantConfig.brandName || 'Storefront'} Support Update • ${ticket.subject}`;
+    const body = buildSupportMessage(ticket);
+    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
+    setActionMessage({ type: 'success', text: `Email composer opened for ${ticket.name}.` });
+    markInProgressAfterContact(ticket);
+  };
+
+  const handleSendWhatsApp = (ticket: Inquiry) => {
+    const phone = sanitizeWhatsAppPhone(ticket.phone);
+    if (!phone) {
+      setActionMessage({ type: 'error', text: `Ticket ${ticket.id.slice(0, 8)} has no valid WhatsApp number.` });
+      return;
+    }
+
+    const text = buildSupportMessage(ticket);
+    const waUrl = `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    setActionMessage({ type: 'success', text: `WhatsApp chat opened for ${ticket.name}.` });
+    markInProgressAfterContact(ticket);
+  };
+
   return (
     <div className="animate-in fade-in duration-500 space-y-6">
       <div className="flex justify-between items-center">
@@ -101,6 +166,16 @@ const SupportManager: React.FC = () => {
           Refresh
         </button>
       </div>
+
+      {actionMessage && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${
+          actionMessage.type === 'error'
+            ? 'bg-red-50 text-red-700 border border-red-200'
+            : 'bg-green-50 text-green-700 border border-green-200'
+        }`}>
+          {actionMessage.text}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -139,6 +214,7 @@ const SupportManager: React.FC = () => {
                   <th className="px-6 py-3 font-medium">Priority</th>
                   <th className="px-6 py-3 font-medium">Status</th>
                   <th className="px-6 py-3 font-medium">Admin Note</th>
+                  <th className="px-6 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -208,6 +284,28 @@ const SupportManager: React.FC = () => {
                           title="Saved on blur"
                         >
                           {savingId === ticket.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 min-w-[220px]">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSendEmail(ticket)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-black text-gray-700 hover:bg-gray-50"
+                          title="Send support reply by email"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSendWhatsApp(ticket)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-xs font-black text-green-700 hover:bg-green-100"
+                          title="Send support reply by WhatsApp"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          WhatsApp
                         </button>
                       </div>
                     </td>

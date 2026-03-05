@@ -1,10 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, RefreshCw, Sparkles, Upload, Wand2 } from 'lucide-react';
+import tenantFileConfig from '../../config/tenant.json';
 import { supabase } from '../../lib/supabase';
 import { clearPublicSiteConfigCache } from '../../services/siteConfigService';
+import { clearTenantConfigCache } from '../../services/tenantConfigService';
+import { useAuth } from '../../contexts/AuthContext';
+import { isSuperAdminEmail } from '../../services/adminAccessService';
+import {
+  ADMIN_IMAGE_GUIDES,
+  formatImageGuideHint,
+  validateImageAgainstGuide,
+  type ImageGuide
+} from '../../utils/adminImageGuides';
+import { FeatureFlags, FeatureKey } from '../../types/tenant';
+import { TenantConfig } from '../../types/tenant';
+import {
+  normalizeFeatureFlagOverrides,
+  normalizePlanName,
+  PLAN_FEATURE_MATRIX,
+  resolveEffectiveFeatureFlags
+} from '../../services/tenantFeatureService';
+import { applyAppearanceSettings, toAppearanceFromRawSettings } from '../../services/appearanceService';
 
 type SettingsTab =
   | 'general'
+  | 'tenant'
+  | 'pages'
   | 'users'
   | 'security'
   | 'notifications'
@@ -33,12 +54,92 @@ interface TabConfig {
   fields: SettingField[];
 }
 
+interface SettingsGroup {
+  title: string;
+  description: string;
+  fields: string[];
+}
+
+type ManagedPageSection = 'company' | 'legal';
+
+interface ManagedPageItem {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  section: ManagedPageSection;
+  isEnabled: boolean;
+  order: number;
+}
+
+interface FooterShopLinkItem {
+  id: string;
+  label: string;
+  href: string;
+  isEnabled: boolean;
+  order: number;
+}
+
+const FEATURE_FLAG_LABELS: Record<FeatureKey, string> = {
+  catalog_public: 'Public Product Catalog',
+  checkout_guest: 'Guest Checkout',
+  payment_bkash: 'bKash Payments',
+  payment_nogad: 'Nogad Payments',
+  payment_bank_transfer: 'Bank Transfer Payments',
+  support_tickets: 'Support Tickets',
+  hero_banners: 'Hero Banner Manager',
+  flash_sales: 'Flash Sale Manager',
+  product_reviews: 'Product Review Moderation',
+  media_control: 'Media Control',
+  customer_management: 'Customer Management',
+  multi_currency: 'Multi-Currency Conversion',
+  advanced_analytics: 'Advanced Analytics/Finance',
+  api_management: 'API Management',
+  custom_pages: 'Company & Legal Pages Manager'
+};
+
+const MANAGED_PAGE_SYNC_MAP: Record<string, { titleKey: string; contentKey: string; section: ManagedPageSection }> = {
+  about: { titleKey: 'company_about_title', contentKey: 'company_about_content', section: 'company' },
+  contact: { titleKey: 'company_contact_title', contentKey: 'company_contact_content', section: 'company' },
+  support: { titleKey: 'company_support_title', contentKey: 'company_support_content', section: 'company' },
+  'shipping-policy': {
+    titleKey: 'company_shipping_policy_title',
+    contentKey: 'company_shipping_policy_content',
+    section: 'company'
+  },
+  'return-policy': { titleKey: 'company_return_policy_title', contentKey: 'company_return_policy_content', section: 'company' },
+  'privacy-policy': { titleKey: 'legal_privacy_policy_title', contentKey: 'legal_privacy_policy_content', section: 'legal' },
+  'terms-of-service': {
+    titleKey: 'legal_terms_of_service_title',
+    contentKey: 'legal_terms_of_service_content',
+    section: 'legal'
+  },
+  'payment-policy': { titleKey: 'legal_payment_policy_title', contentKey: 'legal_payment_policy_content', section: 'legal' },
+  'refund-policy': { titleKey: 'legal_refund_policy_title', contentKey: 'legal_refund_policy_content', section: 'legal' }
+};
+
+const DEFAULT_SHOP_LINKS: FooterShopLinkItem[] = [
+  { id: 'shop-performance', label: 'Performance Parts', href: '/search', isEnabled: true, order: 1 },
+  { id: 'shop-brakes', label: 'Brakes & Suspension', href: '/search?category=Brakes', isEnabled: true, order: 2 },
+  { id: 'shop-engine', label: 'Engine Components', href: '/search?category=Engine', isEnabled: true, order: 3 },
+  { id: 'shop-electronics', label: 'Electronics', href: '/search?category=Electronics', isEnabled: true, order: 4 },
+  { id: 'shop-flash', label: 'Flash Deals', href: '/#flash-sales', isEnabled: true, order: 5 }
+];
+
 const TABS: TabConfig[] = [
   {
     id: 'general',
     label: 'General',
     fields: [
       { key: 'site_name', label: 'Site Name', type: 'text' },
+      { key: 'site_url_name', label: 'URL Name', type: 'text', placeholder: 'shop.noklity.com', helper: 'Short URL label for storefront and branding display' },
+      { key: 'site_url', label: 'Site URL', type: 'text', placeholder: 'https://shop.noklity.com' },
+      { key: 'newsletter_enabled', label: 'Enable Newsletter Section', type: 'switch' },
+      { key: 'newsletter_badge_text', label: 'Newsletter Badge Text', type: 'text', placeholder: 'Exclusive Club' },
+      { key: 'newsletter_title', label: 'Newsletter Title', type: 'text', placeholder: 'Join the Noklity Club' },
+      { key: 'newsletter_description', label: 'Newsletter Description', type: 'textarea', placeholder: 'Get exclusive access...' },
+      { key: 'newsletter_input_placeholder', label: 'Newsletter Input Placeholder', type: 'text', placeholder: 'Enter your email' },
+      { key: 'newsletter_button_text', label: 'Newsletter Button Text', type: 'text', placeholder: 'Join' },
       { key: 'support_email', label: 'Contact Email', type: 'email' },
       { key: 'support_phone', label: 'Support Phone', type: 'text' },
       { key: 'support_address', label: 'Support Address', type: 'textarea' },
@@ -83,6 +184,16 @@ const TABS: TabConfig[] = [
         helper: 'How many base-currency units equal 1 INR'
       }
     ]
+  },
+  {
+    id: 'tenant',
+    label: 'Plans & Features',
+    fields: []
+  },
+  {
+    id: 'pages',
+    label: 'Company & Legal Pages',
+    fields: []
   },
   {
     id: 'users',
@@ -207,21 +318,60 @@ const TABS: TabConfig[] = [
     id: 'appearance',
     label: 'Appearance',
     fields: [
-      { key: 'primary_color', label: 'Primary color', type: 'color' },
-      { key: 'accent_color', label: 'Accent color', type: 'color' },
+      { key: 'primary_color', label: 'Primary color', type: 'color', helper: 'Main brand buttons, active states, highlights' },
+      { key: 'primary_hover_color', label: 'Primary hover color', type: 'color', helper: 'Hover color for primary buttons' },
+      { key: 'accent_color', label: 'Accent color', type: 'color', helper: 'Secondary brand tone for premium sections' },
+      { key: 'success_color', label: 'Success color', type: 'color' },
+      { key: 'warning_color', label: 'Warning color', type: 'color' },
+      { key: 'danger_color', label: 'Danger color', type: 'color' },
+      { key: 'background_color_light', label: 'Light mode background', type: 'color' },
+      { key: 'background_color_dark', label: 'Dark mode background', type: 'color' },
+      { key: 'surface_color_light', label: 'Light mode card surface', type: 'color' },
+      { key: 'surface_color_dark', label: 'Dark mode card surface', type: 'color' },
+      { key: 'text_color_light', label: 'Light mode main text', type: 'color' },
+      { key: 'text_color_dark', label: 'Dark mode main text', type: 'color' },
+      { key: 'muted_text_color_light', label: 'Light mode muted text', type: 'color' },
+      { key: 'muted_text_color_dark', label: 'Dark mode muted text', type: 'color' },
+      { key: 'border_color_light', label: 'Light mode border color', type: 'color' },
+      { key: 'border_color_dark', label: 'Dark mode border color', type: 'color' },
       { key: 'border_radius_px', label: 'Border radius (px)', type: 'number' },
       { key: 'compact_sidebar', label: 'Use compact sidebar', type: 'switch' }
     ]
   }
 ];
 
+const tenantDefaults = tenantFileConfig as TenantConfig;
+const defaultSiteName = tenantDefaults.brandName || 'Storefront';
+const defaultDomain = tenantDefaults.domain || 'localhost';
+const defaultSiteUrl = `https://${defaultDomain}`;
+const defaultSupportEmail = tenantDefaults.supportEmail || 'support@example.com';
+const defaultCompanyName = tenantDefaults.companyName || defaultSiteName;
+const defaultCompanyAddress = tenantDefaults.companyAddress || '';
+const defaultCompanyPhone = tenantDefaults.companyPhone || '';
+const defaultCurrency = (tenantDefaults.currency || 'USD').toUpperCase();
+const defaultCurrencyLocaleMap: Record<string, string> = {
+  BDT: 'en-BD',
+  USD: 'en-US',
+  INR: 'en-IN'
+};
+const currentYear = new Date().getFullYear();
+
 const DEFAULT_VALUES: Record<string, string> = {
-  site_name: 'NOKLITY',
-  support_email: 'support@noklity.com',
-  support_phone: '+1 (555) 123-4567',
-  support_address: '123 Performance Blvd, Speedway City, CA 90210',
+  site_name: defaultSiteName,
+  site_url_name: defaultDomain,
+  site_url: defaultSiteUrl,
+  newsletter_enabled: 'true',
+  newsletter_badge_text: 'Exclusive Club',
+  newsletter_title: `Join the ${defaultSiteName} Club`,
+  newsletter_description: 'Get exclusive access to limited edition drops, installation guides, and 10% off your first order.',
+  newsletter_input_placeholder: 'Enter your email',
+  newsletter_button_text: 'Join',
+  newsletter_background_image_url: '',
+  support_email: defaultSupportEmail,
+  support_phone: defaultCompanyPhone,
+  support_address: defaultCompanyAddress,
   site_tagline: 'Premium Automotive Performance Parts',
-  footer_text: '© 2024 NOKLITY Automotive. All rights reserved.',
+  footer_text: `© ${currentYear} ${defaultCompanyName}. All rights reserved.`,
   whatsapp_number: '+15551234567',
   facebook_url: '',
   instagram_url: '',
@@ -233,11 +383,61 @@ const DEFAULT_VALUES: Record<string, string> = {
   header_logo_dark: '',
   footer_logo: '',
   favicon_url: '',
-  currency_code: 'BDT',
-  currency_locale: 'en-BD',
-  base_currency_code: 'BDT',
+  tenant_brand_name: defaultSiteName,
+  tenant_brand_logo_url: '',
+  tenant_primary_color: tenantDefaults.primaryColor || '#e11d48',
+  tenant_secondary_color: tenantDefaults.secondaryColor || '#0f172a',
+  tenant_support_email: defaultSupportEmail,
+  tenant_company_name: defaultCompanyName,
+  tenant_company_address: defaultCompanyAddress,
+  tenant_company_phone: defaultCompanyPhone,
+  tenant_domain: defaultDomain,
+  tenant_allowed_hosts: Array.isArray(tenantDefaults.allowedHosts) ? tenantDefaults.allowedHosts.join(',') : 'localhost,127.0.0.1',
+  tenant_timezone: tenantDefaults.timezone || 'UTC',
+  tenant_currency: defaultCurrency,
+  tenant_plan_name: tenantDefaults.planName || 'Enterprise',
+  tenant_feature_flags: JSON.stringify(
+    resolveEffectiveFeatureFlags(
+      normalizePlanName(tenantDefaults.planName || 'Enterprise'),
+      tenantDefaults.featureFlags || {}
+    )
+  ),
+  tenant_license_key: tenantDefaults.licenseKey || '',
+  tenant_license_status: tenantDefaults.licenseStatus || 'inactive',
+  currency_code: defaultCurrency,
+  currency_locale: defaultCurrencyLocaleMap[defaultCurrency] || 'en-US',
+  base_currency_code: defaultCurrency,
   exchange_rate_usd: '121.5',
   exchange_rate_inr: '1.45',
+  company_about_title: 'About',
+  company_about_content:
+    `${defaultSiteName} is a premium automotive parts platform focused on performance, reliability, and customer-first service.`,
+  company_contact_title: 'Contact',
+  company_contact_content:
+    'Need help? Contact us by email, phone, WhatsApp, or create a support ticket from the Help page.',
+  company_support_title: 'Support',
+  company_support_content:
+    'For technical issues, order updates, and account help, please use our support center. Our team responds as fast as possible.',
+  company_shipping_policy_title: 'Shipping Policy',
+  company_shipping_policy_content:
+    'Orders are processed after payment verification. Delivery time depends on location and shipping method.',
+  company_return_policy_title: 'Return Policy',
+  company_return_policy_content:
+    'Returns are accepted for eligible products in original condition within the allowed return window.',
+  legal_privacy_policy_title: 'Privacy Policy',
+  legal_privacy_policy_content:
+    'We collect only the data required to operate your account, process orders, and improve service quality.',
+  legal_terms_of_service_title: 'Terms of Service',
+  legal_terms_of_service_content:
+    'By using this website, you agree to follow our store policies, payment terms, and applicable local laws.',
+  legal_payment_policy_title: 'Payment Policy',
+  legal_payment_policy_content:
+    'Supported payment methods are managed from admin settings. Orders are confirmed after successful payment verification.',
+  legal_refund_policy_title: 'Refund Policy',
+  legal_refund_policy_content:
+    'Approved refunds are issued to the original payment channel within the applicable processing period.',
+  managed_pages: '',
+  footer_shop_links: '',
 
   allow_self_signup: 'true',
   require_email_verification: 'true',
@@ -250,7 +450,7 @@ const DEFAULT_VALUES: Record<string, string> = {
   session_timeout_minutes: '120',
   max_login_attempts: '5',
 
-  notification_email: 'support@noklity.com',
+  notification_email: defaultSupportEmail,
   notify_new_order: 'true',
   notify_payment_update: 'true',
   notify_new_customer: 'false',
@@ -279,7 +479,21 @@ const DEFAULT_VALUES: Record<string, string> = {
   custom_footer_script: '',
 
   primary_color: '#e11d48',
+  primary_hover_color: '#be123c',
   accent_color: '#0f172a',
+  success_color: '#16a34a',
+  warning_color: '#f59e0b',
+  danger_color: '#dc2626',
+  background_color_light: '#ffffff',
+  background_color_dark: '#0b1220',
+  surface_color_light: '#ffffff',
+  surface_color_dark: '#111827',
+  text_color_light: '#111827',
+  text_color_dark: '#e5e7eb',
+  muted_text_color_light: '#6b7280',
+  muted_text_color_dark: '#94a3b8',
+  border_color_light: '#e5e7eb',
+  border_color_dark: '#334155',
   border_radius_px: '12',
   compact_sidebar: 'false'
 };
@@ -290,23 +504,523 @@ const localeByCurrency: Record<string, string> = {
   INR: 'en-IN'
 };
 
+const toSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'page';
+
+const normalizeManagedPages = (pages: ManagedPageItem[]) =>
+  pages
+    .map((page, index) => ({
+      id: page.id || `page-${index + 1}`,
+      slug: toSlug(page.slug || page.title || `page-${index + 1}`),
+      title: (page.title || 'Untitled Page').trim(),
+      content: page.content || '',
+      section: page.section === 'legal' ? 'legal' : 'company',
+      isEnabled: page.isEnabled !== false,
+      order: Number.isFinite(page.order) ? page.order : index + 1
+    }))
+    .sort((a, b) => a.order - b.order)
+    .map((page, index) => ({ ...page, order: index + 1 }));
+
+const ensureUniqueSlug = (candidate: string, pages: ManagedPageItem[], currentId?: string) => {
+  const base = toSlug(candidate);
+  const existing = new Set(
+    pages.filter((item) => item.id !== currentId).map((item) => toSlug(item.slug))
+  );
+  if (!existing.has(base)) return base;
+  let suffix = 2;
+  let next = `${base}-${suffix}`;
+  while (existing.has(next)) {
+    suffix += 1;
+    next = `${base}-${suffix}`;
+  }
+  return next;
+};
+
+const createDefaultManagedPages = (values: Record<string, string>): ManagedPageItem[] => {
+  const entries: ManagedPageItem[] = Object.entries(MANAGED_PAGE_SYNC_MAP).map(([slug, mapItem], index) => ({
+    id: `system-${slug}`,
+    slug,
+    title: values[mapItem.titleKey] || slug,
+    content: values[mapItem.contentKey] || '',
+    section: mapItem.section,
+    isEnabled: true,
+    order: index + 1
+  }));
+  return normalizeManagedPages(entries);
+};
+
+const parseManagedPagesSetting = (raw: string | undefined, values: Record<string, string>) => {
+  const fallback = createDefaultManagedPages(values);
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return fallback;
+    const rows: ManagedPageItem[] = parsed.map((item: any, index: number) => ({
+      id: String(item?.id || `custom-${index + 1}`),
+      slug: String(item?.slug || item?.title || `page-${index + 1}`),
+      title: String(item?.title || 'Untitled Page'),
+      content: String(item?.content || ''),
+      section: item?.section === 'legal' ? 'legal' : 'company',
+      isEnabled: item?.isEnabled !== false,
+      order: Number(item?.order || index + 1)
+    }));
+    return normalizeManagedPages(rows);
+  } catch {
+    return fallback;
+  }
+};
+
+const normalizeFooterShopLinks = (links: FooterShopLinkItem[]) =>
+  links
+    .map((item, index) => ({
+      id: String(item.id || `shop-link-${index + 1}`),
+      label: String(item.label || 'Shop Link'),
+      href: String(item.href || '/'),
+      isEnabled: item.isEnabled !== false,
+      order: Number.isFinite(item.order) ? item.order : index + 1
+    }))
+    .sort((a, b) => a.order - b.order)
+    .map((item, index) => ({ ...item, order: index + 1 }));
+
+const parseFooterShopLinksSetting = (raw: string | undefined) => {
+  if (!raw) return normalizeFooterShopLinks(DEFAULT_SHOP_LINKS);
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return normalizeFooterShopLinks(DEFAULT_SHOP_LINKS);
+    const links: FooterShopLinkItem[] = parsed.map((item: any, index: number) => ({
+      id: String(item?.id || `shop-link-${index + 1}`),
+      label: String(item?.label || 'Shop Link'),
+      href: String(item?.href || '/'),
+      isEnabled: item?.isEnabled !== false,
+      order: Number(item?.order || index + 1)
+    }));
+    return normalizeFooterShopLinks(links);
+  } catch {
+    return normalizeFooterShopLinks(DEFAULT_SHOP_LINKS);
+  }
+};
+
+const getUrlNameFromUrl = (siteUrl: string) => {
+  try {
+    const parsed = new URL(siteUrl);
+    return parsed.host || siteUrl;
+  } catch {
+    return siteUrl
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/$/, '')
+      .trim();
+  }
+};
+
+const normalizeColorInput = (value: string, fallback: string) => {
+  const raw = String(value || '').trim();
+  if (!raw) return fallback;
+  const prefixed = raw.startsWith('#') ? raw : `#${raw}`;
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(prefixed) ? prefixed.toLowerCase() : fallback;
+};
+
+interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+interface HslColor {
+  h: number;
+  s: number;
+  l: number;
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const hexToRgb = (hex: string): RgbColor => {
+  const normalized = normalizeColorInput(hex, '#000000').replace('#', '');
+  const fullHex =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => char + char)
+          .join('')
+      : normalized;
+  return {
+    r: parseInt(fullHex.slice(0, 2), 16),
+    g: parseInt(fullHex.slice(2, 4), 16),
+    b: parseInt(fullHex.slice(4, 6), 16)
+  };
+};
+
+const rgbToHex = ({ r, g, b }: RgbColor) =>
+  `#${clamp(Math.round(r), 0, 255).toString(16).padStart(2, '0')}${clamp(Math.round(g), 0, 255)
+    .toString(16)
+    .padStart(2, '0')}${clamp(Math.round(b), 0, 255).toString(16).padStart(2, '0')}`;
+
+const rgbToHsl = ({ r, g, b }: RgbColor): HslColor => {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const delta = max - min;
+
+  let h = 0;
+  const l = (max + min) / 2;
+  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+
+  if (delta !== 0) {
+    if (max === rn) {
+      h = ((gn - bn) / delta) % 6;
+    } else if (max === gn) {
+      h = (bn - rn) / delta + 2;
+    } else {
+      h = (rn - gn) / delta + 4;
+    }
+  }
+
+  h = Math.round(h * 60);
+  if (h < 0) h += 360;
+  return { h, s, l };
+};
+
+const hslToRgb = ({ h, s, l }: HslColor): RgbColor => {
+  const hue = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = l - c / 2;
+
+  let rPrime = 0;
+  let gPrime = 0;
+  let bPrime = 0;
+
+  if (hue < 60) {
+    rPrime = c;
+    gPrime = x;
+  } else if (hue < 120) {
+    rPrime = x;
+    gPrime = c;
+  } else if (hue < 180) {
+    gPrime = c;
+    bPrime = x;
+  } else if (hue < 240) {
+    gPrime = x;
+    bPrime = c;
+  } else if (hue < 300) {
+    rPrime = x;
+    bPrime = c;
+  } else {
+    rPrime = c;
+    bPrime = x;
+  }
+
+  return {
+    r: (rPrime + m) * 255,
+    g: (gPrime + m) * 255,
+    b: (bPrime + m) * 255
+  };
+};
+
+const mixHex = (sourceHex: string, targetHex: string, targetWeight: number) => {
+  const source = hexToRgb(sourceHex);
+  const target = hexToRgb(targetHex);
+  const weight = clamp(targetWeight, 0, 1);
+  return rgbToHex({
+    r: source.r * (1 - weight) + target.r * weight,
+    g: source.g * (1 - weight) + target.g * weight,
+    b: source.b * (1 - weight) + target.b * weight
+  });
+};
+
+const darkenHex = (hex: string, amount: number) => {
+  const hsl = rgbToHsl(hexToRgb(hex));
+  return rgbToHex(hslToRgb({ ...hsl, l: clamp(hsl.l * (1 - clamp(amount, 0, 0.8)), 0, 1) }));
+};
+
+const lightenHex = (hex: string, amount: number) => {
+  const hsl = rgbToHsl(hexToRgb(hex));
+  return rgbToHex(hslToRgb({ ...hsl, l: clamp(hsl.l + (1 - hsl.l) * clamp(amount, 0, 0.8), 0, 1) }));
+};
+
+const getHueDistance = (left: number, right: number) => {
+  const diff = Math.abs(left - right);
+  return Math.min(diff, 360 - diff);
+};
+
+const getAppearanceRawValues = (source: Record<string, string>) => ({
+  primary_color: source.primary_color,
+  primary_hover_color: source.primary_hover_color,
+  accent_color: source.accent_color,
+  success_color: source.success_color,
+  warning_color: source.warning_color,
+  danger_color: source.danger_color,
+  background_color_light: source.background_color_light,
+  background_color_dark: source.background_color_dark,
+  surface_color_light: source.surface_color_light,
+  surface_color_dark: source.surface_color_dark,
+  text_color_light: source.text_color_light,
+  text_color_dark: source.text_color_dark,
+  muted_text_color_light: source.muted_text_color_light,
+  muted_text_color_dark: source.muted_text_color_dark,
+  border_color_light: source.border_color_light,
+  border_color_dark: source.border_color_dark,
+  border_radius_px: source.border_radius_px
+});
+
+const appearanceToSettingsValues = (appearance: ReturnType<typeof toAppearanceFromRawSettings>) => ({
+  primary_color: appearance.primaryColor,
+  primary_hover_color: appearance.primaryHoverColor,
+  accent_color: appearance.accentColor,
+  success_color: appearance.successColor,
+  warning_color: appearance.warningColor,
+  danger_color: appearance.dangerColor,
+  background_color_light: appearance.backgroundColorLight,
+  background_color_dark: appearance.backgroundColorDark,
+  surface_color_light: appearance.surfaceColorLight,
+  surface_color_dark: appearance.surfaceColorDark,
+  text_color_light: appearance.textColorLight,
+  text_color_dark: appearance.textColorDark,
+  muted_text_color_light: appearance.mutedTextColorLight,
+  muted_text_color_dark: appearance.mutedTextColorDark,
+  border_color_light: appearance.borderColorLight,
+  border_color_dark: appearance.borderColorDark,
+  border_radius_px: String(appearance.borderRadiusPx)
+});
+
+interface LogoPaletteResult {
+  primary: string;
+  accent: string;
+}
+
+const extractLogoPalette = (imageUrl: string) =>
+  new Promise<LogoPaletteResult>((resolve, reject) => {
+    if (!imageUrl) {
+      reject(new Error('Logo URL is missing.'));
+      return;
+    }
+
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.referrerPolicy = 'no-referrer';
+    image.decoding = 'async';
+
+    image.onload = () => {
+      const size = 96;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Image engine unavailable in this browser.'));
+        return;
+      }
+
+      ctx.drawImage(image, 0, 0, size, size);
+
+      let data: Uint8ClampedArray;
+      try {
+        data = ctx.getImageData(0, 0, size, size).data;
+      } catch {
+        reject(new Error('Cannot read logo colors (image host blocks color extraction). Use a public logo URL or upload to assets.'));
+        return;
+      }
+
+      const buckets = new Map<string, { rgb: RgbColor; hue: number; weight: number }>();
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3];
+        if (alpha < 72) continue;
+        const rgb: RgbColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
+        const hsl = rgbToHsl(rgb);
+        if ((hsl.l > 0.96 && hsl.s < 0.2) || hsl.l < 0.04) continue;
+
+        const quantized: RgbColor = {
+          r: Math.round(rgb.r / 24) * 24,
+          g: Math.round(rgb.g / 24) * 24,
+          b: Math.round(rgb.b / 24) * 24
+        };
+        const key = `${quantized.r}-${quantized.g}-${quantized.b}`;
+        const vibrance = hsl.s * (1 - Math.abs(hsl.l - 0.5));
+        const weight = 0.25 + vibrance * 2 + alpha / 255;
+        const existing = buckets.get(key);
+        if (existing) {
+          existing.weight += weight;
+        } else {
+          buckets.set(key, { rgb: quantized, hue: hsl.h, weight });
+        }
+      }
+
+      if (buckets.size === 0) {
+        reject(new Error('Logo color detection failed. Try a logo with clear brand colors.'));
+        return;
+      }
+
+      const ranked = Array.from(buckets.values()).sort((a, b) => b.weight - a.weight);
+      const primaryRaw = ranked[0];
+      const accentRaw =
+        ranked.find((item, index) => index > 0 && getHueDistance(item.hue, primaryRaw.hue) >= 18) || ranked[1];
+
+      const normalizedPrimary = (() => {
+        const hsl = rgbToHsl(primaryRaw.rgb);
+        const adjusted = {
+          h: hsl.h,
+          s: clamp(Math.max(hsl.s, 0.45), 0, 1),
+          l: clamp(hsl.l < 0.28 ? 0.46 : hsl.l > 0.72 ? 0.56 : hsl.l, 0, 1)
+        };
+        return rgbToHex(hslToRgb(adjusted));
+      })();
+
+      const normalizedAccent = accentRaw
+        ? (() => {
+            const hsl = rgbToHsl(accentRaw.rgb);
+            return rgbToHex(
+              hslToRgb({
+                h: hsl.h,
+                s: clamp(Math.max(hsl.s, 0.32), 0, 1),
+                l: clamp(hsl.l < 0.2 ? 0.34 : hsl.l > 0.74 ? 0.52 : hsl.l, 0, 1)
+              })
+            );
+          })()
+        : darkenHex(normalizedPrimary, 0.35);
+
+      resolve({
+        primary: normalizedPrimary,
+        accent: normalizedAccent
+      });
+    };
+
+    image.onerror = () => reject(new Error('Failed to load logo for color extraction.'));
+    image.src = imageUrl;
+  });
+
+const buildAppearanceFromLogoPalette = (palette: LogoPaletteResult, current: Record<string, string>) => {
+  const primary = normalizeColorInput(palette.primary, DEFAULT_VALUES.primary_color);
+  const accent = normalizeColorInput(mixHex(palette.accent, '#0f172a', 0.18), DEFAULT_VALUES.accent_color);
+  const appearance = toAppearanceFromRawSettings({
+    ...getAppearanceRawValues(current),
+    primary_color: primary,
+    primary_hover_color: darkenHex(primary, 0.16),
+    accent_color: accent,
+    success_color: lightenHex(mixHex(primary, '#16a34a', 0.55), 0.04),
+    warning_color: lightenHex(mixHex(primary, '#f59e0b', 0.7), 0.02),
+    danger_color: lightenHex(mixHex(primary, '#dc2626', 0.75), 0.02),
+    background_color_light: '#ffffff',
+    surface_color_light: '#ffffff',
+    text_color_light: mixHex(accent, '#111827', 0.52),
+    muted_text_color_light: mixHex(accent, '#6b7280', 0.72),
+    border_color_light: mixHex(accent, '#d1d5db', 0.82),
+    background_color_dark: mixHex(accent, '#020617', 0.86),
+    surface_color_dark: mixHex(accent, '#111827', 0.68),
+    text_color_dark: '#e5e7eb',
+    muted_text_color_dark: '#94a3b8',
+    border_color_dark: mixHex(accent, '#334155', 0.7)
+  });
+
+  return appearance;
+};
+
 const BRAND_ASSET_FIELDS: Array<{ key: string; label: string; helper: string }> = [
   { key: 'header_logo_light', label: 'Header Logo', helper: 'Main logo used in storefront header' },
   { key: 'footer_logo', label: 'Footer Logo', helper: 'Logo shown in footer branding area' },
   { key: 'favicon_url', label: 'Favicon', helper: 'Browser tab icon' },
-  { key: 'link_bar_image_url', label: 'Link Bar Image', helper: 'Optional clickable image bar shown in footer links area' }
+  { key: 'link_bar_image_url', label: 'Link Bar Image', helper: 'Optional clickable image bar shown in footer links area' },
+  { key: 'newsletter_background_image_url', label: 'Newsletter Background', helper: 'Optional background image for home newsletter section' }
+];
+
+const BRAND_ASSET_GUIDE_BY_KEY: Record<string, ImageGuide> = {
+  header_logo_light: ADMIN_IMAGE_GUIDES.headerLogo,
+  footer_logo: ADMIN_IMAGE_GUIDES.footerLogo,
+  favicon_url: ADMIN_IMAGE_GUIDES.favicon,
+  link_bar_image_url: ADMIN_IMAGE_GUIDES.linkBar,
+  newsletter_background_image_url: ADMIN_IMAGE_GUIDES.linkBar
+};
+
+const GENERAL_SETTINGS_GROUPS: SettingsGroup[] = [
+  {
+    title: 'Store Identity',
+    description: 'Core storefront naming and public brand text.',
+    fields: ['site_name', 'site_url_name', 'site_url', 'site_tagline', 'footer_text']
+  },
+  {
+    title: 'Newsletter Section',
+    description: 'Control add/edit/remove content shown in the home subscription banner.',
+    fields: [
+      'newsletter_enabled',
+      'newsletter_badge_text',
+      'newsletter_title',
+      'newsletter_description',
+      'newsletter_input_placeholder',
+      'newsletter_button_text'
+    ]
+  },
+  {
+    title: 'Support Contacts',
+    description: 'Customer-facing support channels and follow-up details.',
+    fields: ['support_email', 'support_phone', 'support_address', 'whatsapp_number']
+  },
+  {
+    title: 'Social & Link Settings',
+    description: 'Footer social URLs and link bar target.',
+    fields: ['facebook_url', 'instagram_url', 'youtube_url', 'twitter_url', 'link_bar_image_link']
+  },
+  {
+    title: 'Currency & Exchange',
+    description: 'Global display currency and conversion rates.',
+    fields: ['currency_code', 'base_currency_code', 'exchange_rate_usd', 'exchange_rate_inr']
+  }
+];
+
+const APPEARANCE_SETTINGS_GROUPS: SettingsGroup[] = [
+  {
+    title: 'Brand Colors',
+    description: 'Primary brand colors used in buttons, links, and highlights.',
+    fields: ['primary_color', 'primary_hover_color', 'accent_color', 'success_color', 'warning_color', 'danger_color']
+  },
+  {
+    title: 'Light Theme Colors',
+    description: 'Background, card, text, and border colors in light mode.',
+    fields: ['background_color_light', 'surface_color_light', 'text_color_light', 'muted_text_color_light', 'border_color_light']
+  },
+  {
+    title: 'Dark Theme Colors',
+    description: 'Background, card, text, and border colors in dark mode.',
+    fields: ['background_color_dark', 'surface_color_dark', 'text_color_dark', 'muted_text_color_dark', 'border_color_dark']
+  },
+  {
+    title: 'Shape & Layout',
+    description: 'Global corner radius and compact sidebar controls.',
+    fields: ['border_radius_px', 'compact_sidebar']
+  }
 ];
 
 const AdminSettings: React.FC = () => {
+  const { profile, user } = useAuth();
+  const isSuperAdmin = isSuperAdminEmail(profile?.email || user?.email || null);
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [values, setValues] = useState<Record<string, string>>(DEFAULT_VALUES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [autoApplying, setAutoApplying] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [settingsRows, setSettingsRows] = useState<Array<{ key: string; value: string; updated_at?: string }>>([]);
+  const [managedPages, setManagedPages] = useState<ManagedPageItem[]>(createDefaultManagedPages(DEFAULT_VALUES));
+  const [shopLinks, setShopLinks] = useState<FooterShopLinkItem[]>(normalizeFooterShopLinks(DEFAULT_SHOP_LINKS));
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(PLAN_FEATURE_MATRIX.Enterprise);
 
   const activeTabConfig = useMemo(() => TABS.find((tab) => tab.id === activeTab) || TABS[0], [activeTab]);
+  const autoPaletteLogoUrl = useMemo(
+    () =>
+      values.header_logo_light ||
+      values.header_logo_dark ||
+      values.footer_logo ||
+      values.tenant_brand_logo_url ||
+      '',
+    [values.header_logo_light, values.header_logo_dark, values.footer_logo, values.tenant_brand_logo_url]
+  );
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -323,7 +1037,30 @@ const AdminSettings: React.FC = () => {
     for (const row of data || []) {
       nextValues[row.key] = row.value || '';
     }
+
+    nextValues.tenant_brand_name = nextValues.tenant_brand_name || nextValues.site_name || DEFAULT_VALUES.tenant_brand_name;
+    nextValues.tenant_brand_logo_url =
+      nextValues.tenant_brand_logo_url || nextValues.header_logo_light || nextValues.header_logo_dark || '';
+    nextValues.tenant_primary_color = nextValues.tenant_primary_color || nextValues.primary_color || DEFAULT_VALUES.tenant_primary_color;
+    nextValues.tenant_secondary_color = nextValues.tenant_secondary_color || nextValues.accent_color || DEFAULT_VALUES.tenant_secondary_color;
+    nextValues.tenant_support_email = nextValues.tenant_support_email || nextValues.support_email || DEFAULT_VALUES.tenant_support_email;
+    nextValues.tenant_company_name = nextValues.tenant_company_name || nextValues.site_name || DEFAULT_VALUES.tenant_company_name;
+    nextValues.tenant_company_address = nextValues.tenant_company_address || nextValues.support_address || DEFAULT_VALUES.tenant_company_address;
+    nextValues.tenant_company_phone = nextValues.tenant_company_phone || nextValues.support_phone || DEFAULT_VALUES.tenant_company_phone;
+    nextValues.tenant_domain = nextValues.tenant_domain || nextValues.site_url_name || DEFAULT_VALUES.tenant_domain;
+    nextValues.tenant_timezone = nextValues.tenant_timezone || nextValues.timezone || DEFAULT_VALUES.tenant_timezone;
+    nextValues.tenant_currency = nextValues.tenant_currency || nextValues.currency_code || DEFAULT_VALUES.tenant_currency;
+    nextValues.tenant_plan_name = normalizePlanName(nextValues.tenant_plan_name || DEFAULT_VALUES.tenant_plan_name);
+    if (!nextValues.tenant_feature_flags) {
+      nextValues.tenant_feature_flags = JSON.stringify(PLAN_FEATURE_MATRIX[nextValues.tenant_plan_name as keyof typeof PLAN_FEATURE_MATRIX]);
+    }
+
+    const parsedOverrides = normalizeFeatureFlagOverrides(nextValues.tenant_feature_flags);
+    setFeatureFlags(resolveEffectiveFeatureFlags(normalizePlanName(nextValues.tenant_plan_name), parsedOverrides));
+
     setValues(nextValues);
+    setManagedPages(parseManagedPagesSetting(nextValues.managed_pages, nextValues));
+    setShopLinks(parseFooterShopLinksSetting(nextValues.footer_shop_links));
     setSettingsRows((data || []) as any);
     setLoading(false);
   };
@@ -332,8 +1069,176 @@ const AdminSettings: React.FC = () => {
     fetchSettings();
   }, []);
 
+  useEffect(() => {
+    applyAppearanceSettings(toAppearanceFromRawSettings(getAppearanceRawValues(values)));
+  }, [
+    values.primary_color,
+    values.primary_hover_color,
+    values.accent_color,
+    values.success_color,
+    values.warning_color,
+    values.danger_color,
+    values.background_color_light,
+    values.background_color_dark,
+    values.surface_color_light,
+    values.surface_color_dark,
+    values.text_color_light,
+    values.text_color_dark,
+    values.muted_text_color_light,
+    values.muted_text_color_dark,
+    values.border_color_light,
+    values.border_color_dark,
+    values.border_radius_px
+  ]);
+
   const setFieldValue = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const applyAppearanceToFormValues = (appearance: ReturnType<typeof toAppearanceFromRawSettings>) => {
+    const mapped = appearanceToSettingsValues(appearance);
+    setValues((prev) => ({
+      ...prev,
+      ...mapped,
+      tenant_primary_color: mapped.primary_color,
+      tenant_secondary_color: mapped.accent_color
+    }));
+  };
+
+  const handleAutoMatchAppearanceFromLogo = async () => {
+    if (!autoPaletteLogoUrl) {
+      setMessage({
+        type: 'error',
+        text: 'Please upload a logo in General > Brand Assets first. Then click Auto Match again.'
+      });
+      return;
+    }
+
+    setAutoApplying(true);
+    setMessage(null);
+    try {
+      const palette = await extractLogoPalette(autoPaletteLogoUrl);
+      const nextAppearance = buildAppearanceFromLogoPalette(palette, values);
+      applyAppearanceToFormValues(nextAppearance);
+      setMessage({
+        type: 'success',
+        text: 'Theme colors were auto-generated from your logo. Review and click Save Changes.'
+      });
+    } catch (error: any) {
+      setMessage({
+        type: 'error',
+        text: error?.message || 'Auto color matching failed. Try another logo image.'
+      });
+    } finally {
+      setAutoApplying(false);
+    }
+  };
+
+  const handleResetAppearanceDefaults = () => {
+    const defaults = toAppearanceFromRawSettings(getAppearanceRawValues(DEFAULT_VALUES));
+    applyAppearanceToFormValues(defaults);
+    setMessage({
+      type: 'success',
+      text: 'Appearance reset to default colors. Click Save Changes to keep it.'
+    });
+  };
+
+  const handleAutoGenerateHoverColor = () => {
+    const primary = normalizeColorInput(values.primary_color, DEFAULT_VALUES.primary_color);
+    setFieldValue('primary_hover_color', darkenHex(primary, 0.16));
+    setMessage({
+      type: 'success',
+      text: 'Primary hover color synced from current primary color.'
+    });
+  };
+
+  const updateManagedPage = (id: string, key: keyof ManagedPageItem, value: string | boolean) => {
+    setManagedPages((prev) =>
+      prev.map((page) => {
+        if (page.id !== id) return page;
+        const next = { ...page, [key]: value } as ManagedPageItem;
+        if (key === 'title' && (!page.slug || page.slug === toSlug(page.title))) {
+          next.slug = ensureUniqueSlug(String(value), prev, id);
+        }
+        if (key === 'slug') {
+          next.slug = ensureUniqueSlug(String(value), prev, id);
+        }
+        return next;
+      })
+    );
+  };
+
+  const addManagedPage = () => {
+    setManagedPages((prev) => {
+      const slug = ensureUniqueSlug('new-page', prev);
+      return [
+        ...prev,
+        {
+          id: `custom-${Date.now()}`,
+          slug,
+          title: 'New Page',
+          content: '',
+          section: 'company',
+          isEnabled: true,
+          order: prev.length + 1
+        }
+      ];
+    });
+  };
+
+  const removeManagedPage = (id: string) => {
+    setManagedPages((prev) => prev.filter((page) => page.id !== id));
+  };
+
+  const moveManagedPage = (id: string, direction: 'up' | 'down') => {
+    setManagedPages((prev) => {
+      const index = prev.findIndex((page) => page.id === id);
+      if (index < 0) return prev;
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [picked] = next.splice(index, 1);
+      next.splice(targetIndex, 0, picked);
+      return next;
+    });
+  };
+
+  const updateShopLink = (id: string, key: keyof FooterShopLinkItem, value: string | boolean) => {
+    setShopLinks((prev) =>
+      prev.map((item) => (item.id === id ? ({ ...item, [key]: value } as FooterShopLinkItem) : item))
+    );
+  };
+
+  const addShopLink = () => {
+    setShopLinks((prev) =>
+      normalizeFooterShopLinks([
+        ...prev,
+        {
+          id: `shop-link-${Date.now()}`,
+          label: 'New Shop Link',
+          href: '/',
+          isEnabled: true,
+          order: prev.length + 1
+        }
+      ])
+    );
+  };
+
+  const removeShopLink = (id: string) => {
+    setShopLinks((prev) => normalizeFooterShopLinks(prev.filter((item) => item.id !== id)));
+  };
+
+  const moveShopLink = (id: string, direction: 'up' | 'down') => {
+    setShopLinks((prev) => {
+      const index = prev.findIndex((item) => item.id === id);
+      if (index < 0) return prev;
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [picked] = next.splice(index, 1);
+      next.splice(targetIndex, 0, picked);
+      return normalizeFooterShopLinks(next);
+    });
   };
 
   const handleUploadAsset = async (settingKey: string, file?: File) => {
@@ -342,6 +1247,17 @@ const AdminSettings: React.FC = () => {
     setMessage(null);
 
     try {
+      const guide = BRAND_ASSET_GUIDE_BY_KEY[settingKey];
+      let uploadInfoText = 'Image uploaded successfully.';
+      if (guide) {
+        const validation = await validateImageAgainstGuide(file, guide);
+        if (validation.shouldBlock) {
+          setMessage({ type: 'error', text: validation.message });
+          return;
+        }
+        uploadInfoText = validation.message;
+      }
+
       const ext = file.name.split('.').pop() || 'png';
       const filePath = `branding/${settingKey}-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
@@ -351,6 +1267,7 @@ const AdminSettings: React.FC = () => {
       if (settingKey === 'header_logo_light' && !values.header_logo_dark) {
         setFieldValue('header_logo_dark', data.publicUrl);
       }
+      setMessage({ type: 'success', text: uploadInfoText });
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Asset upload failed.' });
     } finally {
@@ -362,7 +1279,92 @@ const AdminSettings: React.FC = () => {
     setSaving(true);
     setMessage(null);
 
+    if (activeTab === 'pages') {
+      const normalizedPages = normalizeManagedPages(managedPages);
+      const normalizedShopLinks = normalizeFooterShopLinks(
+        shopLinks.map((item) => ({
+          ...item,
+          label: (item.label || '').trim() || 'Shop Link',
+          href: (item.href || '').trim() || '/'
+        }))
+      );
+      const upserts: Array<{ key: string; value: string }> = [
+        { key: 'managed_pages', value: JSON.stringify(normalizedPages) },
+        { key: 'footer_shop_links', value: JSON.stringify(normalizedShopLinks) }
+      ];
+
+      for (const page of normalizedPages) {
+        const syncMeta = MANAGED_PAGE_SYNC_MAP[page.slug];
+        if (!syncMeta) continue;
+        upserts.push({ key: syncMeta.titleKey, value: page.title });
+        upserts.push({ key: syncMeta.contentKey, value: page.content });
+      }
+
+      const { error } = await supabase.from('site_settings').upsert(upserts, { onConflict: 'key' });
+      setSaving(false);
+
+      if (error) {
+        setMessage({ type: 'error', text: error.message || 'Failed to save page settings.' });
+        return;
+      }
+
+      clearPublicSiteConfigCache();
+      clearTenantConfigCache();
+      setMessage({ type: 'success', text: 'Company, legal, and footer shop links saved successfully.' });
+      fetchSettings();
+      return;
+    }
+
+    if (activeTab === 'tenant') {
+      if (!isSuperAdmin) {
+        setSaving(false);
+        setMessage({ type: 'error', text: 'Only super admin can update plan, feature flags, and license settings.' });
+        return;
+      }
+
+      const normalizedPlan = normalizePlanName(values.tenant_plan_name);
+      const upserts: Array<{ key: string; value: string }> = [
+        { key: 'tenant_brand_name', value: values.tenant_brand_name || values.site_name },
+        { key: 'tenant_brand_logo_url', value: values.tenant_brand_logo_url || values.header_logo_light || '' },
+        { key: 'tenant_primary_color', value: values.tenant_primary_color || '#e11d48' },
+        { key: 'tenant_secondary_color', value: values.tenant_secondary_color || '#0f172a' },
+        { key: 'tenant_support_email', value: values.tenant_support_email || values.support_email || '' },
+        { key: 'tenant_company_name', value: values.tenant_company_name || values.site_name || '' },
+        { key: 'tenant_company_address', value: values.tenant_company_address || values.support_address || '' },
+        { key: 'tenant_company_phone', value: values.tenant_company_phone || values.support_phone || '' },
+        { key: 'tenant_domain', value: values.tenant_domain || values.site_url_name || '' },
+        { key: 'tenant_allowed_hosts', value: values.tenant_allowed_hosts || '' },
+        { key: 'tenant_timezone', value: values.tenant_timezone || values.timezone || 'UTC' },
+        { key: 'tenant_currency', value: values.tenant_currency || values.currency_code || 'USD' },
+        { key: 'tenant_plan_name', value: normalizedPlan },
+        { key: 'tenant_feature_flags', value: JSON.stringify(featureFlags) },
+        { key: 'tenant_license_key', value: values.tenant_license_key || '' },
+        { key: 'tenant_license_status', value: values.tenant_license_status || 'inactive' }
+      ];
+
+      const { error } = await supabase.from('site_settings').upsert(upserts, { onConflict: 'key' });
+      setSaving(false);
+
+      if (error) {
+        setMessage({ type: 'error', text: error.message || 'Failed to save tenant settings.' });
+        return;
+      }
+
+      clearPublicSiteConfigCache();
+      clearTenantConfigCache();
+      setMessage({ type: 'success', text: 'Plan, feature flags, and license settings saved successfully.' });
+      fetchSettings();
+      return;
+    }
+
     const keysToSave = new Set<string>(activeTabConfig.fields.map((field) => field.key));
+    const normalizedAppearanceValues =
+      activeTab === 'appearance'
+        ? (() => {
+            const normalized = toAppearanceFromRawSettings(getAppearanceRawValues(values));
+            return appearanceToSettingsValues(normalized) as Record<string, string>;
+          })()
+        : null;
     if (activeTab === 'general') {
       keysToSave.add('header_logo_light');
       keysToSave.add('header_logo_dark');
@@ -379,16 +1381,25 @@ const AdminSettings: React.FC = () => {
       keysToSave.add('twitter_url');
       keysToSave.add('link_bar_image_url');
       keysToSave.add('link_bar_image_link');
+      keysToSave.add('newsletter_background_image_url');
       keysToSave.add('currency_locale');
+      keysToSave.add('site_url');
+      keysToSave.add('site_url_name');
       if (!values.currency_locale) {
         setFieldValue('currency_locale', localeByCurrency[values.currency_code] || 'en-BD');
+      }
+      if (!values.site_url_name) {
+        setFieldValue('site_url_name', getUrlNameFromUrl(values.site_url || DEFAULT_VALUES.site_url));
       }
     }
 
     const upserts = Array.from(keysToSave).map((key) => {
-      let value = values[key] ?? '';
+      let value = normalizedAppearanceValues?.[key] ?? values[key] ?? '';
       if (key === 'currency_locale') {
         value = values.currency_locale || localeByCurrency[values.currency_code] || 'en-BD';
+      }
+      if (key === 'site_url_name') {
+        value = (values.site_url_name || getUrlNameFromUrl(values.site_url || DEFAULT_VALUES.site_url)).trim();
       }
       return { key, value };
     });
@@ -402,6 +1413,7 @@ const AdminSettings: React.FC = () => {
     }
 
     clearPublicSiteConfigCache();
+    clearTenantConfigCache();
     setMessage({ type: 'success', text: `${activeTabConfig.label} settings saved successfully.` });
     fetchSettings();
   };
@@ -464,28 +1476,36 @@ const AdminSettings: React.FC = () => {
             placeholder={field.placeholder}
             className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold"
           />
+          {field.helper && <p className="text-xs text-gray-500 mt-1">{field.helper}</p>}
         </div>
       );
     }
 
     if (field.type === 'color') {
+      const fallbackColor = DEFAULT_VALUES[field.key] || '#111827';
+      const colorPickerValue = normalizeColorInput(value, fallbackColor);
       return (
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">{field.label}</label>
           <div className="flex items-center gap-3">
             <input
               type="color"
-              value={value || '#000000'}
-              onChange={(e) => setFieldValue(field.key, e.target.value)}
+              value={colorPickerValue}
+              onChange={(e) => setFieldValue(field.key, normalizeColorInput(e.target.value, fallbackColor))}
               className="w-14 h-12 rounded-xl border border-gray-200 bg-white"
             />
             <input
               type="text"
               value={value}
               onChange={(e) => setFieldValue(field.key, e.target.value)}
+              onBlur={(e) => setFieldValue(field.key, normalizeColorInput(e.target.value, fallbackColor))}
               className="flex-1 h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-semibold"
             />
           </div>
+          {!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test((value || '').trim()) && (
+            <p className="text-xs text-amber-700 mt-1">Use HEX color format, example: #e11d48</p>
+          )}
+          {field.helper && <p className="text-xs text-gray-500 mt-1">{field.helper}</p>}
         </div>
       );
     }
@@ -496,11 +1516,609 @@ const AdminSettings: React.FC = () => {
         <input
           type={field.type}
           value={value}
-          onChange={(e) => setFieldValue(field.key, e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setFieldValue(field.key, next);
+            if (field.key === 'site_url' && !values.site_url_name) {
+              setFieldValue('site_url_name', getUrlNameFromUrl(next));
+            }
+          }}
           placeholder={field.placeholder}
           className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
         />
         {field.helper && <p className="text-xs text-gray-500 mt-1">{field.helper}</p>}
+      </div>
+    );
+  };
+
+  const renderGeneralFieldByKey = (key: string) => {
+    const field = activeTabConfig.fields.find((item) => item.key === key);
+    if (!field) return null;
+    return <div key={key}>{renderField(field)}</div>;
+  };
+
+  const renderAppearanceFieldByKey = (key: string) => {
+    const appearanceTab = TABS.find((tab) => tab.id === 'appearance');
+    const field = appearanceTab?.fields.find((item) => item.key === key);
+    if (!field) return null;
+    return <div key={key}>{renderField(field)}</div>;
+  };
+
+  const renderGeneralSettingsContent = () => (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {GENERAL_SETTINGS_GROUPS.map((group) => (
+          <div key={group.title} className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
+            <div>
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">{group.title}</h4>
+              <p className="text-xs text-gray-500 mt-1">{group.description}</p>
+            </div>
+            <div className="space-y-3">
+              {group.fields.map((key) => renderGeneralFieldByKey(key))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={saveCurrentTab}
+          disabled={saving || uploading}
+          className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderAppearanceSettingsContent = () => {
+    const previewLightBackground = normalizeColorInput(values.background_color_light, DEFAULT_VALUES.background_color_light);
+    const previewLightSurface = normalizeColorInput(values.surface_color_light, DEFAULT_VALUES.surface_color_light);
+    const previewLightText = normalizeColorInput(values.text_color_light, DEFAULT_VALUES.text_color_light);
+    const previewLightMuted = normalizeColorInput(values.muted_text_color_light, DEFAULT_VALUES.muted_text_color_light);
+    const previewDarkBackground = normalizeColorInput(values.background_color_dark, DEFAULT_VALUES.background_color_dark);
+    const previewDarkSurface = normalizeColorInput(values.surface_color_dark, DEFAULT_VALUES.surface_color_dark);
+    const previewDarkText = normalizeColorInput(values.text_color_dark, DEFAULT_VALUES.text_color_dark);
+    const previewDarkMuted = normalizeColorInput(values.muted_text_color_dark, DEFAULT_VALUES.muted_text_color_dark);
+    const previewPrimary = normalizeColorInput(values.primary_color, DEFAULT_VALUES.primary_color);
+    const previewPrimaryHover = normalizeColorInput(values.primary_hover_color, DEFAULT_VALUES.primary_hover_color);
+
+    return (
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Smart Color Assistant</h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Auto-match colors from your logo, then fine-tune manually. Live preview updates instantly in admin and storefront.
+              </p>
+              {autoPaletteLogoUrl ? (
+                <p className="text-xs text-gray-600 mt-2 font-semibold break-all">
+                  Logo source: {autoPaletteLogoUrl}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700 mt-2 font-semibold">
+                  No logo found. Upload a logo in General &gt; Brand Assets to enable auto match.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {autoPaletteLogoUrl && (
+                <img
+                  src={autoPaletteLogoUrl}
+                  alt="Brand logo preview"
+                  className="w-16 h-16 rounded-xl object-contain bg-white border border-gray-200"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={autoApplying || saving || uploading}
+              onClick={handleAutoMatchAppearanceFromLogo}
+              className="h-10 px-4 rounded-xl bg-gray-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              {autoApplying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Auto Match from Logo
+            </button>
+
+            <button
+              type="button"
+              disabled={autoApplying || saving || uploading}
+              onClick={handleAutoGenerateHoverColor}
+              className="h-10 px-4 rounded-xl border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-widest hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              <Wand2 className="w-4 h-4" />
+              Auto Hover
+            </button>
+
+            <button
+              type="button"
+              disabled={autoApplying || saving || uploading}
+              onClick={handleResetAppearanceDefaults}
+              className="h-10 px-4 rounded-xl border border-gray-200 bg-white text-gray-700 text-xs font-black uppercase tracking-widest hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reset Defaults
+            </button>
+
+            {!autoPaletteLogoUrl && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('general')}
+                className="h-10 px-4 rounded-xl border border-primary/30 bg-primary/10 text-primary text-xs font-black uppercase tracking-widest hover:bg-primary/20"
+              >
+                Go To General
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Live Preview</h4>
+            <p className="text-xs text-gray-500 mt-1">
+              This preview shows how the storefront cards and buttons will look in light and dark mode.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { label: 'Primary', key: 'primary_color' },
+              { label: 'Primary Hover', key: 'primary_hover_color' },
+              { label: 'Accent', key: 'accent_color' },
+              { label: 'Success', key: 'success_color' },
+              { label: 'Warning', key: 'warning_color' },
+              { label: 'Danger', key: 'danger_color' }
+            ].map((swatch) => (
+              <div key={swatch.key} className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="h-8 rounded-lg border border-gray-200" style={{ backgroundColor: values[swatch.key] || '#ffffff' }} />
+                <p className="text-[11px] font-black uppercase tracking-wider text-gray-600 mt-2">{swatch.label}</p>
+                <p className="text-[11px] font-mono text-gray-500 truncate">{values[swatch.key] || '-'}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-gray-200 p-4 space-y-3" style={{ backgroundColor: previewLightBackground, color: previewLightText }}>
+              <p className="text-[11px] font-black uppercase tracking-widest opacity-70">Light Mode Preview</p>
+              <div className="rounded-lg border p-3" style={{ backgroundColor: previewLightSurface, borderColor: values.border_color_light || DEFAULT_VALUES.border_color_light }}>
+                <p className="text-sm font-black">Shop Parts Faster</p>
+                <p className="text-xs mt-1" style={{ color: previewLightMuted }}>
+                  Buttons, cards, text and border colors update based on your selections.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 h-9 px-4 rounded-lg text-xs font-black uppercase tracking-widest text-white"
+                  style={{ backgroundColor: previewPrimary }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = previewPrimaryHover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = previewPrimary)}
+                >
+                  Primary Action
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-700 p-4 space-y-3" style={{ backgroundColor: previewDarkBackground, color: previewDarkText }}>
+              <p className="text-[11px] font-black uppercase tracking-widest opacity-70">Dark Mode Preview</p>
+              <div className="rounded-lg border p-3" style={{ backgroundColor: previewDarkSurface, borderColor: values.border_color_dark || DEFAULT_VALUES.border_color_dark }}>
+                <p className="text-sm font-black">Premium Performance Theme</p>
+                <p className="text-xs mt-1" style={{ color: previewDarkMuted }}>
+                  Match your brand logo while keeping readability and contrast in dark mode.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 h-9 px-4 rounded-lg text-xs font-black uppercase tracking-widest text-white"
+                  style={{ backgroundColor: previewPrimary }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = previewPrimaryHover)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = previewPrimary)}
+                >
+                  Primary Action
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {APPEARANCE_SETTINGS_GROUPS.map((group) => {
+            const isShapeGroup = group.fields.includes('border_radius_px') || group.fields.includes('compact_sidebar');
+            return (
+              <div key={group.title} className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">{group.title}</h4>
+                  <p className="text-xs text-gray-500 mt-1">{group.description}</p>
+                </div>
+                <div className={isShapeGroup ? 'space-y-3' : 'grid grid-cols-1 md:grid-cols-2 gap-3'}>
+                  {group.fields.map((key) => renderAppearanceFieldByKey(key))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="pt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={saveCurrentTab}
+            disabled={saving || uploading || autoApplying}
+            className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPagesSettingsContent = () => (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Manage Pages</h4>
+            <p className="text-xs text-gray-500 mt-1">Add, edit, remove, and reorder company/legal pages shown in footer.</p>
+          </div>
+          <button
+            type="button"
+            onClick={addManagedPage}
+            className="h-10 px-4 rounded-xl bg-gray-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black"
+          >
+            + Add Page
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {managedPages.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm font-semibold text-gray-500">
+              No pages found. Click "Add Page" to create one.
+            </div>
+          ) : (
+            managedPages.map((page, index) => (
+              <div key={page.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 h-6 rounded-full bg-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-700">
+                      {page.section}
+                    </span>
+                    <span className="text-xs font-bold text-gray-500">Order #{index + 1}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveManagedPage(page.id, 'up')}
+                      disabled={index === 0}
+                      className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveManagedPage(page.id, 'down')}
+                      disabled={index === managedPages.length - 1}
+                      className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
+                    >
+                      Down
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateManagedPage(page.id, 'isEnabled', !page.isEnabled)}
+                      className={`h-8 px-3 rounded-lg text-xs font-black uppercase tracking-widest ${
+                        page.isEnabled
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}
+                    >
+                      {page.isEnabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeManagedPage(page.id)}
+                      className="h-8 px-3 rounded-lg border border-red-200 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Page Title</label>
+                    <input
+                      type="text"
+                      value={page.title}
+                      onChange={(e) => updateManagedPage(page.id, 'title', e.target.value)}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Slug</label>
+                    <input
+                      type="text"
+                      value={page.slug}
+                      onChange={(e) => updateManagedPage(page.id, 'slug', e.target.value)}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                      placeholder="example-page"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Section</label>
+                    <select
+                      value={page.section}
+                      onChange={(e) => updateManagedPage(page.id, 'section', e.target.value as ManagedPageSection)}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                    >
+                      <option value="company">Company</option>
+                      <option value="legal">Legal</option>
+                    </select>
+                  </div>
+                  <div className="xl:col-span-2">
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Content</label>
+                    <textarea
+                      rows={4}
+                      value={page.content}
+                      onChange={(e) => updateManagedPage(page.id, 'content', e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold"
+                      placeholder="Write page content..."
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Footer Shop Links</h4>
+            <p className="text-xs text-gray-500 mt-1">
+              Control the links shown in footer &quot;Shop&quot; section. You can add any internal page or external URL.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addShopLink}
+            className="h-10 px-4 rounded-xl bg-gray-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black"
+          >
+            + Add Shop Link
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {shopLinks.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm font-semibold text-gray-500">
+              No shop links configured. Click &quot;Add Shop Link&quot; to create one.
+            </div>
+          ) : (
+            shopLinks.map((item, index) => (
+              <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 h-6 rounded-full bg-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-700">
+                      Shop Link
+                    </span>
+                    <span className="text-xs font-bold text-gray-500">Order #{index + 1}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveShopLink(item.id, 'up')}
+                      disabled={index === 0}
+                      className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
+                    >
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveShopLink(item.id, 'down')}
+                      disabled={index === shopLinks.length - 1}
+                      className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
+                    >
+                      Down
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateShopLink(item.id, 'isEnabled', !item.isEnabled)}
+                      className={`h-8 px-3 rounded-lg text-xs font-black uppercase tracking-widest ${
+                        item.isEnabled
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      }`}
+                    >
+                      {item.isEnabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeShopLink(item.id)}
+                      className="h-8 px-3 rounded-lg border border-red-200 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Link Label</label>
+                    <input
+                      type="text"
+                      value={item.label}
+                      onChange={(e) => updateShopLink(item.id, 'label', e.target.value)}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                      placeholder="Performance Parts"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Link URL</label>
+                    <input
+                      type="text"
+                      value={item.href}
+                      onChange={(e) => updateShopLink(item.id, 'href', e.target.value)}
+                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                      placeholder="/search?category=Brakes or https://example.com"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="pt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={saveCurrentTab}
+          disabled={saving || uploading}
+          className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderTenantSettingsContent = () => {
+    const planName = normalizePlanName(values.tenant_plan_name);
+    const planDefaults = PLAN_FEATURE_MATRIX[planName];
+
+    return (
+      <div className="space-y-5">
+        <div className={`rounded-xl px-4 py-3 text-sm font-semibold border ${isSuperAdmin ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          {isSuperAdmin
+            ? 'Super admin mode: You can change plan, feature flags, and license configuration.'
+            : 'Read-only mode: only super admin can edit plan, feature flags, and license settings.'}
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Plan</label>
+            <select
+              value={values.tenant_plan_name}
+              disabled={!isSuperAdmin}
+              onChange={(e) => {
+                const nextPlan = normalizePlanName(e.target.value);
+                setFieldValue('tenant_plan_name', nextPlan);
+                setFeatureFlags({ ...PLAN_FEATURE_MATRIX[nextPlan] });
+              }}
+              className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold disabled:opacity-70"
+            >
+              <option value="Basic">Basic</option>
+              <option value="Pro">Pro</option>
+              <option value="Enterprise">Enterprise</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">License Status</label>
+            <select
+              value={values.tenant_license_status}
+              disabled={!isSuperAdmin}
+              onChange={(e) => setFieldValue('tenant_license_status', e.target.value)}
+              className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold disabled:opacity-70"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="expired">Expired</option>
+              <option value="invalid">Invalid</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">License Key</label>
+          <input
+            type="text"
+            value={values.tenant_license_key}
+            disabled={!isSuperAdmin}
+            onChange={(e) => setFieldValue('tenant_license_key', e.target.value.toUpperCase())}
+            className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold disabled:opacity-70"
+            placeholder="NXL-ENTERPRISE-TRIAL0001-0001"
+          />
+          <p className="text-xs text-gray-500 mt-1">Format: NXL-PLAN-XXXXXXXX-XXXX (PLAN = BASIC / PRO / ENTERPRISE)</p>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {[
+            { key: 'tenant_brand_name', label: 'Brand Name' },
+            { key: 'tenant_brand_logo_url', label: 'Brand Logo URL' },
+            { key: 'tenant_support_email', label: 'Support Email' },
+            { key: 'tenant_company_name', label: 'Company Name' },
+            { key: 'tenant_company_phone', label: 'Company Phone' },
+            { key: 'tenant_company_address', label: 'Company Address' },
+            { key: 'tenant_domain', label: 'Primary Domain' },
+            { key: 'tenant_allowed_hosts', label: 'Allowed Hosts (comma-separated)' },
+            { key: 'tenant_timezone', label: 'Timezone' },
+            { key: 'tenant_currency', label: 'Currency' },
+            { key: 'tenant_primary_color', label: 'Primary Color' },
+            { key: 'tenant_secondary_color', label: 'Secondary Color' }
+          ].map((field) => (
+            <div key={field.key}>
+              <label className="block text-sm font-bold text-gray-700 mb-2">{field.label}</label>
+              <input
+                type="text"
+                value={values[field.key] || ''}
+                disabled={!isSuperAdmin}
+                onChange={(e) => setFieldValue(field.key, e.target.value)}
+                className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-semibold disabled:opacity-70"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Feature Flags</h4>
+              <p className="text-xs text-gray-500 mt-1">Turn modules on/off by plan for white-label packages.</p>
+            </div>
+            <button
+              type="button"
+              disabled={!isSuperAdmin}
+              onClick={() => setFeatureFlags({ ...planDefaults })}
+              className="h-9 px-3 rounded-lg border border-gray-200 bg-white text-xs font-black uppercase tracking-widest text-gray-700 disabled:opacity-60"
+            >
+              Reset to {planName}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {Object.keys(FEATURE_FLAG_LABELS).map((key) => {
+              const featureKey = key as FeatureKey;
+              const enabled = Boolean(featureFlags[featureKey]);
+              return (
+                <label key={featureKey} className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-3">
+                  <span className="text-sm font-bold text-gray-800">{FEATURE_FLAG_LABELS[featureKey]}</span>
+                  <button
+                    type="button"
+                    disabled={!isSuperAdmin}
+                    onClick={() => setFeatureFlags((prev) => ({ ...prev, [featureKey]: !prev[featureKey] }))}
+                    className={`w-12 h-7 rounded-full transition-colors relative ${enabled ? 'bg-primary' : 'bg-gray-300'} disabled:opacity-60`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${enabled ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="pt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={saveCurrentTab}
+            disabled={saving || uploading || !isSuperAdmin}
+            className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     );
   };
@@ -563,38 +2181,45 @@ const AdminSettings: React.FC = () => {
           {activeTab === 'general' && (
             <div className="mb-6 rounded-2xl border border-gray-200 p-4 bg-gray-50/50 space-y-4">
               <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Brand Assets</h4>
-              {BRAND_ASSET_FIELDS.map((asset) => (
-                <div key={asset.key} className="space-y-2">
-                  <label className="block text-sm font-bold text-gray-700">{asset.label}</label>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
-                      <Upload className="w-4 h-4" />
-                      {uploading ? 'Uploading...' : 'Choose Image'}
+              {BRAND_ASSET_FIELDS.map((asset) => {
+                const guide = BRAND_ASSET_GUIDE_BY_KEY[asset.key];
+                const guideHint = guide ? formatImageGuideHint(guide) : '';
+                return (
+                  <div key={asset.key} className="space-y-2">
+                    <label className="block text-sm font-bold text-gray-700">{asset.label}</label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                        <Upload className="w-4 h-4" />
+                        {uploading ? 'Uploading...' : 'Choose Image'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => handleUploadAsset(asset.key, e.target.files?.[0])}
+                        />
+                      </label>
                       <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={(e) => handleUploadAsset(asset.key, e.target.files?.[0])}
+                        type="text"
+                        value={values[asset.key] || ''}
+                        onChange={(e) => setFieldValue(asset.key, e.target.value)}
+                        placeholder={`${asset.label} URL`}
+                        className="min-w-[260px] flex-1 h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
                       />
-                    </label>
-                    <input
-                      type="text"
-                      value={values[asset.key] || ''}
-                      onChange={(e) => setFieldValue(asset.key, e.target.value)}
-                      placeholder={`${asset.label} URL`}
-                      className="min-w-[260px] flex-1 h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
-                    />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {asset.helper}
+                      {guideHint ? ` • ${guideHint}` : ''}
+                    </p>
+                    {values[asset.key] && (
+                      <img
+                        src={values[asset.key]}
+                        alt={`${asset.label} preview`}
+                        className="w-20 h-20 rounded-xl border border-gray-200 object-cover bg-white"
+                      />
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500">{asset.helper}</p>
-                  {values[asset.key] && (
-                    <img
-                      src={values[asset.key]}
-                      alt={`${asset.label} preview`}
-                      className="w-20 h-20 rounded-xl border border-gray-200 object-cover bg-white"
-                    />
-                  )}
-                </div>
-              ))}
+                );
+              })}
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-gray-700">Header Logo (Dark Mode)</label>
                 <input
@@ -635,6 +2260,14 @@ const AdminSettings: React.FC = () => {
                 </table>
               </div>
             </div>
+          ) : activeTab === 'general' ? (
+            renderGeneralSettingsContent()
+          ) : activeTab === 'tenant' ? (
+            renderTenantSettingsContent()
+          ) : activeTab === 'pages' ? (
+            renderPagesSettingsContent()
+          ) : activeTab === 'appearance' ? (
+            renderAppearanceSettingsContent()
           ) : (
             <div className="space-y-5">
               {activeTabConfig.fields.map((field) => (
