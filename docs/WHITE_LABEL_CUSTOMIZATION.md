@@ -16,11 +16,9 @@
   - logos and branding assets
 - Admin > Settings > Company & Legal Pages:
   - add/edit/remove pages shown in footer and `/page/:slug`
-- Admin > Settings > Plans & Features (super admin):
-  - plan
-  - license key/status
-  - feature flags
+- Admin > Settings:
   - tenant branding/business metadata
+  - feature toggles for optional modules
 
 ## B) File-based defaults
 - Edit:
@@ -44,10 +42,7 @@
 - `allowedHosts`
 - `timezone`
 - `currency`
-- `planName`
 - `featureFlags`
-- `licenseKey`
-- `licenseStatus`
 
 ## Notes
 - Logo/image guidance and dimension hints are enforced in admin uploads.

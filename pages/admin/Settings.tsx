@@ -12,10 +12,9 @@ import {
   validateImageAgainstGuide,
   type ImageGuide
 } from '../../utils/adminImageGuides';
-import { FeatureFlags, FeatureKey } from '../../types/tenant';
+import { optimizeImageByGuide } from '../../utils/imageOptimization';
 import { TenantConfig } from '../../types/tenant';
 import {
-  normalizeFeatureFlagOverrides,
   normalizePlanName,
   PLAN_FEATURE_MATRIX,
   resolveEffectiveFeatureFlags
@@ -24,7 +23,8 @@ import { applyAppearanceSettings, toAppearanceFromRawSettings } from '../../serv
 
 type SettingsTab =
   | 'general'
-  | 'tenant'
+  | 'header'
+  | 'footer'
   | 'pages'
   | 'users'
   | 'security'
@@ -80,24 +80,6 @@ interface FooterShopLinkItem {
   order: number;
 }
 
-const FEATURE_FLAG_LABELS: Record<FeatureKey, string> = {
-  catalog_public: 'Public Product Catalog',
-  checkout_guest: 'Guest Checkout',
-  payment_bkash: 'bKash Payments',
-  payment_nogad: 'Nogad Payments',
-  payment_bank_transfer: 'Bank Transfer Payments',
-  support_tickets: 'Support Tickets',
-  hero_banners: 'Hero Banner Manager',
-  flash_sales: 'Flash Sale Manager',
-  product_reviews: 'Product Review Moderation',
-  media_control: 'Media Control',
-  customer_management: 'Customer Management',
-  multi_currency: 'Multi-Currency Conversion',
-  advanced_analytics: 'Advanced Analytics/Finance',
-  api_management: 'API Management',
-  custom_pages: 'Company & Legal Pages Manager'
-};
-
 const MANAGED_PAGE_SYNC_MAP: Record<string, { titleKey: string; contentKey: string; section: ManagedPageSection }> = {
   about: { titleKey: 'company_about_title', contentKey: 'company_about_content', section: 'company' },
   contact: { titleKey: 'company_contact_title', contentKey: 'company_contact_content', section: 'company' },
@@ -131,26 +113,17 @@ const TABS: TabConfig[] = [
     id: 'general',
     label: 'General',
     fields: [
-      { key: 'site_name', label: 'Site Name', type: 'text' },
-      { key: 'site_url_name', label: 'URL Name', type: 'text', placeholder: 'shop.noklity.com', helper: 'Short URL label for storefront and branding display' },
-      { key: 'site_url', label: 'Site URL', type: 'text', placeholder: 'https://shop.noklity.com' },
       { key: 'newsletter_enabled', label: 'Enable Newsletter Section', type: 'switch' },
       { key: 'newsletter_badge_text', label: 'Newsletter Badge Text', type: 'text', placeholder: 'Exclusive Club' },
       { key: 'newsletter_title', label: 'Newsletter Title', type: 'text', placeholder: 'Join the Noklity Club' },
       { key: 'newsletter_description', label: 'Newsletter Description', type: 'textarea', placeholder: 'Get exclusive access...' },
       { key: 'newsletter_input_placeholder', label: 'Newsletter Input Placeholder', type: 'text', placeholder: 'Enter your email' },
       { key: 'newsletter_button_text', label: 'Newsletter Button Text', type: 'text', placeholder: 'Join' },
+      { key: 'newsletter_background_image_url', label: 'Newsletter Background Image', type: 'text' },
       { key: 'support_email', label: 'Contact Email', type: 'email' },
       { key: 'support_phone', label: 'Support Phone', type: 'text' },
       { key: 'support_address', label: 'Support Address', type: 'textarea' },
-      { key: 'site_tagline', label: 'Site Tagline', type: 'textarea' },
-      { key: 'footer_text', label: 'Footer Text', type: 'text' },
       { key: 'whatsapp_number', label: 'WhatsApp Number', type: 'text' },
-      { key: 'facebook_url', label: 'Facebook URL', type: 'text', placeholder: 'https://facebook.com/your-page' },
-      { key: 'instagram_url', label: 'Instagram URL', type: 'text', placeholder: 'https://instagram.com/your-page' },
-      { key: 'youtube_url', label: 'YouTube URL', type: 'text', placeholder: 'https://youtube.com/your-channel' },
-      { key: 'twitter_url', label: 'Twitter/X URL', type: 'text', placeholder: 'https://x.com/your-handle' },
-      { key: 'link_bar_image_link', label: 'Link Bar Image URL Target', type: 'text', placeholder: 'https://your-target-link.com' },
       {
         key: 'currency_code',
         label: 'Currency',
@@ -186,9 +159,37 @@ const TABS: TabConfig[] = [
     ]
   },
   {
-    id: 'tenant',
-    label: 'Plans & Features',
-    fields: []
+    id: 'header',
+    label: 'Header',
+    fields: [
+      { key: 'site_name', label: 'Site Name', type: 'text' },
+      {
+        key: 'site_url_name',
+        label: 'URL Name',
+        type: 'text',
+        placeholder: 'shop.noklity.com',
+        helper: 'Short URL label for storefront and branding display'
+      },
+      { key: 'site_url', label: 'Site URL', type: 'text', placeholder: 'https://shop.noklity.com' },
+      { key: 'site_tagline', label: 'Site Tagline', type: 'textarea' },
+      { key: 'header_logo_light', label: 'Header Logo (Light)', type: 'text' },
+      { key: 'header_logo_dark', label: 'Header Logo (Dark)', type: 'text' },
+      { key: 'favicon_url', label: 'Favicon', type: 'text' }
+    ]
+  },
+  {
+    id: 'footer',
+    label: 'Footer',
+    fields: [
+      { key: 'footer_text', label: 'Footer Text', type: 'text' },
+      { key: 'footer_logo', label: 'Footer Logo', type: 'text' },
+      { key: 'facebook_url', label: 'Facebook URL', type: 'text', placeholder: 'https://facebook.com/your-page' },
+      { key: 'instagram_url', label: 'Instagram URL', type: 'text', placeholder: 'https://instagram.com/your-page' },
+      { key: 'youtube_url', label: 'YouTube URL', type: 'text', placeholder: 'https://youtube.com/your-channel' },
+      { key: 'twitter_url', label: 'Twitter/X URL', type: 'text', placeholder: 'https://x.com/your-handle' },
+      { key: 'link_bar_image_url', label: 'Link Bar Image', type: 'text' },
+      { key: 'link_bar_image_link', label: 'Link Bar Image URL Target', type: 'text', placeholder: 'https://your-target-link.com' }
+    ]
   },
   {
     id: 'pages',
@@ -239,6 +240,7 @@ const TABS: TabConfig[] = [
     id: 'billing',
     label: 'Payment & Billing',
     fields: [
+      { key: 'tax_enabled', label: 'Enable tax/VAT section', type: 'switch' },
       { key: 'default_tax_rate', label: 'Default tax rate (%)', type: 'number' },
       { key: 'default_shipping_fee', label: 'Default shipping fee (base currency)', type: 'number' },
       { key: 'invoice_prefix', label: 'Invoice prefix', type: 'text' },
@@ -456,6 +458,7 @@ const DEFAULT_VALUES: Record<string, string> = {
   notify_new_customer: 'false',
   notify_support_ticket: 'true',
 
+  tax_enabled: 'true',
   default_tax_rate: '8',
   default_shipping_fee: '15',
   invoice_prefix: 'INV',
@@ -922,11 +925,18 @@ const buildAppearanceFromLogoPalette = (palette: LogoPaletteResult, current: Rec
   return appearance;
 };
 
-const BRAND_ASSET_FIELDS: Array<{ key: string; label: string; helper: string }> = [
-  { key: 'header_logo_light', label: 'Header Logo', helper: 'Main logo used in storefront header' },
+const HEADER_BRAND_ASSET_FIELDS: Array<{ key: string; label: string; helper: string }> = [
+  { key: 'header_logo_light', label: 'Header Logo (Light)', helper: 'Main logo used in storefront header for light theme' },
+  { key: 'header_logo_dark', label: 'Header Logo (Dark)', helper: 'Optional dark-theme version of header logo' },
+  { key: 'favicon_url', label: 'Favicon', helper: 'Browser tab icon' }
+];
+
+const FOOTER_BRAND_ASSET_FIELDS: Array<{ key: string; label: string; helper: string }> = [
   { key: 'footer_logo', label: 'Footer Logo', helper: 'Logo shown in footer branding area' },
-  { key: 'favicon_url', label: 'Favicon', helper: 'Browser tab icon' },
-  { key: 'link_bar_image_url', label: 'Link Bar Image', helper: 'Optional clickable image bar shown in footer links area' },
+  { key: 'link_bar_image_url', label: 'Link Bar Image', helper: 'Optional clickable image bar shown in footer links area' }
+];
+
+const GENERAL_BRAND_ASSET_FIELDS: Array<{ key: string; label: string; helper: string }> = [
   { key: 'newsletter_background_image_url', label: 'Newsletter Background', helper: 'Optional background image for home newsletter section' }
 ];
 
@@ -939,11 +949,6 @@ const BRAND_ASSET_GUIDE_BY_KEY: Record<string, ImageGuide> = {
 };
 
 const GENERAL_SETTINGS_GROUPS: SettingsGroup[] = [
-  {
-    title: 'Store Identity',
-    description: 'Core storefront naming and public brand text.',
-    fields: ['site_name', 'site_url_name', 'site_url', 'site_tagline', 'footer_text']
-  },
   {
     title: 'Newsletter Section',
     description: 'Control add/edit/remove content shown in the home subscription banner.',
@@ -962,14 +967,25 @@ const GENERAL_SETTINGS_GROUPS: SettingsGroup[] = [
     fields: ['support_email', 'support_phone', 'support_address', 'whatsapp_number']
   },
   {
-    title: 'Social & Link Settings',
-    description: 'Footer social URLs and link bar target.',
-    fields: ['facebook_url', 'instagram_url', 'youtube_url', 'twitter_url', 'link_bar_image_link']
-  },
-  {
     title: 'Currency & Exchange',
     description: 'Global display currency and conversion rates.',
     fields: ['currency_code', 'base_currency_code', 'exchange_rate_usd', 'exchange_rate_inr']
+  }
+];
+
+const HEADER_SETTINGS_GROUPS: SettingsGroup[] = [
+  {
+    title: 'Store Identity',
+    description: 'Brand naming and URL details shown in header and metadata.',
+    fields: ['site_name', 'site_url_name', 'site_url', 'site_tagline']
+  }
+];
+
+const FOOTER_SETTINGS_GROUPS: SettingsGroup[] = [
+  {
+    title: 'Footer Content',
+    description: 'Footer text and social profiles shown to customers.',
+    fields: ['footer_text', 'facebook_url', 'instagram_url', 'youtube_url', 'twitter_url', 'link_bar_image_link']
   }
 ];
 
@@ -1009,8 +1025,6 @@ const AdminSettings: React.FC = () => {
   const [settingsRows, setSettingsRows] = useState<Array<{ key: string; value: string; updated_at?: string }>>([]);
   const [managedPages, setManagedPages] = useState<ManagedPageItem[]>(createDefaultManagedPages(DEFAULT_VALUES));
   const [shopLinks, setShopLinks] = useState<FooterShopLinkItem[]>(normalizeFooterShopLinks(DEFAULT_SHOP_LINKS));
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(PLAN_FEATURE_MATRIX.Enterprise);
-
   const activeTabConfig = useMemo(() => TABS.find((tab) => tab.id === activeTab) || TABS[0], [activeTab]);
   const autoPaletteLogoUrl = useMemo(
     () =>
@@ -1054,9 +1068,6 @@ const AdminSettings: React.FC = () => {
     if (!nextValues.tenant_feature_flags) {
       nextValues.tenant_feature_flags = JSON.stringify(PLAN_FEATURE_MATRIX[nextValues.tenant_plan_name as keyof typeof PLAN_FEATURE_MATRIX]);
     }
-
-    const parsedOverrides = normalizeFeatureFlagOverrides(nextValues.tenant_feature_flags);
-    setFeatureFlags(resolveEffectiveFeatureFlags(normalizePlanName(nextValues.tenant_plan_name), parsedOverrides));
 
     setValues(nextValues);
     setManagedPages(parseManagedPagesSetting(nextValues.managed_pages, nextValues));
@@ -1109,7 +1120,7 @@ const AdminSettings: React.FC = () => {
     if (!autoPaletteLogoUrl) {
       setMessage({
         type: 'error',
-        text: 'Please upload a logo in General > Brand Assets first. Then click Auto Match again.'
+        text: 'Please upload a logo in Header Assets first. Then click Auto Match again.'
       });
       return;
     }
@@ -1258,16 +1269,20 @@ const AdminSettings: React.FC = () => {
         uploadInfoText = validation.message;
       }
 
-      const ext = file.name.split('.').pop() || 'png';
-      const filePath = `branding/${settingKey}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
+      const optimized = guide
+        ? await optimizeImageByGuide(file, guide, { fileNamePrefix: settingKey })
+        : await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.linkBar, { fileNamePrefix: settingKey });
+      const filePath = `branding/${optimized.file.name}`;
+      const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, optimized.file, {
+        upsert: false
+      });
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
       setFieldValue(settingKey, data.publicUrl);
       if (settingKey === 'header_logo_light' && !values.header_logo_dark) {
         setFieldValue('header_logo_dark', data.publicUrl);
       }
-      setMessage({ type: 'success', text: uploadInfoText });
+      setMessage({ type: 'success', text: `${uploadInfoText} Optimized ${optimized.reducedPercent}% smaller.` });
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Asset upload failed.' });
     } finally {
@@ -1281,17 +1296,7 @@ const AdminSettings: React.FC = () => {
 
     if (activeTab === 'pages') {
       const normalizedPages = normalizeManagedPages(managedPages);
-      const normalizedShopLinks = normalizeFooterShopLinks(
-        shopLinks.map((item) => ({
-          ...item,
-          label: (item.label || '').trim() || 'Shop Link',
-          href: (item.href || '').trim() || '/'
-        }))
-      );
-      const upserts: Array<{ key: string; value: string }> = [
-        { key: 'managed_pages', value: JSON.stringify(normalizedPages) },
-        { key: 'footer_shop_links', value: JSON.stringify(normalizedShopLinks) }
-      ];
+      const upserts: Array<{ key: string; value: string }> = [{ key: 'managed_pages', value: JSON.stringify(normalizedPages) }];
 
       for (const page of normalizedPages) {
         const syncMeta = MANAGED_PAGE_SYNC_MAP[page.slug];
@@ -1310,49 +1315,36 @@ const AdminSettings: React.FC = () => {
 
       clearPublicSiteConfigCache();
       clearTenantConfigCache();
-      setMessage({ type: 'success', text: 'Company, legal, and footer shop links saved successfully.' });
+      setMessage({ type: 'success', text: 'Company and legal pages saved successfully.' });
       fetchSettings();
       return;
     }
 
-    if (activeTab === 'tenant') {
-      if (!isSuperAdmin) {
-        setSaving(false);
-        setMessage({ type: 'error', text: 'Only super admin can update plan, feature flags, and license settings.' });
-        return;
-      }
-
-      const normalizedPlan = normalizePlanName(values.tenant_plan_name);
+    if (activeTab === 'footer') {
+      const normalizedShopLinks = normalizeFooterShopLinks(
+        shopLinks.map((item) => ({
+          ...item,
+          label: (item.label || '').trim() || 'Shop Link',
+          href: (item.href || '').trim() || '/'
+        }))
+      );
+      const keysToSave = new Set<string>(activeTabConfig.fields.map((field) => field.key));
       const upserts: Array<{ key: string; value: string }> = [
-        { key: 'tenant_brand_name', value: values.tenant_brand_name || values.site_name },
-        { key: 'tenant_brand_logo_url', value: values.tenant_brand_logo_url || values.header_logo_light || '' },
-        { key: 'tenant_primary_color', value: values.tenant_primary_color || '#e11d48' },
-        { key: 'tenant_secondary_color', value: values.tenant_secondary_color || '#0f172a' },
-        { key: 'tenant_support_email', value: values.tenant_support_email || values.support_email || '' },
-        { key: 'tenant_company_name', value: values.tenant_company_name || values.site_name || '' },
-        { key: 'tenant_company_address', value: values.tenant_company_address || values.support_address || '' },
-        { key: 'tenant_company_phone', value: values.tenant_company_phone || values.support_phone || '' },
-        { key: 'tenant_domain', value: values.tenant_domain || values.site_url_name || '' },
-        { key: 'tenant_allowed_hosts', value: values.tenant_allowed_hosts || '' },
-        { key: 'tenant_timezone', value: values.tenant_timezone || values.timezone || 'UTC' },
-        { key: 'tenant_currency', value: values.tenant_currency || values.currency_code || 'USD' },
-        { key: 'tenant_plan_name', value: normalizedPlan },
-        { key: 'tenant_feature_flags', value: JSON.stringify(featureFlags) },
-        { key: 'tenant_license_key', value: values.tenant_license_key || '' },
-        { key: 'tenant_license_status', value: values.tenant_license_status || 'inactive' }
+        ...Array.from(keysToSave).map((key) => ({ key, value: values[key] ?? '' })),
+        { key: 'footer_shop_links', value: JSON.stringify(normalizedShopLinks) }
       ];
 
       const { error } = await supabase.from('site_settings').upsert(upserts, { onConflict: 'key' });
       setSaving(false);
 
       if (error) {
-        setMessage({ type: 'error', text: error.message || 'Failed to save tenant settings.' });
+        setMessage({ type: 'error', text: error.message || 'Failed to save footer settings.' });
         return;
       }
 
       clearPublicSiteConfigCache();
       clearTenantConfigCache();
-      setMessage({ type: 'success', text: 'Plan, feature flags, and license settings saved successfully.' });
+      setMessage({ type: 'success', text: 'Footer settings saved successfully.' });
       fetchSettings();
       return;
     }
@@ -1366,28 +1358,12 @@ const AdminSettings: React.FC = () => {
           })()
         : null;
     if (activeTab === 'general') {
-      keysToSave.add('header_logo_light');
-      keysToSave.add('header_logo_dark');
-      keysToSave.add('footer_logo');
-      keysToSave.add('favicon_url');
-      keysToSave.add('site_tagline');
-      keysToSave.add('footer_text');
-      keysToSave.add('whatsapp_number');
-      keysToSave.add('support_phone');
-      keysToSave.add('support_address');
-      keysToSave.add('facebook_url');
-      keysToSave.add('instagram_url');
-      keysToSave.add('youtube_url');
-      keysToSave.add('twitter_url');
-      keysToSave.add('link_bar_image_url');
-      keysToSave.add('link_bar_image_link');
-      keysToSave.add('newsletter_background_image_url');
       keysToSave.add('currency_locale');
-      keysToSave.add('site_url');
-      keysToSave.add('site_url_name');
       if (!values.currency_locale) {
         setFieldValue('currency_locale', localeByCurrency[values.currency_code] || 'en-BD');
       }
+    }
+    if (activeTab === 'header') {
       if (!values.site_url_name) {
         setFieldValue('site_url_name', getUrlNameFromUrl(values.site_url || DEFAULT_VALUES.site_url));
       }
@@ -1531,34 +1507,246 @@ const AdminSettings: React.FC = () => {
     );
   };
 
-  const renderGeneralFieldByKey = (key: string) => {
-    const field = activeTabConfig.fields.find((item) => item.key === key);
+  const getTabFieldByKey = (tabId: SettingsTab, key: string) =>
+    TABS.find((tab) => tab.id === tabId)?.fields.find((item) => item.key === key);
+
+  const renderFieldByKeyForTab = (tabId: SettingsTab, key: string) => {
+    const field = getTabFieldByKey(tabId, key);
     if (!field) return null;
     return <div key={key}>{renderField(field)}</div>;
   };
 
-  const renderAppearanceFieldByKey = (key: string) => {
-    const appearanceTab = TABS.find((tab) => tab.id === 'appearance');
-    const field = appearanceTab?.fields.find((item) => item.key === key);
-    if (!field) return null;
-    return <div key={key}>{renderField(field)}</div>;
-  };
+  const renderAppearanceFieldByKey = (key: string) => renderFieldByKeyForTab('appearance', key);
+
+  const renderSettingsGroups = (tabId: SettingsTab, groups: SettingsGroup[]) => (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      {groups.map((group) => (
+        <div key={`${tabId}-${group.title}`} className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
+          <div>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">{group.title}</h4>
+            <p className="text-xs text-gray-500 mt-1">{group.description}</p>
+          </div>
+          <div className="space-y-3">{group.fields.map((key) => renderFieldByKeyForTab(tabId, key))}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderBrandAssetsCard = (
+    heading: string,
+    description: string,
+    assetFields: Array<{ key: string; label: string; helper: string }>
+  ) => (
+    <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50/50 space-y-4">
+      <div>
+        <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">{heading}</h4>
+        <p className="text-xs text-gray-500 mt-1">{description}</p>
+      </div>
+      {assetFields.map((asset) => {
+        const guide = BRAND_ASSET_GUIDE_BY_KEY[asset.key];
+        const guideHint = guide ? formatImageGuideHint(guide) : '';
+        const isWideLogoAsset =
+          asset.key === 'header_logo_light' ||
+          asset.key === 'header_logo_dark' ||
+          asset.key === 'footer_logo';
+        return (
+          <div key={asset.key} className="space-y-2">
+            <label className="block text-sm font-bold text-gray-700">{asset.label}</label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer ${
+                  uploading ? 'opacity-60 pointer-events-none' : ''
+                }`}
+              >
+                <Upload className="w-4 h-4" />
+                {uploading ? 'Uploading...' : 'Choose Image'}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handleUploadAsset(asset.key, e.target.files?.[0])}
+                />
+              </label>
+              <input
+                type="text"
+                value={values[asset.key] || ''}
+                onChange={(e) => setFieldValue(asset.key, e.target.value)}
+                placeholder={`${asset.label} URL`}
+                className="min-w-[260px] flex-1 h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              {asset.helper}
+              {guideHint ? ` • ${guideHint}` : ''}
+            </p>
+            {values[asset.key] && (
+              <img
+                src={values[asset.key]}
+                alt={`${asset.label} preview`}
+                className={`rounded-xl border border-gray-200 bg-white ${
+                  isWideLogoAsset ? 'w-52 h-20 p-2 object-contain' : 'w-20 h-20 object-cover'
+                }`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const renderGeneralSettingsContent = () => (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {GENERAL_SETTINGS_GROUPS.map((group) => (
-          <div key={group.title} className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
-            <div>
-              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">{group.title}</h4>
-              <p className="text-xs text-gray-500 mt-1">{group.description}</p>
-            </div>
-            <div className="space-y-3">
-              {group.fields.map((key) => renderGeneralFieldByKey(key))}
-            </div>
-          </div>
-        ))}
+      {renderBrandAssetsCard(
+        'General Media',
+        'Upload media used in general storefront sections like newsletter.',
+        GENERAL_BRAND_ASSET_FIELDS
+      )}
+      {renderSettingsGroups('general', GENERAL_SETTINGS_GROUPS)}
+
+      <div className="pt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={saveCurrentTab}
+          disabled={saving || uploading}
+          className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
       </div>
+    </div>
+  );
+
+  const renderHeaderSettingsContent = () => (
+    <div className="space-y-5">
+      {renderBrandAssetsCard(
+        'Header Assets',
+        'Control storefront header logos, favicon, and main identity values.',
+        HEADER_BRAND_ASSET_FIELDS
+      )}
+      {renderSettingsGroups('header', HEADER_SETTINGS_GROUPS)}
+
+      <div className="pt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={saveCurrentTab}
+          disabled={saving || uploading}
+          className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderFooterShopLinksContent = () => (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Footer Shop Links</h4>
+          <p className="text-xs text-gray-500 mt-1">
+            Control the links shown in footer &quot;Shop&quot; section. You can add any internal page or external URL.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={addShopLink}
+          className="h-10 px-4 rounded-xl bg-gray-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black"
+        >
+          + Add Shop Link
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {shopLinks.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm font-semibold text-gray-500">
+            No shop links configured. Click &quot;Add Shop Link&quot; to create one.
+          </div>
+        ) : (
+          shopLinks.map((item, index) => (
+            <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 h-6 rounded-full bg-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-700">
+                    Shop Link
+                  </span>
+                  <span className="text-xs font-bold text-gray-500">Order #{index + 1}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveShopLink(item.id, 'up')}
+                    disabled={index === 0}
+                    className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveShopLink(item.id, 'down')}
+                    disabled={index === shopLinks.length - 1}
+                    className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
+                  >
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateShopLink(item.id, 'isEnabled', !item.isEnabled)}
+                    className={`h-8 px-3 rounded-lg text-xs font-black uppercase tracking-widest ${
+                      item.isEnabled
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}
+                  >
+                    {item.isEnabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeShopLink(item.id)}
+                    className="h-8 px-3 rounded-lg border border-red-200 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Link Label</label>
+                  <input
+                    type="text"
+                    value={item.label}
+                    onChange={(e) => updateShopLink(item.id, 'label', e.target.value)}
+                    className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                    placeholder="Performance Parts"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Link URL</label>
+                  <input
+                    type="text"
+                    value={item.href}
+                    onChange={(e) => updateShopLink(item.id, 'href', e.target.value)}
+                    className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
+                    placeholder="/search?category=Brakes or https://example.com"
+                  />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const renderFooterSettingsContent = () => (
+    <div className="space-y-5">
+      {renderBrandAssetsCard(
+        'Footer Assets',
+        'Manage footer logo and optional link bar image.',
+        FOOTER_BRAND_ASSET_FIELDS
+      )}
+      {renderSettingsGroups('footer', FOOTER_SETTINGS_GROUPS)}
+      {renderFooterShopLinksContent()}
 
       <div className="pt-3 flex justify-end">
         <button
@@ -1600,7 +1788,7 @@ const AdminSettings: React.FC = () => {
                 </p>
               ) : (
                 <p className="text-xs text-amber-700 mt-2 font-semibold">
-                  No logo found. Upload a logo in General &gt; Brand Assets to enable auto match.
+                  No logo found. Upload a logo in Header assets to enable auto match.
                 </p>
               )}
             </div>
@@ -1649,10 +1837,10 @@ const AdminSettings: React.FC = () => {
             {!autoPaletteLogoUrl && (
               <button
                 type="button"
-                onClick={() => setActiveTab('general')}
+                onClick={() => setActiveTab('header')}
                 className="h-10 px-4 rounded-xl border border-primary/30 bg-primary/10 text-primary text-xs font-black uppercase tracking-widest hover:bg-primary/20"
               >
-                Go To General
+                Go To Header
               </button>
             )}
           </div>
@@ -1873,104 +2061,6 @@ const AdminSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Footer Shop Links</h4>
-            <p className="text-xs text-gray-500 mt-1">
-              Control the links shown in footer &quot;Shop&quot; section. You can add any internal page or external URL.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={addShopLink}
-            className="h-10 px-4 rounded-xl bg-gray-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black"
-          >
-            + Add Shop Link
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {shopLinks.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm font-semibold text-gray-500">
-              No shop links configured. Click &quot;Add Shop Link&quot; to create one.
-            </div>
-          ) : (
-            shopLinks.map((item, index) => (
-              <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2 h-6 rounded-full bg-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-700">
-                      Shop Link
-                    </span>
-                    <span className="text-xs font-bold text-gray-500">Order #{index + 1}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => moveShopLink(item.id, 'up')}
-                      disabled={index === 0}
-                      className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveShopLink(item.id, 'down')}
-                      disabled={index === shopLinks.length - 1}
-                      className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-600 disabled:opacity-40"
-                    >
-                      Down
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateShopLink(item.id, 'isEnabled', !item.isEnabled)}
-                      className={`h-8 px-3 rounded-lg text-xs font-black uppercase tracking-widest ${
-                        item.isEnabled
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : 'bg-gray-100 text-gray-600 border border-gray-200'
-                      }`}
-                    >
-                      {item.isEnabled ? 'Enabled' : 'Disabled'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeShopLink(item.id)}
-                      className="h-8 px-3 rounded-lg border border-red-200 text-xs font-black uppercase tracking-widest text-red-600 hover:bg-red-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Link Label</label>
-                    <input
-                      type="text"
-                      value={item.label}
-                      onChange={(e) => updateShopLink(item.id, 'label', e.target.value)}
-                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
-                      placeholder="Performance Parts"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-widest text-gray-500 mb-1">Link URL</label>
-                    <input
-                      type="text"
-                      value={item.href}
-                      onChange={(e) => updateShopLink(item.id, 'href', e.target.value)}
-                      className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold"
-                      placeholder="/search?category=Brakes or https://example.com"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
       <div className="pt-3 flex justify-end">
         <button
           type="button"
@@ -1983,145 +2073,6 @@ const AdminSettings: React.FC = () => {
       </div>
     </div>
   );
-
-  const renderTenantSettingsContent = () => {
-    const planName = normalizePlanName(values.tenant_plan_name);
-    const planDefaults = PLAN_FEATURE_MATRIX[planName];
-
-    return (
-      <div className="space-y-5">
-        <div className={`rounded-xl px-4 py-3 text-sm font-semibold border ${isSuperAdmin ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-          {isSuperAdmin
-            ? 'Super admin mode: You can change plan, feature flags, and license configuration.'
-            : 'Read-only mode: only super admin can edit plan, feature flags, and license settings.'}
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">Plan</label>
-            <select
-              value={values.tenant_plan_name}
-              disabled={!isSuperAdmin}
-              onChange={(e) => {
-                const nextPlan = normalizePlanName(e.target.value);
-                setFieldValue('tenant_plan_name', nextPlan);
-                setFeatureFlags({ ...PLAN_FEATURE_MATRIX[nextPlan] });
-              }}
-              className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold disabled:opacity-70"
-            >
-              <option value="Basic">Basic</option>
-              <option value="Pro">Pro</option>
-              <option value="Enterprise">Enterprise</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">License Status</label>
-            <select
-              value={values.tenant_license_status}
-              disabled={!isSuperAdmin}
-              onChange={(e) => setFieldValue('tenant_license_status', e.target.value)}
-              className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold disabled:opacity-70"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="expired">Expired</option>
-              <option value="invalid">Invalid</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">License Key</label>
-          <input
-            type="text"
-            value={values.tenant_license_key}
-            disabled={!isSuperAdmin}
-            onChange={(e) => setFieldValue('tenant_license_key', e.target.value.toUpperCase())}
-            className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-bold disabled:opacity-70"
-            placeholder="NXL-ENTERPRISE-TRIAL0001-0001"
-          />
-          <p className="text-xs text-gray-500 mt-1">Format: NXL-PLAN-XXXXXXXX-XXXX (PLAN = BASIC / PRO / ENTERPRISE)</p>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {[
-            { key: 'tenant_brand_name', label: 'Brand Name' },
-            { key: 'tenant_brand_logo_url', label: 'Brand Logo URL' },
-            { key: 'tenant_support_email', label: 'Support Email' },
-            { key: 'tenant_company_name', label: 'Company Name' },
-            { key: 'tenant_company_phone', label: 'Company Phone' },
-            { key: 'tenant_company_address', label: 'Company Address' },
-            { key: 'tenant_domain', label: 'Primary Domain' },
-            { key: 'tenant_allowed_hosts', label: 'Allowed Hosts (comma-separated)' },
-            { key: 'tenant_timezone', label: 'Timezone' },
-            { key: 'tenant_currency', label: 'Currency' },
-            { key: 'tenant_primary_color', label: 'Primary Color' },
-            { key: 'tenant_secondary_color', label: 'Secondary Color' }
-          ].map((field) => (
-            <div key={field.key}>
-              <label className="block text-sm font-bold text-gray-700 mb-2">{field.label}</label>
-              <input
-                type="text"
-                value={values[field.key] || ''}
-                disabled={!isSuperAdmin}
-                onChange={(e) => setFieldValue(field.key, e.target.value)}
-                className="w-full h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm font-semibold disabled:opacity-70"
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Feature Flags</h4>
-              <p className="text-xs text-gray-500 mt-1">Turn modules on/off by plan for white-label packages.</p>
-            </div>
-            <button
-              type="button"
-              disabled={!isSuperAdmin}
-              onClick={() => setFeatureFlags({ ...planDefaults })}
-              className="h-9 px-3 rounded-lg border border-gray-200 bg-white text-xs font-black uppercase tracking-widest text-gray-700 disabled:opacity-60"
-            >
-              Reset to {planName}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {Object.keys(FEATURE_FLAG_LABELS).map((key) => {
-              const featureKey = key as FeatureKey;
-              const enabled = Boolean(featureFlags[featureKey]);
-              return (
-                <label key={featureKey} className="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-3">
-                  <span className="text-sm font-bold text-gray-800">{FEATURE_FLAG_LABELS[featureKey]}</span>
-                  <button
-                    type="button"
-                    disabled={!isSuperAdmin}
-                    onClick={() => setFeatureFlags((prev) => ({ ...prev, [featureKey]: !prev[featureKey] }))}
-                    className={`w-12 h-7 rounded-full transition-colors relative ${enabled ? 'bg-primary' : 'bg-gray-300'} disabled:opacity-60`}
-                  >
-                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${enabled ? 'left-6' : 'left-1'}`} />
-                  </button>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="pt-3 flex justify-end">
-          <button
-            type="button"
-            onClick={saveCurrentTab}
-            disabled={saving || uploading || !isSuperAdmin}
-            className="h-11 px-6 rounded-xl bg-primary text-white font-black text-sm hover:bg-red-700 disabled:opacity-60"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   const recentSettings = useMemo(
     () => [...settingsRows].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || '')).slice(0, 20),
@@ -2178,61 +2129,6 @@ const AdminSettings: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'general' && (
-            <div className="mb-6 rounded-2xl border border-gray-200 p-4 bg-gray-50/50 space-y-4">
-              <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Brand Assets</h4>
-              {BRAND_ASSET_FIELDS.map((asset) => {
-                const guide = BRAND_ASSET_GUIDE_BY_KEY[asset.key];
-                const guideHint = guide ? formatImageGuideHint(guide) : '';
-                return (
-                  <div key={asset.key} className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700">{asset.label}</label>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
-                        <Upload className="w-4 h-4" />
-                        {uploading ? 'Uploading...' : 'Choose Image'}
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={(e) => handleUploadAsset(asset.key, e.target.files?.[0])}
-                        />
-                      </label>
-                      <input
-                        type="text"
-                        value={values[asset.key] || ''}
-                        onChange={(e) => setFieldValue(asset.key, e.target.value)}
-                        placeholder={`${asset.label} URL`}
-                        className="min-w-[260px] flex-1 h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {asset.helper}
-                      {guideHint ? ` • ${guideHint}` : ''}
-                    </p>
-                    {values[asset.key] && (
-                      <img
-                        src={values[asset.key]}
-                        alt={`${asset.label} preview`}
-                        className="w-20 h-20 rounded-xl border border-gray-200 object-cover bg-white"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-              <div className="space-y-2">
-                <label className="block text-sm font-bold text-gray-700">Header Logo (Dark Mode)</label>
-                <input
-                  type="text"
-                  value={values.header_logo_dark || ''}
-                  onChange={(e) => setFieldValue('header_logo_dark', e.target.value)}
-                  placeholder="Dark mode logo URL (optional)"
-                  className="w-full h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold"
-                />
-              </div>
-            </div>
-          )}
-
           {activeTab === 'logs' ? (
             <div className="rounded-xl border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -2262,8 +2158,10 @@ const AdminSettings: React.FC = () => {
             </div>
           ) : activeTab === 'general' ? (
             renderGeneralSettingsContent()
-          ) : activeTab === 'tenant' ? (
-            renderTenantSettingsContent()
+          ) : activeTab === 'header' ? (
+            renderHeaderSettingsContent()
+          ) : activeTab === 'footer' ? (
+            renderFooterSettingsContent()
           ) : activeTab === 'pages' ? (
             renderPagesSettingsContent()
           ) : activeTab === 'appearance' ? (

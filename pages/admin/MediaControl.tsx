@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
+import { optimizeImageByGuide, optimizeImageForUpload } from '../../utils/imageOptimization';
 
 type BucketName = 'assets' | 'avatars' | 'payment-proofs';
 type MediaTypeFilter = 'all' | 'images' | 'others';
@@ -235,11 +236,20 @@ const MediaControl: React.FC = () => {
 
     const normalizedFolder = sanitizeFolderPath(folder);
     let uploadedCount = 0;
+    let optimizedCount = 0;
+    let reducedBytesTotal = 0;
     const failed: string[] = [];
 
     for (const file of Array.from(files)) {
       try {
-        if (selectedGuide) {
+        const isImage = file.type.startsWith('image/');
+
+        if (selectedGuide && !isImage) {
+          failed.push(`${file.name}: selected guide requires an image file.`);
+          continue;
+        }
+
+        if (selectedGuide && isImage) {
           const validation = await validateImageAgainstGuide(file, selectedGuide);
           if (validation.shouldBlock) {
             failed.push(`${file.name}: ${validation.message}`);
@@ -247,9 +257,25 @@ const MediaControl: React.FC = () => {
           }
         }
 
-        const finalName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeFileName(file.name)}`;
+        let fileToUpload = file;
+        if (isImage) {
+          const optimized = selectedGuide
+            ? await optimizeImageByGuide(file, selectedGuide, { fileNamePrefix: 'media' })
+            : await optimizeImageForUpload(file, {
+                targetWidth: 1920,
+                targetHeight: 1920,
+                fit: 'contain',
+                maxBytes: 4 * 1024 * 1024,
+                fileNamePrefix: 'media'
+              });
+          fileToUpload = optimized.file;
+          optimizedCount += 1;
+          reducedBytesTotal += Math.max(0, optimized.originalBytes - optimized.optimizedBytes);
+        }
+
+        const finalName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeFileName(fileToUpload.name)}`;
         const path = normalizedFolder ? `${normalizedFolder}/${finalName}` : finalName;
-        const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
+        const { error } = await supabase.storage.from(bucket).upload(path, fileToUpload, { upsert: false });
         if (error) throw error;
         uploadedCount += 1;
       } catch (error: any) {
@@ -260,8 +286,13 @@ const MediaControl: React.FC = () => {
     setUploading(false);
     await fetchMedia();
 
+    const optimizationHint =
+      optimizedCount > 0 && reducedBytesTotal > 0
+        ? ` Optimized ${optimizedCount} image(s), saved ${formatBytes(reducedBytesTotal)}.`
+        : '';
+
     if (failed.length === 0) {
-      setMessage({ type: 'success', text: `Uploaded ${uploadedCount} file(s) successfully.` });
+      setMessage({ type: 'success', text: `Uploaded ${uploadedCount} file(s) successfully.${optimizationHint}` });
       return;
     }
 
@@ -269,7 +300,7 @@ const MediaControl: React.FC = () => {
       type: uploadedCount > 0 ? 'success' : 'error',
       text:
         uploadedCount > 0
-          ? `Uploaded ${uploadedCount} file(s). ${failed.length} file(s) failed.`
+          ? `Uploaded ${uploadedCount} file(s). ${failed.length} file(s) failed.${optimizationHint}`
           : `Upload failed: ${failed.slice(0, 2).join(' | ')}`
     });
   };

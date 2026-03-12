@@ -9,12 +9,16 @@ interface ProductDetailsPageProps {
   productId?: string;
   onAddToCart: (product: Product) => void;
   onNavigate: (view: any) => void;
+  onHomeClick?: () => void;
+  onCategoryClick?: (category: string) => void;
 }
 
 const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ 
   productId, 
   onAddToCart, 
-  onNavigate 
+  onNavigate,
+  onHomeClick,
+  onCategoryClick
 }) => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +89,8 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
       product={product} 
       onClose={handleClose} 
       onAddToCart={onAddToCart} 
+      onHomeClick={onHomeClick}
+      onCategoryClick={onCategoryClick}
     />
   );
 };

@@ -8,9 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "setup:single-tenant": "bash scripts/setup-single-tenant.sh",
+    "check:prepublish": "node scripts/prepublish-check.mjs",
     "test:productization": "node scripts/productization-check.mjs",
     "test:smoke": "npm run build",
-    "test": "npm run test:productization && npm run test:smoke"
+    "test": "npm run test:productization && npm run test:smoke && npm run check:prepublish"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

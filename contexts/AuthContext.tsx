@@ -2,6 +2,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import {
+  clearSupabaseStoredSession,
+  readSupabaseStoredSession
+} from '../utils/supabaseAuthStorage';
 
 export interface UserProfile {
   id: string;
@@ -37,6 +41,13 @@ const isAllowlistedAdminEmail = (email?: string | null) => {
   if (!email) return false;
   return ADMIN_EMAIL_ALLOWLIST.includes(email.toLowerCase());
 };
+
+const getSupabaseUrl = () =>
+  (
+    ((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) ||
+      (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL : '') ||
+      '') as string
+  ).trim();
 
 const PROFILE_TABLE_MISSING_ERROR_CODES = new Set(['PGRST205', '42P01']);
 
@@ -93,6 +104,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const readSessionFromStorage = (): Session | null => {
+    if (typeof window === 'undefined') return null;
+    return readSupabaseStoredSession(getSupabaseUrl(), window.localStorage);
+  };
+
+  const clearStoredSession = () => {
+    if (typeof window === 'undefined') return;
+    const supabaseUrl = getSupabaseUrl();
+    clearSupabaseStoredSession(supabaseUrl, window.localStorage);
+    clearSupabaseStoredSession(supabaseUrl, window.sessionStorage);
+  };
+
+  const isInvalidJwtError = (error: unknown) => {
+    const message =
+      typeof error === 'object' && error && 'message' in error
+        ? String((error as { message?: string }).message || '').toLowerCase()
+        : '';
+    return message.includes('invalid jwt') || message.includes('jwt expired');
+  };
+
+  const validateSessionToken = async (candidate: Session | null): Promise<Session | null> => {
+    if (!candidate?.access_token) return null;
+
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.getUser(candidate.access_token),
+        7000,
+        'Auth token validation'
+      );
+      if (!error && data?.user?.id) {
+        return candidate;
+      }
+      if (!isInvalidJwtError(error)) {
+        return candidate;
+      }
+    } catch {
+      // Continue to refresh path below.
+    }
+
+    try {
+      const { data: refreshed, error: refreshError } = await withTimeout(
+        supabase.auth.refreshSession(),
+        7000,
+        'Auth session refresh'
+      );
+
+      if (refreshError || !refreshed.session?.access_token) {
+        clearStoredSession();
+        return null;
+      }
+
+      const { data: refreshedUser, error: refreshedUserError } = await withTimeout(
+        supabase.auth.getUser(refreshed.session.access_token),
+        7000,
+        'Refreshed token validation'
+      );
+
+      if (refreshedUserError || !refreshedUser?.user?.id) {
+        clearStoredSession();
+        return null;
+      }
+
+      return refreshed.session;
+    } catch {
+      clearStoredSession();
+      return null;
+    }
+  };
+
+  const getAuthSessionSafely = async (): Promise<Session | null> => {
+    try {
+      const {
+        data: { session },
+        error
+      } = await withTimeout(supabase.auth.getSession(), 7000, 'Auth session recovery');
+      if (error) return readSessionFromStorage();
+      return session ?? readSessionFromStorage();
+    } catch {
+      return readSessionFromStorage();
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -106,12 +199,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) throw error;
 
-        if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
+        const safeSession = await validateSessionToken(session);
 
-          if (session?.user) {
-            await fetchProfile(session.user.id, mounted, session.user);
+        if (mounted) {
+          setSession(safeSession);
+          setUser(safeSession?.user ?? null);
+
+          if (safeSession?.user) {
+            await fetchProfile(safeSession.user.id, mounted, safeSession.user);
           } else {
             setProfile(null);
             setIsLoading(false);
@@ -120,11 +215,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.error('Auth initialization error:', error);
 
+        const fallbackSession = await validateSessionToken(await getAuthSessionSafely());
+        const fallbackSessionUser = fallbackSession?.user ?? null;
         const fallbackUser = await getAuthUserSafely();
-        if (mounted && fallbackUser) {
-          setSession(null);
-          setUser(fallbackUser);
-          await fetchProfile(fallbackUser.id, mounted, fallbackUser);
+        const recoveredUser = fallbackSessionUser || fallbackUser;
+
+        if (mounted && recoveredUser && fallbackSession?.access_token) {
+          setSession(fallbackSession);
+          setUser(recoveredUser);
+          await fetchProfile(recoveredUser.id, mounted, recoveredUser);
           return;
         }
 
@@ -139,13 +238,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       if (mounted) {
-        setSession(session);
-        setUser(session?.user ?? null);
+        const resolvedSession =
+          nextSession ?? (_event !== 'SIGNED_OUT' ? await getAuthSessionSafely() : null);
+        const safeSession = await validateSessionToken(resolvedSession);
+        const hadToken = Boolean(resolvedSession?.access_token);
+        const effectiveSession = safeSession;
+        if (hadToken && !safeSession) {
+          clearStoredSession();
+        }
+        setSession(effectiveSession);
+        setUser(effectiveSession?.user ?? null);
 
-        if (session?.user) {
-          await fetchProfile(session.user.id, mounted, session.user);
+        if (effectiveSession?.user) {
+          await fetchProfile(effectiveSession.user.id, mounted, effectiveSession.user);
         } else {
           setProfile(null);
           setIsLoading(false);

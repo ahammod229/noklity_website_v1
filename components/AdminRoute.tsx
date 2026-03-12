@@ -1,7 +1,8 @@
 
 import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -9,7 +10,8 @@ interface AdminRouteProps {
 }
 
 const AdminRoute: React.FC<AdminRouteProps> = ({ children, onNavigate }) => {
-  const { user, isLoading, isAdmin } = useAuth();
+  const { user, session, isLoading, isAdmin } = useAuth();
+  const hasSessionToken = Boolean(session?.access_token);
 
   useEffect(() => {
     // Wait for auth to finish loading
@@ -24,9 +26,17 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children, onNavigate }) => {
       if (!isAdmin) {
         console.warn('Unauthorized access attempt to admin route');
         onNavigate('home');
+        return;
+      }
+
+      if (!hasSessionToken) {
+        // Non-blocking recovery. If refresh fails, keep route decision based on user/admin.
+        void supabase.auth.refreshSession().catch(() => {
+          // noop
+        });
       }
     }
-  }, [user, isLoading, isAdmin, onNavigate]);
+  }, [user, session, isLoading, isAdmin, hasSessionToken, onNavigate]);
 
   if (isLoading) {
     return (

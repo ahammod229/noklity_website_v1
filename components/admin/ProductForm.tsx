@@ -3,6 +3,7 @@ import { X, Loader2, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-rea
 import { Product } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
+import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
 export interface ProductFormData {
   name: string;
@@ -234,13 +235,20 @@ const ProductForm: React.FC<ProductFormProps> = ({
         setFormMessage({ type: 'error', text: validation.message });
         return;
       }
-      const ext = file.name.split('.').pop() || 'jpg';
-      const filePath = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
+      const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.productPrimary, {
+        fileNamePrefix: 'product-primary'
+      });
+      const filePath = `products/${optimized.file.name}`;
+      const { error } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
       if (error) throw error;
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
       setFormData((prev) => ({ ...prev, image: data.publicUrl }));
-      setFormMessage({ type: 'success', text: validation.message });
+      setFormMessage({
+        type: 'success',
+        text: `${validation.message} Optimized ${optimized.reducedPercent}% smaller (${Math.round(
+          optimized.optimizedBytes / 1024
+        )}KB).`
+      });
     } catch (error) {
       console.error('Primary image upload failed:', error);
       setFormMessage({ type: 'error', text: 'Primary image upload failed. Check admin storage permissions.' });
@@ -269,9 +277,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
       const uploadedUrls: string[] = [];
       for (const file of filesArray) {
-        const ext = file.name.split('.').pop() || 'jpg';
-        const filePath = `products/gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
+        const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.productGallery, {
+          fileNamePrefix: 'product-gallery'
+        });
+        const filePath = `products/${optimized.file.name}`;
+        const { error } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
         if (error) throw error;
         const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
         uploadedUrls.push(data.publicUrl);

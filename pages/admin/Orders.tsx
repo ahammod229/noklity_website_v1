@@ -16,13 +16,21 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Loader2
+  Loader2,
+  Truck
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import OrderTable from '../../components/admin/OrderTable';
 import { Order } from '../../types';
 import { useCurrency } from '../../hooks/useCurrency';
 import { getShortOrderId, formatShortOrderId } from '../../utils/orderId';
+import {
+  createSteadfastParcelForOrder,
+  getSteadfastConfig,
+  SteadfastDeliveryStatus,
+  SteadfastTrackingState,
+  syncSteadfastTrackingForOrder
+} from '../../services/steadfastDeliveryService';
 
 // Extended type for Admin purposes matching the UI needs
 export interface AdminOrderDetail extends Order {
@@ -50,6 +58,12 @@ export interface AdminOrderDetail extends Order {
     status: string;
     createdAt: string;
   } | null;
+  deliveryProvider?: 'steadfast' | 'manual' | null;
+  deliveryConsignmentId?: string | null;
+  deliveryTrackingCode?: string | null;
+  deliveryTrackingUrl?: string | null;
+  deliveryStatus?: SteadfastDeliveryStatus;
+  deliveryLastSyncedAt?: string | null;
 }
 
 interface AdminOrdersProps {
@@ -83,20 +97,71 @@ const normalizeOrderStatus = (status?: string): Order['status'] => {
   }
 };
 
+const mapDeliveryToOrderStatus = (
+  deliveryStatus: SteadfastDeliveryStatus | undefined,
+  currentStatus: Order['status']
+): Order['status'] => {
+  switch (deliveryStatus) {
+    case 'delivered':
+      return 'Delivered';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'in_transit':
+      return currentStatus === 'Delivered' ? currentStatus : 'Shipped';
+    case 'picked':
+    case 'pending_pickup':
+    case 'created':
+      if (currentStatus === 'Pending' || currentStatus === 'Processing') return 'Processing';
+      return currentStatus;
+    default:
+      return currentStatus;
+  }
+};
+
+const deliveryStatusLabel = (status?: SteadfastDeliveryStatus) => {
+  if (!status || status === 'not_created') return 'Not Created';
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (s) => s.toUpperCase());
+};
+
 const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
   const { formatCurrency } = useCurrency();
   const [orders, setOrders] = useState<AdminOrderDetail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null);
+  const [steadfastState, setSteadfastState] = useState({
+    configured: false,
+    enabled: false,
+    autoCreate: false,
+    trackingEnabled: true
+  });
+  const [parcelActionLoading, setParcelActionLoading] = useState<'create' | 'sync' | null>(null);
 
   useEffect(() => {
-    fetchOrders();
+    void fetchOrders();
+    void fetchSteadfastState();
   }, []);
+
+  const fetchSteadfastState = async () => {
+    try {
+      const config = await getSteadfastConfig();
+      setSteadfastState({
+        configured: config.configured,
+        enabled: config.enabled,
+        autoCreate: config.autoCreate,
+        trackingEnabled: config.trackingEnabled
+      });
+    } catch (error) {
+      console.warn('Unable to load Steadfast state for orders page:', error);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
+    setMessage(null);
     try {
       // Fetch orders with related data
       const { data, error } = await supabase
@@ -142,9 +207,15 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
             }),
             total: order.total_amount,
             status: normalizeOrderStatus(order.status),
-            itemsCount: order.order_items.length,
+            itemsCount: (order.order_items || []).length,
             paymentStatus,
             paymentMethod: order.payment_method || 'N/A',
+            deliveryProvider: order.delivery_provider,
+            deliveryConsignmentId: order.delivery_consignment_id,
+            deliveryTrackingCode: order.delivery_tracking_code,
+            deliveryTrackingUrl: order.delivery_tracking_url,
+            deliveryStatus: order.delivery_status || 'not_created',
+            deliveryLastSyncedAt: order.delivery_last_synced_at,
             shippingAddress: {
               street: shipping.address || '',
               city: shipping.city || '',
@@ -152,7 +223,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               zip: shipping.zip || '',
               country: shipping.country || ''
             },
-            items: order.order_items.map((item: any) => ({
+            items: (order.order_items || []).map((item: any) => ({
               id: item.product?.id || 'unknown',
               name: item.product?.title || 'Unknown Product',
               price: item.price,
@@ -197,9 +268,94 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(prev => prev ? { ...prev, status: normalizedStatus } : null);
       }
+
+      if (
+        normalizedStatus === 'Processing' &&
+        steadfastState.enabled &&
+        steadfastState.autoCreate
+      ) {
+        try {
+          const tracking = await createSteadfastParcelForOrder(orderId);
+          applyTrackingToOrder(orderId, tracking);
+          setMessage({ type: 'success', text: 'Order moved to Processing and Steadfast parcel created.' });
+        } catch (deliveryError) {
+          console.error('Auto parcel creation failed:', deliveryError);
+          setMessage({
+            type: 'error',
+            text:
+              deliveryError instanceof Error
+                ? `Status updated, but parcel creation failed: ${deliveryError.message}`
+                : 'Status updated, but parcel creation failed.'
+          });
+        }
+      }
     } catch (error) {
       console.error('Error updating order status:', error);
       alert('Failed to update order status');
+    }
+  };
+
+  const applyTrackingToOrder = (orderId: string, tracking: SteadfastTrackingState) => {
+    setOrders((prev) =>
+      prev.map((order) => {
+        if (order.id !== orderId) return order;
+        return {
+          ...order,
+          deliveryProvider: 'steadfast',
+          deliveryConsignmentId: tracking.consignmentId || order.deliveryConsignmentId || null,
+          deliveryTrackingCode: tracking.trackingCode || order.deliveryTrackingCode || null,
+          deliveryTrackingUrl: tracking.trackingUrl || order.deliveryTrackingUrl || null,
+          deliveryStatus: tracking.deliveryStatus || order.deliveryStatus || 'not_created',
+          deliveryLastSyncedAt: tracking.lastSyncedAt || new Date().toISOString(),
+          status: mapDeliveryToOrderStatus(tracking.deliveryStatus, order.status)
+        };
+      })
+    );
+
+    setSelectedOrder((prev) => {
+      if (!prev || prev.id !== orderId) return prev;
+      return {
+        ...prev,
+        deliveryProvider: 'steadfast',
+        deliveryConsignmentId: tracking.consignmentId || prev.deliveryConsignmentId || null,
+        deliveryTrackingCode: tracking.trackingCode || prev.deliveryTrackingCode || null,
+        deliveryTrackingUrl: tracking.trackingUrl || prev.deliveryTrackingUrl || null,
+        deliveryStatus: tracking.deliveryStatus || prev.deliveryStatus || 'not_created',
+        deliveryLastSyncedAt: tracking.lastSyncedAt || new Date().toISOString(),
+        status: mapDeliveryToOrderStatus(tracking.deliveryStatus, prev.status)
+      };
+    });
+  };
+
+  const handleCreateParcel = async (orderId: string) => {
+    setParcelActionLoading('create');
+    try {
+      const tracking = await createSteadfastParcelForOrder(orderId);
+      applyTrackingToOrder(orderId, tracking);
+      setMessage({ type: 'success', text: 'Steadfast parcel created successfully.' });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to create Steadfast parcel.'
+      });
+    } finally {
+      setParcelActionLoading(null);
+    }
+  };
+
+  const handleSyncTracking = async (orderId: string, guestEmail?: string) => {
+    setParcelActionLoading('sync');
+    try {
+      const tracking = await syncSteadfastTrackingForOrder(orderId, guestEmail);
+      applyTrackingToOrder(orderId, tracking);
+      setMessage({ type: 'success', text: 'Tracking updated from Steadfast.' });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to sync tracking from Steadfast.'
+      });
+    } finally {
+      setParcelActionLoading(null);
     }
   };
 
@@ -274,6 +430,92 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
     printWindow.print();
   };
 
+  const handleExportOrdersCsv = async () => {
+    if (filteredOrders.length === 0) {
+      setMessage({ type: 'error', text: 'No order rows to export.' });
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const headers = [
+        'order_short_id',
+        'order_id',
+        'date',
+        'status',
+        'payment_status',
+        'payment_method',
+        'customer_name',
+        'email',
+        'phone',
+        'items_count',
+        'total',
+        'shipping_street',
+        'shipping_city',
+        'shipping_state',
+        'shipping_zip',
+        'shipping_country',
+        'payment_reference',
+        'payment_document_type',
+        'payment_document_status',
+        'payment_document_created_at',
+        'items'
+      ];
+
+      const escapeCsv = (value: string | number | null | undefined) =>
+        `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+      const rows = filteredOrders.map((order) => {
+        const itemsText = order.items
+          .map((item) => `${item.name} (x${item.quantity})`)
+          .join(' | ');
+
+        return [
+          getShortOrderId(order.id),
+          order.id,
+          order.date,
+          order.status,
+          order.paymentStatus,
+          order.paymentMethod,
+          order.customerName,
+          order.email,
+          order.phone,
+          order.itemsCount,
+          Number(order.total).toFixed(2),
+          order.shippingAddress.street,
+          order.shippingAddress.city,
+          order.shippingAddress.state,
+          order.shippingAddress.zip,
+          order.shippingAddress.country,
+          order.paymentSubmission?.transactionReference || '',
+          order.paymentSubmission?.documentType || '',
+          order.paymentSubmission?.status || '',
+          order.paymentSubmission?.createdAt || '',
+          itemsText
+        ]
+          .map(escapeCsv)
+          .join(',');
+      });
+
+      const content = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: 'Orders CSV exported successfully.' });
+    } catch (error) {
+      console.error('Orders CSV export failed', error);
+      setMessage({ type: 'error', text: 'Failed to export orders CSV.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const stats = [
     { label: 'Total Orders', value: orders.length.toString(), icon: ShoppingBag, color: 'text-gray-900', bg: 'bg-gray-100' },
     { label: 'Pending', value: orders.filter(o => o.status === 'Pending').length.toString(), icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50' },
@@ -307,12 +549,22 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
              <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
              Refresh
            </button>
-           <button className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm">
+           <button
+             onClick={handleExportOrdersCsv}
+             disabled={exporting}
+             className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest hover:border-gray-900 transition-all shadow-sm disabled:opacity-60"
+           >
              <Download className="w-4 h-4" />
-             Export
+             {exporting ? 'Exporting...' : 'Export'}
            </button>
         </div>
       </div>
+
+      {message && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+          {message.text}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -524,6 +776,92 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                           View Payment Proof
                         </button>
                        )}
+                    </div>
+                  </section>
+
+                  <section className="p-6 bg-white rounded-[1.5rem] border border-gray-100 shadow-sm">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Truck className="w-3.5 h-3.5" /> Delivery Tracking
+                    </h3>
+                    <div className="space-y-2 text-xs text-gray-600 font-semibold">
+                      <p>
+                        Provider:{' '}
+                        <span className="font-black text-gray-900">
+                          {selectedOrder.deliveryProvider ? selectedOrder.deliveryProvider.toUpperCase() : 'Not assigned'}
+                        </span>
+                      </p>
+                      <p>
+                        Status:{' '}
+                        <span className="font-black text-gray-900">{deliveryStatusLabel(selectedOrder.deliveryStatus)}</span>
+                      </p>
+                      {selectedOrder.deliveryConsignmentId && (
+                        <p>
+                          Consignment ID:{' '}
+                          <span className="font-black text-gray-900">{selectedOrder.deliveryConsignmentId}</span>
+                        </p>
+                      )}
+                      {selectedOrder.deliveryTrackingCode && (
+                        <p>
+                          Tracking Code:{' '}
+                          <span className="font-black text-gray-900">{selectedOrder.deliveryTrackingCode}</span>
+                        </p>
+                      )}
+                      {selectedOrder.deliveryTrackingUrl && (
+                        <a
+                          href={selectedOrder.deliveryTrackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-primary font-black hover:underline"
+                        >
+                          Open tracking link <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {selectedOrder.deliveryLastSyncedAt && (
+                        <p className="text-[11px] text-gray-500">
+                          Last synced: {new Date(selectedOrder.deliveryLastSyncedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-2">
+                      <button
+                        type="button"
+                        disabled={
+                          !steadfastState.enabled ||
+                          !steadfastState.configured ||
+                          parcelActionLoading !== null ||
+                          Boolean(selectedOrder.deliveryConsignmentId)
+                        }
+                        onClick={() => handleCreateParcel(selectedOrder.id)}
+                        className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-xs font-black uppercase tracking-widest hover:border-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {parcelActionLoading === 'create' ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating Parcel
+                          </>
+                        ) : (
+                          'Create Steadfast Parcel'
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          !steadfastState.trackingEnabled ||
+                          !steadfastState.configured ||
+                          parcelActionLoading !== null ||
+                          !selectedOrder.deliveryProvider
+                        }
+                        onClick={() => handleSyncTracking(selectedOrder.id, selectedOrder.email)}
+                        className="px-4 py-2 rounded-xl bg-gray-900 text-white text-xs font-black uppercase tracking-widest hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {parcelActionLoading === 'sync' ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Syncing
+                          </>
+                        ) : (
+                          'Sync Tracking'
+                        )}
+                      </button>
                     </div>
                   </section>
                 </div>

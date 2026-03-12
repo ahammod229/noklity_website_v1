@@ -305,6 +305,16 @@ const AppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleHomeFromProductDetails = () => {
+    setActiveCategory(null);
+    navigate('home');
+  };
+
+  const handleCategoryFromProductDetails = (category: string) => {
+    setActiveCategory(category || null);
+    navigate('home');
+  };
+
   const openCart = () => {
     if (isMobileViewport) {
       setIsCartOpen(false);
@@ -375,6 +385,8 @@ const AppContent: React.FC = () => {
                 productId={currentParam}
                 onAddToCart={addToCart}
                 onNavigate={navigate}
+                onHomeClick={handleHomeFromProductDetails}
+                onCategoryClick={handleCategoryFromProductDetails}
             />
         );
     }
@@ -513,44 +525,54 @@ const AppContent: React.FC = () => {
     );
   };
 
-  const isLayoutHidden = ['admin', 'login', 'signup', 'forgot-password', 'invoice'].includes(currentView);
+  const isImmersiveProductMobile = currentView === 'product-details' && isMobileViewport;
+  const isHeaderHidden =
+    ['admin', 'login', 'signup', 'forgot-password', 'invoice'].includes(currentView) ||
+    isImmersiveProductMobile;
+  const isFooterHidden =
+    ['admin', 'login', 'signup', 'forgot-password'].includes(currentView) ||
+    isImmersiveProductMobile;
   const isMobileBottomNavVisible =
-    !isLayoutHidden &&
-    !['checkout', 'order-success', 'payment-success', 'payment-failed'].includes(currentView);
+    !isHeaderHidden &&
+    !['checkout', 'order-success', 'payment-success', 'payment-failed', 'product-details'].includes(currentView);
 
   return (
     <ErrorBoundary>
-      {!isLayoutHidden && (
-        <Header
-          onLoginClick={handleAuthClick}
-          cartItemCount={cartCount}
-          onCartClick={openCart}
-          onHelpClick={() =>
-            tenantConfig.featureFlags.support_tickets
-              ? navigate('help')
-              : showToast('Support module is disabled for this plan.', 'error')
-          }
-          onWishlistClick={() => navigate('wishlist')}
-          wishlistCount={wishlist.length}
-          user={user}
-        />
+      {!isHeaderHidden && (
+        <div className="print:hidden">
+          <Header
+            onLoginClick={handleAuthClick}
+            cartItemCount={cartCount}
+            onCartClick={openCart}
+            onHelpClick={() =>
+              tenantConfig.featureFlags.support_tickets
+                ? navigate('help')
+                : showToast('Support module is disabled for this plan.', 'error')
+            }
+            onWishlistClick={() => navigate('wishlist')}
+            wishlistCount={wishlist.length}
+            user={user}
+          />
+        </div>
       )}
       
       <div className={isMobileBottomNavVisible ? 'pb-[84px] md:pb-0' : ''}>
         {renderContent()}
       </div>
       
-      {!isLayoutHidden && <Footer />}
+      {!isFooterHidden && <Footer />}
 
       {isMobileBottomNavVisible && (
-        <MobileBottomNav
-          currentView={currentView}
-          isLoggedIn={Boolean(user)}
-          cartItemCount={cartCount}
-          wishlistCount={wishlist.length}
-          onNavigate={(view) => navigate(view as any)}
-          onCartClick={openCart}
-        />
+        <div className="print:hidden">
+          <MobileBottomNav
+            currentView={currentView}
+            isLoggedIn={Boolean(user)}
+            cartItemCount={cartCount}
+            wishlistCount={wishlist.length}
+            onNavigate={(view) => navigate(view as any)}
+            onCartClick={openCart}
+          />
+        </div>
       )}
       
       <AuthModal 
@@ -574,7 +596,7 @@ const AppContent: React.FC = () => {
         onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
       />
 
-      {isUserAdmin && currentView !== 'admin' && (
+      {isUserAdmin && !['admin', 'product-details'].includes(currentView) && (
         <div className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-50 max-w-[calc(100vw-1.5rem)]">
           <button 
             onClick={() => navigate('admin')}

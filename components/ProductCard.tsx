@@ -5,6 +5,7 @@ import { ShoppingCart, Star, Heart } from 'lucide-react';
 import { useWishlist } from '../contexts/WishlistContext';
 import { useCurrency } from '../hooks/useCurrency';
 import { useTheme } from '../contexts/ThemeContext';
+import OptimizedImage from './ui/OptimizedImage';
 
 interface ProductCardProps {
   product: Product;
@@ -83,9 +84,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
 
       {/* Image Container */}
       <div className="product-card-image-surface relative aspect-square sm:aspect-[4/3] overflow-hidden p-3 sm:p-6 transition-colors duration-500">
-        <img 
+        <OptimizedImage
           src={product.image} 
           alt={product.name} 
+          width={640}
+          responsiveWidths={[320, 480, 640, 768, 960]}
+          quality={82}
           className={`w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out ${
             theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
           }`}

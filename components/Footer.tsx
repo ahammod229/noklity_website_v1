@@ -115,7 +115,7 @@ const Footer: React.FC = () => {
     /^https?:\/\//i.test(href) || /^(mailto|tel):/i.test(href);
 
   return (
-    <footer className="mt-14 sm:mt-20 bg-slate-950 text-slate-100 border-t border-slate-800">
+    <footer className="print:hidden mt-14 sm:mt-20 bg-slate-950 text-slate-100 border-t border-slate-800">
       <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
           <div>
@@ -151,7 +151,7 @@ const Footer: React.FC = () => {
             <a
               href={siteUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center mt-3 text-xs font-bold text-primary hover:text-red-300 transition-colors"
             >
               {siteUrlName}
@@ -181,7 +181,7 @@ const Footer: React.FC = () => {
                     key={social.label}
                     href={social.url}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     aria-label={social.label}
                     className="w-10 h-10 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hover:border-primary hover:text-white hover:bg-primary/20 transition-colors flex items-center justify-center"
                   >
@@ -213,7 +213,7 @@ const Footer: React.FC = () => {
                     <a
                       href={item.href || '/'}
                       target={isExternalHref(item.href || '') ? '_blank' : undefined}
-                      rel={isExternalHref(item.href || '') ? 'noreferrer' : undefined}
+                      rel={isExternalHref(item.href || '') ? 'noopener noreferrer' : undefined}
                       className="text-sm font-semibold text-slate-400 hover:text-white transition-colors"
                     >
                       {item.label}

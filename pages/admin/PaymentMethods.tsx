@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, Upload, Pencil, Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
+import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
 interface PaymentMethod {
   id: string;
@@ -106,12 +107,14 @@ const PaymentMethods: React.FC = () => {
     if (validation.shouldBlock) {
       throw new Error(validation.message);
     }
-    const ext = file.name.split('.').pop() || 'png';
-    const filePath = `payments/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
+    const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.paymentLogo, {
+      fileNamePrefix: 'payment-logo'
+    });
+    const filePath = `payments/${optimized.file.name}`;
+    const { error } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
     if (error) throw error;
     const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-    return { url: data.publicUrl, infoMessage: validation.message };
+    return { url: data.publicUrl, infoMessage: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` };
   };
 
   const addMethod = async () => {

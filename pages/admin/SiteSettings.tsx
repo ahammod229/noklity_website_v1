@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Save, Loader2, Upload, X, Globe, MessageCircle, Mail, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { clearPublicSiteConfigCache } from '../../services/siteConfigService';
+import { ADMIN_IMAGE_GUIDES } from '../../utils/adminImageGuides';
+import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
 interface SiteConfig {
   header_logo_light: string;
@@ -111,13 +113,24 @@ const SiteSettings: React.FC = () => {
 
     setUploading(key);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${key}-${Date.now()}.${fileExt}`;
+      const guideByKey: Partial<Record<keyof SiteConfig, keyof typeof ADMIN_IMAGE_GUIDES>> = {
+        header_logo_light: 'headerLogo',
+        header_logo_dark: 'headerLogo',
+        footer_logo: 'footerLogo',
+        favicon_url: 'favicon'
+      };
+      const guideKey = guideByKey[key];
+
+      const optimized = guideKey
+        ? await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES[guideKey], { fileNamePrefix: String(key) })
+        : file;
+      const fileToUpload = optimized instanceof File ? optimized : optimized.file;
+      const fileName = fileToUpload.name || `${key}-${Date.now()}.webp`;
       const filePath = `branding/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('assets')
-        .upload(filePath, file);
+        .upload(filePath, fileToUpload, { upsert: false });
 
       if (uploadError) throw uploadError;
 

@@ -3,6 +3,7 @@ import InvoiceLayout from '../components/InvoiceLayout';
 import { ChevronLeft, Printer, Download, Package, Loader2, AlertCircle } from 'lucide-react';
 import { getInvoiceByOrderId, getInvoiceNumber, downloadInvoicePDF, InvoiceData } from '../services/invoiceService';
 import { useCurrency } from '../hooks/useCurrency';
+import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 
 interface InvoicePageProps {
   orderId?: string;
@@ -11,9 +12,14 @@ interface InvoicePageProps {
 
 const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
   const { formatCurrency } = useCurrency();
+  const initialSiteConfig = getPublicSiteConfigSnapshot();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<InvoiceData | null>(null);
+  const [billingConfig, setBillingConfig] = useState(() => ({
+    taxEnabled: initialSiteConfig.taxEnabled,
+    taxRate: initialSiteConfig.defaultTaxRate
+  }));
 
   useEffect(() => {
     const loadInvoice = async () => {
@@ -35,6 +41,60 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
 
     loadInvoice();
   }, [orderId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const applyConfig = (nextConfig: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
+      if (!mounted) return;
+      setBillingConfig({
+        taxEnabled: nextConfig.taxEnabled,
+        taxRate: nextConfig.defaultTaxRate
+      });
+    };
+
+    const refreshConfig = async () => {
+      try {
+        const liveConfig = await getPublicSiteConfig();
+        applyConfig(liveConfig);
+      } catch (cfgErr) {
+        console.warn('Failed to load invoice billing config:', cfgErr);
+      }
+    };
+
+    applyConfig(getPublicSiteConfigSnapshot());
+    void refreshConfig();
+
+    const handleConfigUpdated = () => {
+      applyConfig(getPublicSiteConfigSnapshot());
+      void refreshConfig();
+    };
+
+    window.addEventListener('site-config-updated', handleConfigUpdated as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('site-config-updated', handleConfigUpdated as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading || !data) return;
+    let shouldAutoPrint = false;
+    try {
+      shouldAutoPrint = window.sessionStorage.getItem('noklity_auto_print_invoice') === '1';
+      if (shouldAutoPrint) {
+        window.sessionStorage.removeItem('noklity_auto_print_invoice');
+      }
+    } catch {
+      shouldAutoPrint = false;
+    }
+    if (!shouldAutoPrint) return;
+
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [loading, data?.id]);
 
   if (loading) {
     return (
@@ -70,6 +130,10 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
   }
 
   const invoiceNum = getInvoiceNumber(data.id);
+  const normalizedTaxRate = Math.max(0, Number(billingConfig.taxRate) || 0);
+  const taxLabelPercent = Number.isInteger(normalizedTaxRate)
+    ? String(normalizedTaxRate)
+    : normalizedTaxRate.toFixed(2).replace(/\.?0+$/, '');
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans print:min-h-0 print:block print:bg-white">
@@ -178,10 +242,12 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
                 <span className="text-gray-400 uppercase tracking-widest">Shipping</span>
                 <span className="text-gray-900">{formatCurrency(data.shipping)}</span>
               </div>
-              <div className="flex justify-between text-sm font-bold pb-4 border-b border-gray-100">
-                <span className="text-gray-400 uppercase tracking-widest">Tax (VAT 8%)</span>
-                <span className="text-gray-900">{formatCurrency(data.tax)}</span>
-              </div>
+              {billingConfig.taxEnabled && (
+                <div className="flex justify-between text-sm font-bold pb-4 border-b border-gray-100">
+                  <span className="text-gray-400 uppercase tracking-widest">Tax (VAT {taxLabelPercent}%)</span>
+                  <span className="text-gray-900">{formatCurrency(data.tax)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center pt-2">
                 <span className="text-lg font-black text-gray-900 uppercase tracking-tighter">Grand Total</span>
                 <span className="text-3xl font-black text-primary tracking-tighter">{formatCurrency(data.total)}</span>

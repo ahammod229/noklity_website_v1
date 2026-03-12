@@ -9,6 +9,8 @@ import { supabase } from '../lib/supabase';
 import AddressForm from '../components/account/AddressForm';
 import { useCurrency } from '../hooks/useCurrency';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
+import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
+import { optimizeImageForUpload } from '../utils/imageOptimization';
 import { 
   ChevronLeft, 
   MapPin, 
@@ -51,28 +53,38 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   
-  const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nogad' | 'bank_transfer'>('bkash');
+  const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nogad' | 'bank_transfer'>('nogad');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [selectedBankCode, setSelectedBankCode] = useState<string>('');
   const [transactionReference, setTransactionReference] = useState('');
   const [documentType, setDocumentType] = useState('Transfer Proof');
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [checkoutMessage, setCheckoutMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const initialSiteConfig = getPublicSiteConfigSnapshot();
+  const [billingConfig, setBillingConfig] = useState(() => ({
+    taxEnabled: initialSiteConfig.taxEnabled,
+    taxRate: initialSiteConfig.defaultTaxRate,
+    shippingFee: initialSiteConfig.defaultShippingFee
+  }));
   const configuredCodeSet = new Set(paymentMethods.map((m) => m.code));
   const featurePaymentEnabled: Record<'bkash' | 'nogad' | 'bank_transfer', boolean> = {
     bkash: canUseFeature('payment_bkash'),
     nogad: canUseFeature('payment_nogad'),
     bank_transfer: canUseFeature('payment_bank_transfer')
   };
-  const checkoutMethods = (['bkash', 'nogad', 'bank_transfer'] as const).filter((code) =>
+  const checkoutMethods = (['nogad', 'bkash', 'bank_transfer'] as const).filter((code) =>
     featurePaymentEnabled[code] && (configuredCodeSet.size === 0 ? true : configuredCodeSet.has(code))
   );
 
   // Calculations
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shippingCost = cart.length > 0 ? 15.00 : 0;
-  const tax = subtotal * 0.08; // 8% Tax Mock
+  const shippingCost = cart.length > 0 ? Math.max(0, Number(billingConfig.shippingFee) || 0) : 0;
+  const normalizedTaxRate = Math.max(0, Number(billingConfig.taxRate) || 0);
+  const tax = billingConfig.taxEnabled ? subtotal * (normalizedTaxRate / 100) : 0;
   const total = subtotal + shippingCost + tax;
+  const taxLabelPercent = Number.isInteger(normalizedTaxRate)
+    ? String(normalizedTaxRate)
+    : normalizedTaxRate.toFixed(2).replace(/\.?0+$/, '');
   const stockIssues = useMemo(
     () =>
       cart.filter((item) => {
@@ -89,6 +101,41 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   }, [user?.id]);
 
   useEffect(() => {
+    let mounted = true;
+    const applyConfig = (nextConfig: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
+      if (!mounted) return;
+      setBillingConfig({
+        taxEnabled: nextConfig.taxEnabled,
+        taxRate: nextConfig.defaultTaxRate,
+        shippingFee: nextConfig.defaultShippingFee
+      });
+    };
+
+    const refreshConfig = async () => {
+      try {
+        const liveConfig = await getPublicSiteConfig();
+        applyConfig(liveConfig);
+      } catch (error) {
+        console.warn('Failed to refresh checkout billing config:', error);
+      }
+    };
+
+    applyConfig(getPublicSiteConfigSnapshot());
+    void refreshConfig();
+
+    const handleConfigUpdated = () => {
+      applyConfig(getPublicSiteConfigSnapshot());
+      void refreshConfig();
+    };
+
+    window.addEventListener('site-config-updated', handleConfigUpdated as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('site-config-updated', handleConfigUpdated as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
     if (user?.email) {
       setGuestEmail(user.email);
       return;
@@ -99,7 +146,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (!checkoutMethods.includes(paymentMethod)) {
-      setPaymentMethod(checkoutMethods[0] || 'bkash');
+      setPaymentMethod(checkoutMethods[0] || 'nogad');
     }
   }, [checkoutMethods, paymentMethod]);
 
@@ -258,11 +305,23 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
           const currentUserId = currentSession.session?.user?.id;
           let documentPath: string | null = null;
           if (proofFile && currentUserId) {
-            const ext = proofFile.name.split('.').pop() || 'jpg';
+            const isImage = proofFile.type.startsWith('image/');
+            const uploadFile = isImage
+              ? (
+                  await optimizeImageForUpload(proofFile, {
+                    targetWidth: 1600,
+                    targetHeight: 1600,
+                    fit: 'contain',
+                    maxBytes: 3 * 1024 * 1024,
+                    fileNamePrefix: `payment-proof-${result.orderId}`
+                  })
+                ).file
+              : proofFile;
+            const ext = uploadFile.name.split('.').pop() || (isImage ? 'webp' : 'bin');
             const filePath = `${currentUserId}/${result.orderId}-${Date.now()}.${ext}`;
             const { error: uploadError } = await supabase.storage
               .from('payment-proofs')
-              .upload(filePath, proofFile, { upsert: false });
+              .upload(filePath, uploadFile, { upsert: false });
             if (!uploadError) {
               documentPath = filePath;
             }
@@ -663,10 +722,12 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                         <span className="text-gray-500 font-medium">Shipping Estimate</span>
                         <span className="font-bold text-gray-900">{formatCurrency(shippingCost)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500 font-medium">Tax (8%)</span>
-                        <span className="font-bold text-gray-900">{formatCurrency(tax)}</span>
-                    </div>
+                    {billingConfig.taxEnabled && (
+                      <div className="flex justify-between text-sm">
+                          <span className="text-gray-500 font-medium">Tax ({taxLabelPercent}%)</span>
+                          <span className="font-bold text-gray-900">{formatCurrency(tax)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200">
                         <span className="text-lg font-black text-gray-900 tracking-tight">Total</span>
                         <span className="text-2xl font-black text-primary tracking-tighter">{formatCurrency(total)}</span>

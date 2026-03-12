@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { Json } from '../types';
 import { getShortOrderId } from '../utils/orderId';
+import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from './siteConfigService';
 
 export interface InvoiceItem {
   sku: string;
@@ -84,7 +85,14 @@ export const getInvoiceByOrderId = async (orderId: string): Promise<InvoiceData 
 
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
     const total = Number(data.total_amount) || 0;
-    const estimatedShipping = subtotal > 0 ? 15 : 0;
+    let configuredShippingFee = getPublicSiteConfigSnapshot().defaultShippingFee;
+    try {
+      const siteConfig = await getPublicSiteConfig();
+      configuredShippingFee = siteConfig.defaultShippingFee;
+    } catch {
+      // Keep snapshot/default fee when DB fetch fails.
+    }
+    const estimatedShipping = subtotal > 0 ? Math.max(0, Number(configuredShippingFee) || 0) : 0;
     const tax = Math.max(0, total - subtotal - estimatedShipping);
 
     return {

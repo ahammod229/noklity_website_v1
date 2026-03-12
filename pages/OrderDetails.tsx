@@ -13,13 +13,20 @@ import {
   Download, 
   Loader2, 
   AlertCircle,
-  XCircle
+  RefreshCcw,
+  XCircle,
+  ExternalLink
 } from 'lucide-react';
 import { getOrderById, OrderDetail } from '../services/orderService';
 import { downloadInvoicePDF } from '../services/invoiceService';
 import { supabase } from '../lib/supabase';
 import { useCurrency } from '../hooks/useCurrency';
 import { formatShortOrderId } from '../utils/orderId';
+import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
+import {
+  SteadfastDeliveryStatus,
+  syncSteadfastTrackingForOrder
+} from '../services/steadfastDeliveryService';
 
 interface OrderDetailsProps {
   onLoginClick: () => void;
@@ -29,15 +36,48 @@ interface OrderDetailsProps {
   orderId?: string;
 }
 
+const mapDeliveryToOrderStatus = (
+  deliveryStatus: SteadfastDeliveryStatus,
+  currentStatus: OrderDetail['status']
+): OrderDetail['status'] => {
+  switch (deliveryStatus) {
+    case 'delivered':
+      return 'Delivered';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'in_transit':
+      return currentStatus === 'Delivered' ? currentStatus : 'Shipped';
+    case 'picked':
+    case 'pending_pickup':
+    case 'created':
+      if (currentStatus === 'Pending' || currentStatus === 'Processing') return 'Processing';
+      return currentStatus;
+    default:
+      return currentStatus;
+  }
+};
+
+const deliveryStatusLabel = (status?: SteadfastDeliveryStatus) => {
+  if (!status || status === 'not_created') return 'Not Created';
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
+};
+
 const OrderDetails: React.FC<OrderDetailsProps> = ({
   onNavigate,
   orderId
 }) => {
   const { formatCurrency } = useCurrency();
+  const initialSiteConfig = getPublicSiteConfigSnapshot();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submittingReviewFor, setSubmittingReviewFor] = useState<string | null>(null);
+  const [trackingSyncing, setTrackingSyncing] = useState(false);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [billingConfig, setBillingConfig] = useState(() => ({
+    taxEnabled: initialSiteConfig.taxEnabled,
+    taxRate: initialSiteConfig.defaultTaxRate
+  }));
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -65,6 +105,68 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
 
     fetchOrder();
   }, [orderId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const applyConfig = (nextConfig: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
+      if (!mounted) return;
+      setBillingConfig({
+        taxEnabled: nextConfig.taxEnabled,
+        taxRate: nextConfig.defaultTaxRate
+      });
+    };
+
+    const refreshConfig = async () => {
+      try {
+        const liveConfig = await getPublicSiteConfig();
+        applyConfig(liveConfig);
+      } catch (cfgErr) {
+        console.warn('Failed to refresh order tax config:', cfgErr);
+      }
+    };
+
+    applyConfig(getPublicSiteConfigSnapshot());
+    void refreshConfig();
+
+    const handleConfigUpdated = () => {
+      applyConfig(getPublicSiteConfigSnapshot());
+      void refreshConfig();
+    };
+
+    window.addEventListener('site-config-updated', handleConfigUpdated as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('site-config-updated', handleConfigUpdated as EventListener);
+    };
+  }, []);
+
+  const canTrackParcel = Boolean(order?.deliveryProvider === 'steadfast' || order?.deliveryConsignmentId);
+
+  const handleSyncTracking = async () => {
+    if (!order) return;
+    setTrackingSyncing(true);
+    setTrackingError(null);
+    try {
+      const tracking = await syncSteadfastTrackingForOrder(order.id, order.email);
+      setOrder((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          deliveryProvider: 'steadfast',
+          deliveryConsignmentId: tracking.consignmentId || prev.deliveryConsignmentId || null,
+          deliveryTrackingCode: tracking.trackingCode || prev.deliveryTrackingCode || null,
+          deliveryTrackingUrl: tracking.trackingUrl || prev.deliveryTrackingUrl || null,
+          deliveryStatus: tracking.deliveryStatus || prev.deliveryStatus || 'not_created',
+          deliveryLastSyncedAt: tracking.lastSyncedAt || new Date().toISOString(),
+          status: mapDeliveryToOrderStatus(tracking.deliveryStatus || 'unknown', prev.status)
+        };
+      });
+    } catch (error) {
+      setTrackingError(error instanceof Error ? error.message : 'Failed to sync delivery tracking.');
+    } finally {
+      setTrackingSyncing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -158,6 +260,10 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
   const progressWidth = isCancelled 
     ? '0%' 
     : `${Math.max(0, Math.min(100, (currentStatusIdx / (steps.length - 1)) * 100))}%`;
+  const normalizedTaxRate = Math.max(0, Number(billingConfig.taxRate) || 0);
+  const taxLabelPercent = Number.isInteger(normalizedTaxRate)
+    ? String(normalizedTaxRate)
+    : normalizedTaxRate.toFixed(2).replace(/\.?0+$/, '');
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
@@ -173,11 +279,18 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
             </button>
             <div className="flex gap-3">
                 <button 
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    try {
+                      window.sessionStorage.setItem('noklity_auto_print_invoice', '1');
+                    } catch {
+                      // Ignore storage access errors.
+                    }
+                    onNavigate('invoice', order.id);
+                  }}
                   className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                     <Printer className="w-4 h-4" />
-                    Print
+                    Print Invoice
                 </button>
                 <button 
                   onClick={() => downloadInvoicePDF(order.id)}
@@ -347,10 +460,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                             <span className="text-gray-600">Shipping</span>
                             <span className="font-medium text-gray-900">{formatCurrency(order.shipping)}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Tax</span>
-                            <span className="font-medium text-gray-900">{formatCurrency(order.tax)}</span>
-                        </div>
+                        {billingConfig.taxEnabled && (
+                          <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Tax ({taxLabelPercent}%)</span>
+                              <span className="font-medium text-gray-900">{formatCurrency(order.tax)}</span>
+                          </div>
+                        )}
                     </div>
                     <div className="flex justify-between items-center pt-4 mb-6">
                         <span className="text-lg font-bold text-gray-900">Total</span>
@@ -397,6 +512,79 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                              {order.paymentMethod}
                         </div>
                      </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <Truck className="w-4 h-4" /> Delivery Tracking
+                    </h3>
+                    <div className="space-y-2 text-sm text-gray-700">
+                        <p>
+                            <span className="text-gray-500">Provider: </span>
+                            <span className="font-semibold text-gray-900">
+                                {order.deliveryProvider ? order.deliveryProvider.toUpperCase() : 'Not assigned'}
+                            </span>
+                        </p>
+                        <p>
+                            <span className="text-gray-500">Status: </span>
+                            <span className="font-semibold text-gray-900">{deliveryStatusLabel(order.deliveryStatus)}</span>
+                        </p>
+                        {order.deliveryConsignmentId && (
+                          <p>
+                            <span className="text-gray-500">Consignment ID: </span>
+                            <span className="font-semibold text-gray-900">{order.deliveryConsignmentId}</span>
+                          </p>
+                        )}
+                        {order.deliveryTrackingCode && (
+                          <p>
+                            <span className="text-gray-500">Tracking Code: </span>
+                            <span className="font-semibold text-gray-900">{order.deliveryTrackingCode}</span>
+                          </p>
+                        )}
+                        {order.deliveryTrackingUrl && (
+                          <a
+                            href={order.deliveryTrackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-primary font-semibold hover:underline"
+                          >
+                            Open courier tracking page <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {order.deliveryLastSyncedAt && (
+                          <p className="text-xs text-gray-500">
+                            Last synced: {new Date(order.deliveryLastSyncedAt).toLocaleString()}
+                          </p>
+                        )}
+                    </div>
+
+                    {trackingError && (
+                      <p className="mt-3 text-xs text-red-600 font-semibold">{trackingError}</p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSyncTracking}
+                      disabled={trackingSyncing || !canTrackParcel}
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-xs font-bold uppercase tracking-widest hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {trackingSyncing ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCcw className="w-3.5 h-3.5" />
+                          Refresh Tracking
+                        </>
+                      )}
+                    </button>
+                    {!canTrackParcel && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Parcel not created yet. Tracking will appear after dispatch.
+                      </p>
+                    )}
                 </div>
 
                 <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">

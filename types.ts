@@ -60,6 +60,21 @@ export interface Order {
   total: number;
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
   itemsCount: number;
+  deliveryProvider?: 'steadfast' | 'manual' | null;
+  deliveryConsignmentId?: string | null;
+  deliveryTrackingCode?: string | null;
+  deliveryTrackingUrl?: string | null;
+  deliveryStatus?:
+    | 'not_created'
+    | 'created'
+    | 'pending_pickup'
+    | 'picked'
+    | 'in_transit'
+    | 'delivered'
+    | 'cancelled'
+    | 'failed'
+    | 'unknown';
+  deliveryLastSyncedAt?: string | null;
 }
 
 // Database Types
@@ -335,6 +350,22 @@ export interface Database {
           transaction_id: string | null;
           paid_at: string | null;
           shipping_address: Json;
+          delivery_provider: 'steadfast' | 'manual' | null;
+          delivery_consignment_id: string | null;
+          delivery_tracking_code: string | null;
+          delivery_tracking_url: string | null;
+          delivery_status:
+            | 'not_created'
+            | 'created'
+            | 'pending_pickup'
+            | 'picked'
+            | 'in_transit'
+            | 'delivered'
+            | 'cancelled'
+            | 'failed'
+            | 'unknown';
+          delivery_last_synced_at: string | null;
+          delivery_payload: Json | null;
           created_at: string;
         };
         Insert: {
@@ -347,6 +378,22 @@ export interface Database {
           transaction_id?: string | null;
           paid_at?: string | null;
           shipping_address: Json;
+          delivery_provider?: 'steadfast' | 'manual' | null;
+          delivery_consignment_id?: string | null;
+          delivery_tracking_code?: string | null;
+          delivery_tracking_url?: string | null;
+          delivery_status?:
+            | 'not_created'
+            | 'created'
+            | 'pending_pickup'
+            | 'picked'
+            | 'in_transit'
+            | 'delivered'
+            | 'cancelled'
+            | 'failed'
+            | 'unknown';
+          delivery_last_synced_at?: string | null;
+          delivery_payload?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -359,6 +406,22 @@ export interface Database {
           transaction_id?: string | null;
           paid_at?: string | null;
           shipping_address?: Json;
+          delivery_provider?: 'steadfast' | 'manual' | null;
+          delivery_consignment_id?: string | null;
+          delivery_tracking_code?: string | null;
+          delivery_tracking_url?: string | null;
+          delivery_status?:
+            | 'not_created'
+            | 'created'
+            | 'pending_pickup'
+            | 'picked'
+            | 'in_transit'
+            | 'delivered'
+            | 'cancelled'
+            | 'failed'
+            | 'unknown';
+          delivery_last_synced_at?: string | null;
+          delivery_payload?: Json | null;
           created_at?: string;
         };
         Relationships: [
@@ -760,6 +823,7 @@ export interface Database {
           base_url: string | null;
           auth_type: 'none' | 'api_key' | 'bearer' | 'basic';
           secret_ref: string | null;
+          config: Json | null;
           status: 'active' | 'inactive';
           last_checked_at: string | null;
           notes: string | null;
@@ -773,6 +837,7 @@ export interface Database {
           base_url?: string | null;
           auth_type?: 'none' | 'api_key' | 'bearer' | 'basic';
           secret_ref?: string | null;
+          config?: Json | null;
           status?: 'active' | 'inactive';
           last_checked_at?: string | null;
           notes?: string | null;
@@ -786,6 +851,7 @@ export interface Database {
           base_url?: string | null;
           auth_type?: 'none' | 'api_key' | 'bearer' | 'basic';
           secret_ref?: string | null;
+          config?: Json | null;
           status?: 'active' | 'inactive';
           last_checked_at?: string | null;
           notes?: string | null;

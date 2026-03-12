@@ -19,16 +19,15 @@
 4. Optional if avatar upload fails:
    - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/supabase/avatar_bucket_fix.sql`
 
-## 3) Configure brand + plan
+## 3) Configure brand + business settings
 1. Set base defaults in `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/config/tenant.json`.
 2. Start app: `npm run dev`
-3. Login as super admin and go to:
-   - Admin > Settings > Plans & Features
+3. Login as admin and go to:
+   - Admin > Settings
 4. Set:
-   - plan (`Basic/Pro/Enterprise`)
-   - license status/key
-   - feature flags
    - tenant branding/business fields
+   - payment and API settings
+   - optional feature flags (if you use module gating)
 
 ## 4) Optional bKash sandbox setup
 1. Deploy edge functions:

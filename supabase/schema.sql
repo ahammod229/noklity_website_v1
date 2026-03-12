@@ -258,8 +258,60 @@ create table if not exists public.orders (
   transaction_id text,
   paid_at timestamp with time zone,
   shipping_address jsonb not null,
+  delivery_provider text,
+  delivery_consignment_id text,
+  delivery_tracking_code text,
+  delivery_tracking_url text,
+  delivery_status text not null default 'not_created' check (
+    delivery_status in (
+      'not_created',
+      'pending',
+      'delivered_approval_pending',
+      'partial_delivered_approval_pending',
+      'cancelled_approval_pending',
+      'unknown_approval_pending',
+      'partial_delivered',
+      'hold',
+      'in_review',
+      'created',
+      'pending_pickup',
+      'picked',
+      'in_transit',
+      'delivered',
+      'cancelled',
+      'failed',
+      'unknown'
+    )
+  ),
+  delivery_last_synced_at timestamp with time zone,
+  delivery_payload jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+alter table public.orders add column if not exists delivery_provider text;
+alter table public.orders add column if not exists delivery_consignment_id text;
+alter table public.orders add column if not exists delivery_tracking_code text;
+alter table public.orders add column if not exists delivery_tracking_url text;
+alter table public.orders add column if not exists delivery_status text not null default 'not_created';
+alter table public.orders add column if not exists delivery_last_synced_at timestamp with time zone;
+alter table public.orders add column if not exists delivery_payload jsonb;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'orders_delivery_provider_check'
+      and conrelid = 'public.orders'::regclass
+  ) then
+    alter table public.orders
+      add constraint orders_delivery_provider_check
+      check (delivery_provider is null or delivery_provider in ('steadfast', 'manual'));
+  end if;
+end $$;
+
+create index if not exists orders_delivery_status_idx on public.orders(delivery_status);
+create index if not exists orders_delivery_tracking_code_idx on public.orders(delivery_tracking_code);
 
 create table if not exists public.order_items (
   id uuid default gen_random_uuid() primary key,
@@ -616,10 +668,14 @@ values
   ('notify_payment_update', 'true'),
   ('notify_new_customer', 'false'),
   ('notify_support_ticket', 'true'),
+  ('tax_enabled', 'true'),
   ('default_tax_rate', '8'),
   ('default_shipping_fee', '15'),
   ('invoice_prefix', 'INV'),
   ('payment_auto_confirm', 'false'),
+  ('delivery_provider_steadfast_enabled', 'false'),
+  ('delivery_provider_steadfast_auto_create', 'false'),
+  ('delivery_provider_steadfast_tracking_enabled', 'true'),
   ('public_api_enabled', 'false'),
   ('enable_cors', 'true'),
   ('api_rate_limit_per_minute', '60'),
@@ -1158,12 +1214,15 @@ create table if not exists public.api_integrations (
   base_url text,
   auth_type text not null default 'none' check (auth_type in ('none', 'api_key', 'bearer', 'basic')),
   secret_ref text,
+  config jsonb not null default '{}'::jsonb,
   status text not null default 'inactive' check (status in ('active', 'inactive')),
   last_checked_at timestamp with time zone,
   notes text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+alter table public.api_integrations add column if not exists config jsonb not null default '{}'::jsonb;
 
 drop trigger if exists set_api_integrations_updated_at on public.api_integrations;
 create trigger set_api_integrations_updated_at

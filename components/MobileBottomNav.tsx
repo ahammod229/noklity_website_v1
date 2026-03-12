@@ -33,7 +33,7 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ] as const;
 
   return (
-    <div className="md:hidden fixed bottom-0 inset-x-0 z-[65] pb-[env(safe-area-inset-bottom)]">
+    <div className="print:hidden md:hidden fixed bottom-0 inset-x-0 z-[65] pb-[env(safe-area-inset-bottom)]">
       <div className="mx-2 mb-2 rounded-2xl border border-gray-200 bg-white/95 backdrop-blur-md shadow-[0_18px_45px_rgba(2,6,23,0.22)]">
         <div className="h-16 grid grid-cols-4">
           {navItems.map((item) => {

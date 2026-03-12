@@ -3,6 +3,7 @@ import { ArrowRight, Loader2, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getProductById } from '../services/productService';
 import { Product } from '../types';
+import OptimizedImage from './ui/OptimizedImage';
 
 type HeroTargetType = 'none' | 'product' | 'category' | 'url';
 
@@ -27,6 +28,27 @@ interface HeroProps {
   onProductClick: (product: Product) => void;
   onSelectCategory: (category: string) => void;
 }
+
+const parseBannerTargetUrls = (value?: string | null): { primary: string; secondary: string } => {
+  const raw = String(value || '').trim();
+  if (!raw) return { primary: '', secondary: '' };
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const primary = String(record.primary || record.shop_now || record.shopNow || '').trim();
+      const secondary = String(record.secondary || record.view_catalog || record.viewCatalog || '').trim();
+      if (primary || secondary) {
+        return { primary, secondary };
+      }
+    }
+  } catch {
+    // Backward compatibility with plain URL
+  }
+
+  return { primary: raw, secondary: '' };
+};
 
 const FALLBACK_BANNER: HeroBanner = {
   id: 'fallback',
@@ -98,11 +120,21 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
     }
   };
 
-  const handlePrimaryAction = async () => {
+  const navigateToUrl = (url: string) => {
+    const normalized = url.trim();
+    if (!normalized) return;
+    window.location.href = normalized;
+  };
+
+  const handleBannerAction = async (button: 'primary' | 'secondary') => {
     setErrorText(null);
     if (!activeBanner) return;
 
     if (activeBanner.target_type === 'product') {
+      if (button === 'secondary') {
+        scrollToCatalog();
+        return;
+      }
       if (!activeBanner.target_product_id) {
         scrollToCatalog();
         return;
@@ -134,8 +166,20 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
       return;
     }
 
-    if (activeBanner.target_type === 'url' && activeBanner.target_url) {
-      window.location.href = activeBanner.target_url;
+    if (activeBanner.target_type === 'url') {
+      const parsedUrls = parseBannerTargetUrls(activeBanner.target_url);
+      const targetUrl = button === 'secondary'
+        ? (parsedUrls.secondary || parsedUrls.primary)
+        : (parsedUrls.primary || parsedUrls.secondary);
+
+      if (targetUrl) {
+        navigateToUrl(targetUrl);
+        return;
+      }
+    }
+
+    if (button === 'secondary' && activeBanner.target_type === 'product') {
+      scrollToCatalog();
       return;
     }
 
@@ -145,7 +189,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
   return (
     <section className="pt-2 pb-5 sm:pt-4 sm:pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div
-        onClick={handlePrimaryAction}
+        onClick={() => handleBannerAction('primary')}
         className="relative rounded-2xl sm:rounded-[2.5rem] overflow-hidden h-[360px] sm:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
       >
         {isLoading ? (
@@ -155,9 +199,13 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
         ) : (
           <>
             <div className="absolute inset-0">
-              <img
+              <OptimizedImage
                 src={activeBanner.image_url}
                 alt={activeBanner.title}
+                width={1920}
+                responsiveWidths={[640, 960, 1280, 1600, 1920, 2560]}
+                quality={84}
+                loading="eager"
                 className="w-full h-full object-cover object-center transform transition-transform duration-[20s] group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-gray-950/90 via-gray-900/50 to-transparent" />
@@ -191,7 +239,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handlePrimaryAction();
+                        handleBannerAction('primary');
                       }}
                       disabled={isNavigating}
                       className="w-full sm:w-auto bg-primary hover:bg-red-600 text-white text-sm font-bold py-3.5 sm:py-4 px-6 sm:px-8 rounded-full transition-all duration-300 flex items-center justify-center shadow-xl shadow-red-900/30 hover:shadow-red-600/40 hover:-translate-y-1 disabled:opacity-70 disabled:cursor-not-allowed"
@@ -202,7 +250,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        scrollToCatalog();
+                        handleBannerAction('secondary');
                       }}
                       className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-bold py-3.5 sm:py-4 px-6 sm:px-8 rounded-full transition-all duration-300 backdrop-blur-sm hover:-translate-y-1"
                     >

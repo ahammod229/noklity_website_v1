@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Edit2, Trash2, Save, X, Loader2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
+import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
 interface DbCategory {
   id: string;
@@ -116,13 +117,15 @@ const CategoryManager: React.FC = () => {
         setMessage({ type: 'error', text: validation.message });
         return;
       }
-      const ext = file.name.split('.').pop() || 'png';
-      const filePath = `categories/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, file, { upsert: false });
+      const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.categoryLogo, {
+        fileNamePrefix: 'category-logo'
+      });
+      const filePath = `categories/${optimized.file.name}`;
+      const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
       setForm((prev) => ({ ...prev, logo_url: data.publicUrl }));
-      setMessage({ type: 'success', text: validation.message });
+      setMessage({ type: 'success', text: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` });
     } catch (error: any) {
       setMessage({ type: 'error', text: toFriendlyError(error?.message || 'Logo upload failed') });
     } finally {

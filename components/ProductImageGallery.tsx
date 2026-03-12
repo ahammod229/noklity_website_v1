@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import OptimizedImage from './ui/OptimizedImage';
 
 interface ProductImageGalleryProps {
   mainImage: string;
@@ -33,9 +34,13 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
         onMouseLeave={() => setIsHovered(false)}
         onMouseMove={handleMouseMove}
       >
-        <img
+        <OptimizedImage
           src={galleryImages[activeImage]}
           alt={productName}
+          width={960}
+          responsiveWidths={[320, 480, 640, 768, 960, 1200]}
+          quality={84}
+          loading="eager"
           className={`w-full h-full object-contain transition-transform duration-200 ${
             theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
           } ${isHovered ? 'scale-150' : 'scale-100'}`}
@@ -62,9 +67,12 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
               : 'border-transparent hover:border-gray-200'
             }`}
           >
-            <img
+            <OptimizedImage
               src={img}
               alt={`View ${idx + 1}`}
+              width={160}
+              responsiveWidths={[96, 128, 160, 192]}
+              quality={80}
               className={`w-full h-full object-contain p-1 ${
                 theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
               }`}

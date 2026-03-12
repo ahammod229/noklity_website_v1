@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ImagePlus, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
+import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
 type TargetType = 'none' | 'product' | 'category' | 'url';
 
@@ -40,7 +41,8 @@ interface HeroForm {
   target_type: TargetType;
   target_product_id: string;
   target_category: string;
-  target_url: string;
+  primary_target_url: string;
+  secondary_target_url: string;
   is_active: boolean;
   sort_order: number;
 }
@@ -56,9 +58,31 @@ const EMPTY_FORM: HeroForm = {
   target_type: 'none',
   target_product_id: '',
   target_category: '',
-  target_url: '',
+  primary_target_url: '',
+  secondary_target_url: '',
   is_active: true,
   sort_order: 0
+};
+
+const parseBannerTargetUrls = (value?: string | null): { primary: string; secondary: string } => {
+  const raw = String(value || '').trim();
+  if (!raw) return { primary: '', secondary: '' };
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const primary = String(record.primary || record.shop_now || record.shopNow || '').trim();
+      const secondary = String(record.secondary || record.view_catalog || record.viewCatalog || '').trim();
+      if (primary || secondary) {
+        return { primary, secondary };
+      }
+    }
+  } catch {
+    // backward compatibility: plain URL stored before JSON support
+  }
+
+  return { primary: raw, secondary: '' };
 };
 
 const toFriendlyError = (value?: string) => {
@@ -82,10 +106,14 @@ const HeroBanners: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<HeroForm>(EMPTY_FORM);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedPrimaryProductId, setSelectedPrimaryProductId] = useState('');
+  const [selectedSecondaryCategory, setSelectedSecondaryCategory] = useState('');
 
   const resetForm = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setSelectedPrimaryProductId('');
+    setSelectedSecondaryCategory('');
   };
 
   const fetchAll = async () => {
@@ -140,13 +168,16 @@ const HeroBanners: React.FC = () => {
         setMessage({ type: 'error', text: validation.message });
         return;
       }
-      const ext = file.name.split('.').pop() || 'jpg';
-      const path = `hero-banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage.from('assets').upload(path, file, { upsert: false });
+      const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.heroBanner, {
+        fileNamePrefix: 'hero-banner',
+        fit: 'cover'
+      });
+      const path = `hero-banners/${optimized.file.name}`;
+      const { error } = await supabase.storage.from('assets').upload(path, optimized.file, { upsert: false });
       if (error) throw error;
       const { data } = supabase.storage.from('assets').getPublicUrl(path);
       setForm((prev) => ({ ...prev, image_url: data.publicUrl }));
-      setMessage({ type: 'success', text: validation.message });
+      setMessage({ type: 'success', text: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` });
     } catch (error: any) {
       setMessage({ type: 'error', text: toFriendlyError(error?.message || 'Hero image upload failed') });
     } finally {
@@ -165,7 +196,15 @@ const HeroBanners: React.FC = () => {
     target_type: form.target_type,
     target_product_id: form.target_type === 'product' ? (form.target_product_id || null) : null,
     target_category: form.target_type === 'category' ? (form.target_category.trim() || null) : null,
-    target_url: form.target_type === 'url' ? (form.target_url.trim() || null) : null,
+    target_url: form.target_type === 'url'
+      ? (() => {
+          const primary = form.primary_target_url.trim();
+          const secondary = form.secondary_target_url.trim();
+          if (!primary && !secondary) return null;
+          if (!secondary) return primary;
+          return JSON.stringify({ primary, secondary });
+        })()
+      : null,
     is_active: form.is_active,
     sort_order: Number(form.sort_order || 0)
   });
@@ -190,8 +229,8 @@ const HeroBanners: React.FC = () => {
       setMessage({ type: 'error', text: 'Select a target category.' });
       return;
     }
-    if (form.target_type === 'url' && !form.target_url.trim()) {
-      setMessage({ type: 'error', text: 'Provide target URL.' });
+    if (form.target_type === 'url' && !form.primary_target_url.trim() && !form.secondary_target_url.trim()) {
+      setMessage({ type: 'error', text: 'Provide at least one button URL for Shop Now or View Catalog.' });
       return;
     }
 
@@ -214,6 +253,7 @@ const HeroBanners: React.FC = () => {
   };
 
   const handleEdit = (banner: HeroBanner) => {
+    const parsedUrls = parseBannerTargetUrls(banner.target_url);
     setEditingId(banner.id);
     setForm({
       badge_text: banner.badge_text || 'Premium Selection',
@@ -226,10 +266,15 @@ const HeroBanners: React.FC = () => {
       target_type: banner.target_type,
       target_product_id: banner.target_product_id || '',
       target_category: banner.target_category || '',
-      target_url: banner.target_url || '',
+      primary_target_url: parsedUrls.primary,
+      secondary_target_url: parsedUrls.secondary,
       is_active: banner.is_active,
       sort_order: banner.sort_order ?? 0
     });
+    const matchedPrimaryProduct = products.find((product) => `/product/${product.id}` === parsedUrls.primary);
+    setSelectedPrimaryProductId(matchedPrimaryProduct?.id || '');
+    const matchedSecondaryCategory = categories.find((name) => `/search?q=${encodeURIComponent(name)}` === parsedUrls.secondary);
+    setSelectedSecondaryCategory(matchedSecondaryCategory || '');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -260,6 +305,18 @@ const HeroBanners: React.FC = () => {
     products.forEach((product) => map.set(product.id, product.title));
     return map;
   }, [products]);
+
+  const handlePrimaryProductSelect = (value: string) => {
+    setSelectedPrimaryProductId(value);
+    if (!value) return;
+    setForm((prev) => ({ ...prev, primary_target_url: `/product/${value}` }));
+  };
+
+  const handleSecondaryCategorySelect = (value: string) => {
+    setSelectedSecondaryCategory(value);
+    if (!value) return;
+    setForm((prev) => ({ ...prev, secondary_target_url: `/search?q=${encodeURIComponent(value)}` }));
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -357,12 +414,73 @@ const HeroBanners: React.FC = () => {
           )}
 
           {form.target_type === 'url' && (
-            <input
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold md:col-span-2"
-              placeholder="https://example.com or /product/abc"
-              value={form.target_url}
-              onChange={(e) => setForm((prev) => ({ ...prev, target_url: e.target.value }))}
-            />
+            <div className="md:col-span-2 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold"
+                  placeholder="Shop Now URL (e.g. /product/abc)"
+                  value={form.primary_target_url}
+                  onChange={(e) => setForm((prev) => ({ ...prev, primary_target_url: e.target.value }))}
+                />
+                <input
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold"
+                  placeholder="View Catalog URL (optional)"
+                  value={form.secondary_target_url}
+                  onChange={(e) => setForm((prev) => ({ ...prev, secondary_target_url: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <select
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold"
+                  value={selectedPrimaryProductId}
+                  onChange={(e) => handlePrimaryProductSelect(e.target.value)}
+                >
+                  <option value="">Quick pick Shop Now product</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.title}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold"
+                  value={selectedSecondaryCategory}
+                  onChange={(e) => handleSecondaryCategorySelect(e.target.value)}
+                >
+                  <option value="">Quick pick View Catalog category</option>
+                  {categories.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, secondary_target_url: '/search' }))}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-700 hover:bg-gray-50"
+                >
+                  Set View Catalog = /search
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPrimaryProductId('');
+                    setSelectedSecondaryCategory('');
+                    setForm((prev) => ({ ...prev, primary_target_url: '', secondary_target_url: '' }));
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-black uppercase tracking-widest text-gray-700 hover:bg-gray-50"
+                >
+                  Clear URLs
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                Tip: Shop Now usually uses `/product/PRODUCT_ID` and View Catalog uses `/search` or `/search?q=category`.
+              </p>
+            </div>
           )}
 
           {form.target_type === 'none' && (
@@ -443,7 +561,15 @@ const HeroBanners: React.FC = () => {
                           <span>Product: {productTitleById.get(banner.target_product_id) || banner.target_product_id}</span>
                         ) : null}
                         {banner.target_type === 'category' ? <span>Category: {banner.target_category || '-'}</span> : null}
-                        {banner.target_type === 'url' ? <span>URL: {banner.target_url || '-'}</span> : null}
+                        {banner.target_type === 'url' ? (
+                          <span>
+                            {(() => {
+                              const urls = parseBannerTargetUrls(banner.target_url);
+                              if (!urls.primary && !urls.secondary) return 'URL: -';
+                              return `Shop: ${urls.primary || '-'}${urls.secondary ? ` | Catalog: ${urls.secondary}` : ''}`;
+                            })()}
+                          </span>
+                        ) : null}
                         {banner.target_type === 'none' ? <span>Catalog section</span> : null}
                       </td>
                       <td className="px-6 py-4">

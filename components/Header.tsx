@@ -203,11 +203,15 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex justify-between items-center h-full gap-4 lg:gap-8">
           
           {/* LEFT: Logo (Image Based) */}
-          <a href="/" onClick={closeMobileOverlays} className="flex-shrink-0 flex items-center gap-3 group relative z-50">
+          <a href="/" onClick={closeMobileOverlays} className="flex-shrink-0 min-w-0 flex items-center gap-3 group relative z-50">
             <img 
               src={activeLogoSrc}
               alt={siteName} 
-              className="h-[30px] sm:h-[34px] md:h-[38px] w-auto max-w-[130px] sm:max-w-[190px] md:max-w-[220px] object-contain transition-transform duration-300 group-hover:scale-105"
+              className={`w-auto object-contain transition-transform duration-300 group-hover:scale-105 ${
+                isMobileSearchOpen
+                  ? 'h-[26px] max-w-[88px]'
+                  : 'h-[34px] sm:h-[40px] md:h-[48px] max-w-[180px] sm:max-w-[260px] md:max-w-[340px]'
+              }`}
               onError={() => {
                 if (activeLogoSrc !== fallbackLogo) {
                   setLogoLoadFailed(true);

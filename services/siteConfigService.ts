@@ -55,6 +55,10 @@ export interface PublicSiteConfig {
   exchangeRateUsd: number; // Base currency units per 1 USD
   exchangeRateInr: number; // Base currency units per 1 INR
   allowGuestCheckout: boolean;
+  taxEnabled: boolean;
+  defaultTaxRate: number;
+  defaultShippingFee: number;
+  invoicePrefix: string;
   companyAboutTitle: string;
   companyAboutContent: string;
   companyContactTitle: string;
@@ -137,6 +141,10 @@ const DEFAULT_CONFIG: PublicSiteConfig = {
   exchangeRateUsd: 121.5,
   exchangeRateInr: 1.45,
   allowGuestCheckout: true,
+  taxEnabled: true,
+  defaultTaxRate: 8,
+  defaultShippingFee: 15,
+  invoicePrefix: 'INV',
   companyAboutTitle: 'About',
   companyAboutContent: `${tenantDefaults.brandName || 'Our store'} is a premium ecommerce platform focused on reliability and customer-first service.`,
   companyContactTitle: 'Contact',
@@ -389,9 +397,14 @@ let cacheUpdatedAt = 0;
 const CACHE_TTL_MS = 60_000;
 const SITE_CONFIG_CACHE_KEY = 'noklity_public_site_config_v1';
 
-const parseNumber = (value: string | undefined, fallback: number) => {
+const parsePositiveNumber = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const parseNonNegativeNumber = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 
 const parseBoolean = (value: string | undefined, fallback: boolean) => {
@@ -505,9 +518,13 @@ export const getPublicSiteConfig = async (): Promise<PublicSiteConfig> => {
     currencyCode: map.get('currency_code') || DEFAULT_CONFIG.currencyCode,
     currencyLocale: map.get('currency_locale') || DEFAULT_CONFIG.currencyLocale,
     baseCurrencyCode: map.get('base_currency_code') || DEFAULT_CONFIG.baseCurrencyCode,
-    exchangeRateUsd: parseNumber(map.get('exchange_rate_usd'), DEFAULT_CONFIG.exchangeRateUsd),
-    exchangeRateInr: parseNumber(map.get('exchange_rate_inr'), DEFAULT_CONFIG.exchangeRateInr),
+    exchangeRateUsd: parsePositiveNumber(map.get('exchange_rate_usd'), DEFAULT_CONFIG.exchangeRateUsd),
+    exchangeRateInr: parsePositiveNumber(map.get('exchange_rate_inr'), DEFAULT_CONFIG.exchangeRateInr),
     allowGuestCheckout: parseBoolean(map.get('allow_guest_checkout'), DEFAULT_CONFIG.allowGuestCheckout),
+    taxEnabled: parseBoolean(map.get('tax_enabled'), DEFAULT_CONFIG.taxEnabled),
+    defaultTaxRate: parseNonNegativeNumber(map.get('default_tax_rate'), DEFAULT_CONFIG.defaultTaxRate),
+    defaultShippingFee: parseNonNegativeNumber(map.get('default_shipping_fee'), DEFAULT_CONFIG.defaultShippingFee),
+    invoicePrefix: map.get('invoice_prefix') || DEFAULT_CONFIG.invoicePrefix,
     companyAboutTitle: map.get('company_about_title') || DEFAULT_CONFIG.companyAboutTitle,
     companyAboutContent: map.get('company_about_content') || DEFAULT_CONFIG.companyAboutContent,
     companyContactTitle: map.get('company_contact_title') || DEFAULT_CONFIG.companyContactTitle,
@@ -542,7 +559,7 @@ export const getPublicSiteConfig = async (): Promise<PublicSiteConfig> => {
     mutedTextColorDark: map.get('muted_text_color_dark') || DEFAULT_CONFIG.mutedTextColorDark,
     borderColorLight: map.get('border_color_light') || DEFAULT_CONFIG.borderColorLight,
     borderColorDark: map.get('border_color_dark') || DEFAULT_CONFIG.borderColorDark,
-    borderRadiusPx: parseNumber(map.get('border_radius_px'), DEFAULT_CONFIG.borderRadiusPx),
+    borderRadiusPx: parseNonNegativeNumber(map.get('border_radius_px'), DEFAULT_CONFIG.borderRadiusPx),
     managedPages: [],
     shopLinks: []
   };

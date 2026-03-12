@@ -28,6 +28,21 @@ export interface OrderDetail extends Order {
   subtotal: number;
   shipping: number;
   tax: number;
+  deliveryProvider?: 'steadfast' | 'manual' | null;
+  deliveryConsignmentId?: string | null;
+  deliveryTrackingCode?: string | null;
+  deliveryTrackingUrl?: string | null;
+  deliveryStatus?:
+    | 'not_created'
+    | 'created'
+    | 'pending_pickup'
+    | 'picked'
+    | 'in_transit'
+    | 'delivered'
+    | 'cancelled'
+    | 'failed'
+    | 'unknown';
+  deliveryLastSyncedAt?: string | null;
 }
 
 const mapPaymentMethodLabel = (paymentMethod: string) => {
@@ -290,7 +305,13 @@ export const getOrderById = async (id: string): Promise<OrderDetail | null> => {
       shipping: 0, // In this model, shipping was included in total or calculated at checkout. Displaying 0 for simplicity or extract if saved separately.
       tax: 0,
       total: data.total_amount,
-      itemsCount: items.length
+      itemsCount: items.length,
+      deliveryProvider: data.delivery_provider || null,
+      deliveryConsignmentId: data.delivery_consignment_id || null,
+      deliveryTrackingCode: data.delivery_tracking_code || null,
+      deliveryTrackingUrl: data.delivery_tracking_url || null,
+      deliveryStatus: data.delivery_status || 'not_created',
+      deliveryLastSyncedAt: data.delivery_last_synced_at || null
     };
 
   } catch (error) {

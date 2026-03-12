@@ -4,9 +4,8 @@ React + Vite + Supabase ecommerce storefront and admin panel, productized for re
 
 ## What was added
 - Unified tenant configuration (`file + DB + env`) with runtime cache.
-- Plan and feature-flag enforcement (`Basic`, `Pro`, `Enterprise`).
-- License-aware plan fallback (`Basic` fallback when invalid).
-- Admin settings for branding, company info, pages, plans, and feature toggles.
+- Feature-flag enforcement for optional modules.
+- Admin settings for branding, company info, pages, and business configuration.
 - Single-tenant deployment model (safe default).
 - Optional multi-tenant scaffold (not fully activated).
 
@@ -23,6 +22,7 @@ React + Vite + Supabase ecommerce storefront and admin panel, productized for re
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
+- `npm run check:prepublish`
 - `npm run test:productization`
 - `npm run test:smoke`
 - `npm run test`
@@ -40,10 +40,10 @@ React + Vite + Supabase ecommerce storefront and admin panel, productized for re
   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/NEW_CUSTOMER_SETUP.md`
 - White-label customization:
   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/WHITE_LABEL_CUSTOMIZATION.md`
-- Plan & feature flags:
-  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/PLAN_FEATURE_FLAGS.md`
 - Upgrade guide:
   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/UPGRADE_GUIDE.md`
+- HostSeba cPanel deployment:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/HOSTSEBA_CPANEL_DEPLOYMENT.md`
 
 ## bKash setup
 - Deploy edge functions:

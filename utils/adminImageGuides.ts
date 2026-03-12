@@ -64,10 +64,10 @@ export const ADMIN_IMAGE_GUIDES = {
   } as ImageGuide,
   headerLogo: {
     label: 'Header logo',
-    recommendedWidth: 420,
-    recommendedHeight: 120,
-    minimumWidth: 280,
-    minimumHeight: 80,
+    recommendedWidth: 440,
+    recommendedHeight: 140,
+    minimumWidth: 300,
+    minimumHeight: 96,
     maxSizeMb: 2,
     strictAspect: false
   } as ImageGuide,
