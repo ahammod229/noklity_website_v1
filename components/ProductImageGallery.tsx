@@ -38,8 +38,9 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
           src={galleryImages[activeImage]}
           alt={productName}
           width={960}
-          responsiveWidths={[320, 480, 640, 768, 960, 1200]}
-          quality={84}
+          height={960}
+          responsiveWidths={[400, 800, 1200, 1600]}
+          sizes="(max-width: 1024px) 100vw, 40vw"
           loading="eager"
           className={`w-full h-full object-contain transition-transform duration-200 ${
             theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
@@ -71,8 +72,9 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
               src={img}
               alt={`View ${idx + 1}`}
               width={160}
-              responsiveWidths={[96, 128, 160, 192]}
-              quality={80}
+              height={160}
+              responsiveWidths={[400, 800]}
+              sizes="80px"
               className={`w-full h-full object-contain p-1 ${
                 theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
               }`}

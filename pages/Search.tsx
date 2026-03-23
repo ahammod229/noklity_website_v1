@@ -5,6 +5,7 @@ import SearchFilters from '../components/SearchFilters';
 import { searchProducts, SearchFilters as FilterType } from '../services/searchService';
 import { Product } from '../types';
 import { SlidersHorizontal, ArrowLeft, ArrowDownUp, PackageX } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 
 interface SearchPageProps {
   onLoginClick: () => void;
@@ -25,14 +26,26 @@ const Search: React.FC<SearchPageProps> = ({
     return (params.get('q') || '').trim();
   }, []);
 
+  const getCategoryFromUrl = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get('category') || '').trim();
+  }, []);
+
   const [query, setQuery] = useState(() => (initialQuery || getQueryFromUrl()).trim());
   const [results, setResults] = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState<FilterType>({ sortBy: 'relevance' });
+  const [filters, setFilters] = useState<FilterType>(() => {
+    const category = (typeof window !== 'undefined' ? getCategoryFromUrl() : '').trim();
+    return {
+      sortBy: 'relevance',
+      category: category ? [category] : undefined
+    };
+  });
   const [facets, setFacets] = useState<{ categories: {name: string, count: number}[], priceRange: {min: number, max: number} } | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
 
   const performSearch = useCallback(async () => {
     if (initialLoading) {
@@ -40,13 +53,22 @@ const Search: React.FC<SearchPageProps> = ({
     } else {
       setIsSearching(true);
     }
+    setError(null);
 
-    const data = await searchProducts(query, filters);
-    setResults(data.products);
-    setTotalCount(data.totalCount);
-    setFacets(data.facets);
-    setInitialLoading(false);
-    setIsSearching(false);
+    try {
+      const data = await searchProducts(query, filters);
+      setResults(data.products);
+      setTotalCount(data.totalCount);
+      setFacets(data.facets);
+    } catch (err) {
+      setResults([]);
+      setTotalCount(0);
+      setFacets(undefined);
+      setError('Something went wrong while loading products. Please try again.');
+    } finally {
+      setInitialLoading(false);
+      setIsSearching(false);
+    }
   }, [filters, initialLoading, query]);
 
   // Initial and reactive search
@@ -57,11 +79,19 @@ const Search: React.FC<SearchPageProps> = ({
   useEffect(() => {
     const syncQueryFromUrl = () => {
       const nextQuery = getQueryFromUrl();
+      const nextCategory = getCategoryFromUrl();
       setQuery((prev) => (prev === nextQuery ? prev : nextQuery));
+      setFilters((prev) => {
+        const nextCategoryArray = nextCategory ? [nextCategory] : undefined;
+        const prevCategoryKey = JSON.stringify(prev.category || []);
+        const nextCategoryKey = JSON.stringify(nextCategoryArray || []);
+        if (prevCategoryKey === nextCategoryKey) return prev;
+        return { ...prev, category: nextCategoryArray };
+      });
     };
     window.addEventListener('popstate', syncQueryFromUrl);
     return () => window.removeEventListener('popstate', syncQueryFromUrl);
-  }, [getQueryFromUrl]);
+  }, [getCategoryFromUrl, getQueryFromUrl]);
 
   const handleFilterChange = useCallback((newFilters: FilterType) => {
     setFilters((prev) => {
@@ -82,6 +112,23 @@ const Search: React.FC<SearchPageProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
+      <SeoHead
+        title={
+          query
+            ? `Search results for "${query}" | Noklity`
+            : filters.category?.[0]
+              ? `${filters.category[0]} Products | Noklity`
+              : 'Search Products | Noklity'
+        }
+        description={
+          query
+            ? `Browse Noklity search results for ${query}. Find imported electronics, tools, tyres and parts in Bangladesh.`
+            : filters.category?.[0]
+              ? `Browse ${filters.category[0]} products on Noklity, including imported electronics, tools, tyres and parts in Bangladesh.`
+              : 'Search and browse imported electronics, tools, tyres and parts on Noklity.'
+        }
+        path={typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '/search'}
+      />
       <main className="flex-grow">
         {/* Search Header */}
         <div className="bg-gray-50 border-b border-gray-200 py-8">
@@ -162,6 +209,20 @@ const Search: React.FC<SearchPageProps> = ({
                                 <div key={i} className="bg-gray-100 rounded-[2rem] h-[420px] animate-pulse"></div>
                             ))}
                         </div>
+                    ) : error ? (
+                        <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
+                            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
+                                <PackageX className="w-10 h-10 text-gray-300" strokeWidth={1.5} />
+                            </div>
+                            <h2 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Search unavailable</h2>
+                            <p className="text-gray-500 mb-8 max-w-sm font-medium leading-relaxed">{error}</p>
+                            <button
+                                onClick={performSearch}
+                                className="bg-primary text-white font-bold py-3 px-8 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 active:scale-95 text-sm"
+                            >
+                                Try Again
+                            </button>
+                        </div>
                     ) : results.length > 0 ? (
                         <div className="relative">
                           {isSearching && (
@@ -210,18 +271,6 @@ const Search: React.FC<SearchPageProps> = ({
                         </div>
                     )}
 
-                    {/* Pagination Mock */}
-                    {!initialLoading && results.length > 0 && (
-                        <div className="mt-16 flex justify-center">
-                            <nav className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
-                                <button className="px-6 py-3 bg-white text-gray-400 rounded-xl text-xs font-black uppercase tracking-widest cursor-not-allowed">Prev</button>
-                                <button className="px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black shadow-lg">1</button>
-                                <button className="px-6 py-3 bg-transparent text-gray-500 rounded-xl text-xs font-black hover:bg-white hover:text-gray-900 transition-all">2</button>
-                                <button className="px-6 py-3 bg-transparent text-gray-500 rounded-xl text-xs font-black hover:bg-white hover:text-gray-900 transition-all">3</button>
-                                <button className="px-6 py-3 bg-white text-gray-900 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all">Next</button>
-                            </nav>
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

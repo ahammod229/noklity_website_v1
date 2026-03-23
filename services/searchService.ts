@@ -1,6 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import { Product } from '../types';
+import { isCatalogVisibleProductRow } from './productService';
 
 export interface SearchFilters {
   category?: string[];
@@ -57,7 +58,9 @@ const sanitizeLike = (value: string) =>
  */
 export const searchProducts = async (query: string, filters: SearchFilters = {}): Promise<SearchResult> => {
   try {
-    let dbQuery = supabase.from('products').select('*', { count: 'exact' });
+    let dbQuery = supabase
+      .from('products')
+      .select('id,title,category,price,discount_price,image_url,rating,stock,is_flash_sale,description,created_at,status,is_active', { count: 'exact' });
 
     // 1. Text Search (ILIKE)
     if (query && query.trim() !== '') {
@@ -105,32 +108,29 @@ export const searchProducts = async (query: string, filters: SearchFilters = {})
     const { data, count, error } = await dbQuery;
 
     if (error) {
-      console.error('Search error:', JSON.stringify(error, null, 2));
-      return { 
-        products: [], 
-        totalCount: 0, 
-        facets: { categories: [], priceRange: { min: 0, max: 0 } } 
-      };
+      throw new Error(error.message || 'Unable to search products.');
     }
 
-    const products = (data || []).map(mapProduct);
+    const products = (data || []).filter(isCatalogVisibleProductRow).map(mapProduct);
+    const categoryCounts = new Map<string, number>();
+    let maxPrice = 0;
 
-    // Simplified Facets (In a real app, these would be separate aggregation queries)
+    products.forEach((product) => {
+      categoryCounts.set(product.category, (categoryCounts.get(product.category) || 0) + 1);
+      maxPrice = Math.max(maxPrice, Number(product.price || 0));
+    });
+
     return {
       products,
-      totalCount: count || 0,
+      totalCount: products.length || count || 0,
       facets: {
-        categories: [], 
-        priceRange: { min: 0, max: 5000 }
+        categories: Array.from(categoryCounts.entries()).map(([name, itemCount]) => ({ name, count: itemCount })),
+        priceRange: { min: 0, max: maxPrice || 5000 }
       }
     };
   } catch (err) {
     console.error('Unexpected error in searchProducts:', err);
-    return { 
-      products: [], 
-      totalCount: 0, 
-      facets: { categories: [], priceRange: { min: 0, max: 0 } } 
-    };
+    throw err instanceof Error ? err : new Error('Unexpected search error.');
   }
 };
 
@@ -144,8 +144,6 @@ export const getSearchSuggestions = async (query: string, limit = 6): Promise<Se
       .from('products')
       .select('id,title,category,image_url,price,discount_price,is_active,status,stock')
       .or(`title.ilike.${likeValue},category.ilike.${likeValue},brand.ilike.${likeValue}`)
-      .eq('is_active', true)
-      .eq('status', 'active')
       .gt('stock', 0)
       .limit(limit);
 
@@ -154,7 +152,7 @@ export const getSearchSuggestions = async (query: string, limit = 6): Promise<Se
       return [];
     }
 
-    return (data || []).map(mapSuggestion);
+    return (data || []).filter(isCatalogVisibleProductRow).map(mapSuggestion);
   } catch (error) {
     console.error('Unexpected suggestion search error:', error);
     return [];

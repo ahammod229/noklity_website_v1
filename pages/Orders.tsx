@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Package, Truck, CheckCircle, Clock, ChevronRight, Search, ArrowRight, XCircle } from 'lucide-react';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 interface OrdersProps {
   onLoginClick: () => void;
@@ -123,7 +124,15 @@ const Orders: React.FC<OrdersProps> = ({
                                 {/* Product Image */}
                                 <div className="w-full sm:w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 flex-shrink-0 overflow-hidden relative group-hover:border-gray-200 transition-colors">
                                     {order.previewImage && (
-                                        <img src={order.previewImage} alt="Product" className="w-full h-full object-cover mix-blend-multiply" />
+                                        <OptimizedImage
+                                          src={order.previewImage}
+                                          alt={order.previewName || 'Product'}
+                                          className="w-full h-full object-cover mix-blend-multiply"
+                                          width={96}
+                                          height={96}
+                                          responsiveWidths={[400, 800]}
+                                          sizes="96px"
+                                        />
                                     )}
                                     {order.itemCount > 1 && (
                                         <div className="absolute bottom-0 right-0 bg-gray-900 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-tl-lg">

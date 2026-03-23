@@ -19,8 +19,8 @@ export interface ImageGuideValidationResult {
 export const ADMIN_IMAGE_GUIDES = {
   productPrimary: {
     label: 'Product primary image',
-    recommendedWidth: 1200,
-    recommendedHeight: 1200,
+    recommendedWidth: 1600,
+    recommendedHeight: 1600,
     minimumWidth: 800,
     minimumHeight: 800,
     maxSizeMb: 5,
@@ -28,8 +28,8 @@ export const ADMIN_IMAGE_GUIDES = {
   } as ImageGuide,
   productGallery: {
     label: 'Product gallery image',
-    recommendedWidth: 1200,
-    recommendedHeight: 1200,
+    recommendedWidth: 1600,
+    recommendedHeight: 1600,
     minimumWidth: 800,
     minimumHeight: 800,
     maxSizeMb: 5,

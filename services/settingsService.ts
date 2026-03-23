@@ -55,7 +55,7 @@ const DEFAULT_SETTINGS: WebsiteSettings = {
   branding: {
     siteName: defaultSiteName,
     tagline: 'Premium Automotive Performance Parts',
-    headerLogo: 'https://images.unsplash.com/photo-1599507591144-667d404d4902?q=80&w=200&auto=format&fit=crop',
+    headerLogo: '',
     footerLogo: '',
     favicon: '',
   },

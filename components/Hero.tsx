@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Loader2, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getProductById } from '../services/productService';
@@ -73,6 +73,10 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartXRef = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     const fetchBanners = async () => {
@@ -99,18 +103,79 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
     fetchBanners();
   }, []);
 
+  const displayedBanners = useMemo(() => {
+    return banners.length > 0 ? banners : [FALLBACK_BANNER];
+  }, [banners]);
+
   useEffect(() => {
-    if (banners.length <= 1) return undefined;
+    if (displayedBanners.length <= 1) return undefined;
     const timer = window.setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % banners.length);
+      setActiveIndex((prev) => (prev + 1) % displayedBanners.length);
     }, 7000);
     return () => window.clearInterval(timer);
-  }, [banners.length]);
+  }, [displayedBanners.length]);
+
+  useEffect(() => {
+    setActiveIndex((prev) => {
+      if (displayedBanners.length === 0) return 0;
+      return Math.min(prev, displayedBanners.length - 1);
+    });
+  }, [displayedBanners.length]);
 
   const activeBanner = useMemo(() => {
-    if (banners.length === 0) return FALLBACK_BANNER;
-    return banners[activeIndex] || banners[0];
-  }, [banners, activeIndex]);
+    return displayedBanners[activeIndex] || displayedBanners[0] || FALLBACK_BANNER;
+  }, [displayedBanners, activeIndex]);
+
+  const goToBanner = (nextIndex: number) => {
+    if (displayedBanners.length <= 1) return;
+    const wrappedIndex = (nextIndex + displayedBanners.length) % displayedBanners.length;
+    setActiveIndex(wrappedIndex);
+    setDragOffset(0);
+  };
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (displayedBanners.length <= 1) return;
+    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+    suppressClickRef.current = false;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartXRef.current === null || displayedBanners.length <= 1) return;
+    const currentX = event.touches[0]?.clientX ?? touchStartXRef.current;
+    const deltaX = currentX - touchStartXRef.current;
+    if (Math.abs(deltaX) > 8) {
+      suppressClickRef.current = true;
+    }
+    setDragOffset(deltaX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartXRef.current === null) return;
+
+    const swipeThreshold = 60;
+    if (dragOffset <= -swipeThreshold) {
+      goToBanner(activeIndex + 1);
+    } else if (dragOffset >= swipeThreshold) {
+      goToBanner(activeIndex - 1);
+    } else {
+      setDragOffset(0);
+    }
+
+    touchStartXRef.current = null;
+    setIsDragging(false);
+
+    if (suppressClickRef.current) {
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+  };
+
+  const handleContainerClick = () => {
+    if (suppressClickRef.current) return;
+    handleBannerAction('primary');
+  };
 
   const scrollToCatalog = () => {
     onSelectCategory('');
@@ -189,8 +254,12 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
   return (
     <section className="pt-2 pb-5 sm:pt-4 sm:pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div
-        onClick={() => handleBannerAction('primary')}
-        className="relative rounded-2xl sm:rounded-[2.5rem] overflow-hidden h-[360px] sm:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
+        onClick={handleContainerClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        className="relative rounded-2xl sm:rounded-[2.5rem] overflow-hidden h-[240px] xs:h-[280px] sm:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
       >
         {isLoading ? (
           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
@@ -198,20 +267,31 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
           </div>
         ) : (
           <>
-            <div className="absolute inset-0">
-              <OptimizedImage
-                src={activeBanner.image_url}
-                alt={activeBanner.title}
-                width={1920}
-                responsiveWidths={[640, 960, 1280, 1600, 1920, 2560]}
-                quality={84}
-                loading="eager"
-                className="w-full h-full object-cover object-center transform transition-transform duration-[20s] group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-gray-950/90 via-gray-900/50 to-transparent" />
+            <div
+              className="absolute inset-0 flex"
+              style={{
+                transform: `translateX(calc(${-activeIndex * 100}% + ${dragOffset}px))`,
+                transition: isDragging ? 'none' : 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1)'
+              }}
+            >
+              {displayedBanners.map((banner) => (
+                <div key={banner.id} className="relative h-full min-w-full bg-gray-50 sm:bg-transparent">
+                  <OptimizedImage
+                    src={banner.image_url}
+                    alt={banner.title}
+                    width={1920}
+                    height={760}
+                    responsiveWidths={[400, 800, 1200, 1600]}
+                    sizes="100vw"
+                    loading="eager"
+                    className="w-full h-full object-contain sm:object-cover object-center transform transition-transform duration-[20s] sm:group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-transparent sm:bg-gradient-to-r sm:from-gray-950/90 sm:via-gray-900/50 sm:to-transparent" />
+                </div>
+              ))}
             </div>
 
-            <div className="relative h-full flex items-end sm:items-center px-3 sm:px-6 md:px-12 lg:px-16 pb-4 sm:pb-0">
+            <div className="relative hidden h-full items-center px-6 md:px-12 lg:px-16 sm:flex">
               <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl max-w-[98%] sm:max-w-lg w-full text-white shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
                 <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-primary/40 rounded-full blur-[60px] pointer-events-none" />
 
@@ -267,14 +347,14 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
               </div>
             </div>
 
-            {banners.length > 1 && (
-              <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 flex items-center gap-2">
-                {banners.map((banner, index) => (
+            {displayedBanners.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 sm:bottom-6 sm:right-6 sm:left-auto sm:translate-x-0 flex items-center gap-2 rounded-full bg-black/20 px-3 py-2 backdrop-blur-md">
+                {displayedBanners.map((banner, index) => (
                   <button
                     key={banner.id}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveIndex(index);
+                      goToBanner(index);
                     }}
                     className={`h-2.5 rounded-full transition-all ${index === activeIndex ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/70'}`}
                     aria-label={`Go to banner ${index + 1}`}

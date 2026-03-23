@@ -12,7 +12,9 @@
     "localhost",
     "127.0.0.1",
     "noklity.com",
-    "www.noklity.com"
+    "www.noklity.com",
+    "noklity-fd082.web.app",
+    "noklity-fd082.firebaseapp.com"
   ],
   "timezone": "Asia/Dhaka",
   "currency": "BDT",

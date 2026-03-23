@@ -83,6 +83,7 @@ pass('tenant.json includes all expected feature flags');
 const envExample = readUtf8('.env.example');
 [
   'VITE_SUPABASE_URL',
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
   'VITE_SUPABASE_ANON_KEY',
   'VITE_TENANT_BRAND_NAME',
   'VITE_TENANT_PLAN_NAME',

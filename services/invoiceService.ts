@@ -93,8 +93,6 @@ export const getInvoiceByOrderId = async (orderId: string): Promise<InvoiceData 
       // Keep snapshot/default fee when DB fetch fails.
     }
     const estimatedShipping = subtotal > 0 ? Math.max(0, Number(configuredShippingFee) || 0) : 0;
-    const tax = Math.max(0, total - subtotal - estimatedShipping);
-
     return {
       id: data.id,
       date: new Date(data.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
@@ -110,7 +108,7 @@ export const getInvoiceByOrderId = async (orderId: string): Promise<InvoiceData 
       subtotal,
       discount: 0,
       shipping: estimatedShipping,
-      tax,
+      tax: 0,
       total
     };
   } catch (err) {

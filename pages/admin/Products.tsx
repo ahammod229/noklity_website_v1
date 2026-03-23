@@ -11,6 +11,11 @@ interface ProductsPageProps {
   showToast?: (message: string, type?: ToastType) => void;
 }
 
+const isLiveCatalogProduct = (product: Product) => {
+  const normalizedStatus = String(product.status || '').trim().toLowerCase();
+  return normalizedStatus !== 'inactive' && product.isActive !== false;
+};
+
 const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -19,11 +24,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [catalogRecoveryNeeded, setCatalogRecoveryNeeded] = useState(false);
+  const [restoringCatalog, setRestoringCatalog] = useState(false);
 
   // Helper to show toast if provided, otherwise console log or alert
   const notify = (msg: string, type: ToastType = 'success') => {
     if (showToast) showToast(msg, type);
-    else console.log(`[${type.toUpperCase()}] ${msg}`);
+    else if (typeof window !== 'undefined') window.alert(msg);
   };
 
   useEffect(() => {
@@ -74,7 +82,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
         warranty: row.warranty || '',
         countryOfOrigin: row.country_of_origin || '',
         status: row.status || 'active',
-        taxPercent: Number(row.tax_percent || 0),
         defaultDeliveryFee: Number(row.default_delivery_fee || 0),
         // Let's align with schema: price is selling price. If discount_price is set in DB, that's likely the sale price.
         // However, standard e-comm schema usually has `price` (regular) and `sale_price` (discounted).
@@ -96,9 +103,38 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
         isFlashSale: row.is_flash_sale,
         description: row.description,
       }));
-      setProducts(mappedProducts);
+      const visibleProducts = mappedProducts.filter(isLiveCatalogProduct);
+      setCatalogRecoveryNeeded(mappedProducts.length > 0 && visibleProducts.length === 0);
+      setProducts(visibleProducts.length > 0 ? visibleProducts : mappedProducts);
     }
     setLoading(false);
+  };
+
+  const handleRestoreCatalog = async () => {
+    if (products.length === 0) return;
+    setRestoringCatalog(true);
+
+    try {
+      const productIds = products.map((product) => product.id);
+      const { error } = await supabase
+        .from('products')
+        .update({
+          status: 'active',
+          is_active: true
+        })
+        .in('id', productIds);
+
+      if (error) {
+        throw error;
+      }
+
+      notify('All products were restored to the live catalog.');
+      await fetchProducts();
+    } catch (error: any) {
+      notify(error?.message || 'Failed to restore products', 'error');
+    } finally {
+      setRestoringCatalog(false);
+    }
   };
 
   const handleOpenModal = (product?: Product) => {
@@ -113,18 +149,82 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
+    setDeletingProductId(id);
 
-    // Optimistic UI
-    const prevProducts = [...products];
-    setProducts(products.filter(p => p.id !== id));
+    try {
+      const { data: orderItems, error: orderReferenceError } = await supabase
+        .from('order_items')
+        .select('order_id')
+        .eq('product_id', id);
 
-    const { error } = await supabase.from('products').delete().eq('id', id);
+      if (orderReferenceError) {
+        throw orderReferenceError;
+      }
 
-    if (error) {
-      setProducts(prevProducts);
-      notify('Failed to delete product', 'error');
-    } else {
+      const relatedOrderIds = Array.from(
+        new Set((orderItems || []).map((item: { order_id: string | null }) => item.order_id).filter(Boolean))
+      ) as string[];
+
+      if (relatedOrderIds.length > 0) {
+        const { count: pendingOrderCount, error: pendingOrderError } = await supabase
+          .from('orders')
+          .select('id', { count: 'exact', head: true })
+          .in('id', relatedOrderIds)
+          .in('status', ['Pending', 'pending']);
+
+        if (pendingOrderError) {
+          throw pendingOrderError;
+        }
+
+        if ((pendingOrderCount || 0) > 0) {
+          notify('This product is used in pending orders, so you cannot delete it yet.', 'error');
+          return;
+        }
+
+        const [{ error: archiveError }, { error: cartCleanupError }, { error: wishlistCleanupError }] =
+          await Promise.all([
+            supabase
+              .from('products')
+              .update({
+                status: 'inactive',
+                is_active: false,
+                stock: 0,
+                is_flash_sale: false
+              })
+              .eq('id', id),
+            supabase.from('cart_items').delete().eq('product_id', id),
+            supabase.from('wishlist_items').delete().eq('product_id', id)
+          ]);
+
+        if (archiveError) {
+          throw archiveError;
+        }
+
+        if (cartCleanupError) {
+          console.warn('Cart cleanup warning while archiving product:', cartCleanupError);
+        }
+        if (wishlistCleanupError) {
+          console.warn('Wishlist cleanup warning while archiving product:', wishlistCleanupError);
+        }
+
+        notify('This product was removed from the live catalog and admin list because its orders are already completed or cancelled.');
+        setProducts((prev) => prev.filter((product) => product.id !== id));
+        return;
+      }
+
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) {
+        throw error;
+      }
+
+      setProducts((prev) => prev.filter((product) => product.id !== id));
       notify('Product deleted successfully');
+    } catch (error: any) {
+      console.error('Failed to delete product:', error);
+      notify(error?.message || 'Failed to delete product', 'error');
+      await fetchProducts();
+    } finally {
+      setDeletingProductId(null);
     }
   };
 
@@ -180,7 +280,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
       delivery_charges: formData.deliveryCharges,
       warranty_months: formData.warrantyMonths,
       warranty_policy: formData.warrantyPolicy || null,
-      tax_percent: formData.taxPercent,
+      tax_percent: 0,
       default_delivery_fee: formData.defaultDeliveryFee,
       shipping_info: formData.shippingInfo || null,
       return_policy: formData.returnPolicy || null,
@@ -253,6 +353,26 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
             </div>
         </div>
 
+        {catalogRecoveryNeeded && (
+          <div className="mx-6 mb-0 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-black text-amber-900">All products are currently hidden from the customer panel.</p>
+              <p className="text-sm font-semibold text-amber-800 mt-1">
+                This usually means they were archived. Restore them to make the live catalog visible again.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRestoreCatalog}
+              disabled={restoringCatalog}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-black text-white transition hover:bg-amber-700 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {restoringCatalog ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Restore All Products
+            </button>
+          </div>
+        )}
+
         {/* Table Component */}
         <ProductTable 
           products={filteredProducts}
@@ -260,6 +380,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
           onEdit={handleOpenModal}
           onDelete={handleDelete}
           onToggleFlashSale={handleToggleFlashSale}
+          deletingProductId={deletingProductId}
         />
       </div>
 

@@ -203,7 +203,7 @@ export const getTenantConfigSnapshot = (): TenantRuntimeConfig => {
   const stored = loadFromStorage();
   if (stored) {
     tenantCache = stored;
-    tenantCacheUpdatedAt = Date.now();
+    tenantCacheUpdatedAt = 0;
     return stored;
   }
   tenantCache = asRuntimeConfig(getDefaultConfig());
@@ -214,6 +214,14 @@ export const getTenantConfigSnapshot = (): TenantRuntimeConfig => {
 export const getTenantConfig = async (): Promise<TenantRuntimeConfig> => {
   if (tenantCache && Date.now() - tenantCacheUpdatedAt < TENANT_CACHE_TTL_MS) {
     return tenantCache;
+  }
+
+  if (!tenantCache) {
+    const stored = loadFromStorage();
+    if (stored) {
+      tenantCache = stored;
+      tenantCacheUpdatedAt = 0;
+    }
   }
 
   const defaults = getDefaultConfig();

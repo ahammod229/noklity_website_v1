@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Noklity favicon">
+  <rect width="64" height="64" rx="18" fill="#ffffff"/>
+  <path d="M14 46V18h8l14 15V18h14v28h-8L28 31v15H14z" fill="#0f172a"/>
+  <path d="M16 46V18h8l14 15V18h12v6H44v9h7v6h-7v7h-8L22 31v15h-6z" fill="#e11d48"/>
+</svg>

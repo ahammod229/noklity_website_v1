@@ -37,10 +37,16 @@ import { WishlistProvider, useWishlist } from './contexts/WishlistContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
-import { getPublicSiteConfig } from './services/siteConfigService';
+import {
+  clearPublicSiteConfigCache,
+  getPublicSiteConfig,
+  subscribeToPublicSiteConfigSignals
+} from './services/siteConfigService';
 import { TenantConfigProvider, useTenantConfig } from './contexts/TenantConfigContext';
-import { isHostAllowed } from './services/tenantConfigService';
+import { clearTenantConfigCache, isHostAllowed } from './services/tenantConfigService';
 import { applyAppearanceSettings } from './services/appearanceService';
+import RouteSeo from './components/RouteSeo';
+import { supabase } from './lib/supabase';
 
 // Inner App component to use Auth, Cart, and Wishlist Context
 const AppContent: React.FC = () => {
@@ -153,10 +159,6 @@ const AppContent: React.FC = () => {
       try {
         const config = await getPublicSiteConfig();
         if (!mounted) return;
-        if (config.siteName) {
-          const urlPart = (config.siteUrlName || '').trim();
-          document.title = urlPart ? `${config.siteName} | ${urlPart}` : config.siteName;
-        }
         applyAppearanceSettings({
           primaryColor: config.primaryColor,
           primaryHoverColor: config.primaryHoverColor,
@@ -198,6 +200,94 @@ const AppContent: React.FC = () => {
     return () => {
       mounted = false;
       window.removeEventListener('site-config-updated', handleUpdated as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let isActive = true;
+    let lastKnownRevision = '';
+    let isCheckingRevision = false;
+
+    const refreshSharedConfig = () => {
+      if (!isActive) return;
+      clearPublicSiteConfigCache({ broadcast: false });
+      clearTenantConfigCache();
+    };
+
+    const syncLatestConfigRevision = async (forceRefresh = false) => {
+      if (!isActive || isCheckingRevision) return;
+      isCheckingRevision = true;
+
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (!isActive || error) return;
+
+        const nextRevision = String(data?.[0]?.updated_at || '');
+        if (forceRefresh) {
+          if (nextRevision) {
+            lastKnownRevision = nextRevision;
+          }
+          refreshSharedConfig();
+          return;
+        }
+
+        if (!lastKnownRevision) {
+          lastKnownRevision = nextRevision;
+          return;
+        }
+
+        if (nextRevision && nextRevision !== lastKnownRevision) {
+          lastKnownRevision = nextRevision;
+          refreshSharedConfig();
+        }
+      } finally {
+        isCheckingRevision = false;
+      }
+    };
+
+    const unsubscribeSignals = subscribeToPublicSiteConfigSignals(() => {
+      void syncLatestConfigRevision(true);
+    });
+
+    const realtimeChannel = supabase
+      .channel(`site-settings-sync-${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'site_settings' },
+        () => {
+          void syncLatestConfigRevision(true);
+        }
+      )
+      .subscribe();
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void syncLatestConfigRevision();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const pollInterval = window.setInterval(() => {
+      if (!document.hidden) {
+        void syncLatestConfigRevision();
+      }
+    }, 15000);
+
+    void syncLatestConfigRevision();
+
+    return () => {
+      isActive = false;
+      unsubscribeSignals();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.clearInterval(pollInterval);
+      void supabase.removeChannel(realtimeChannel);
     };
   }, []);
 
@@ -538,6 +628,7 @@ const AppContent: React.FC = () => {
 
   return (
     <ErrorBoundary>
+      <RouteSeo view={currentView} param={currentParam} />
       {!isHeaderHidden && (
         <div className="print:hidden">
           <Header

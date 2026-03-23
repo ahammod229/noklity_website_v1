@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
+import SeoHead from '../components/SeoHead';
 
 interface ContentPageProps {
   slug?: string;
@@ -54,8 +55,20 @@ const ContentPage: React.FC<ContentPageProps> = ({ slug, onNavigate }) => {
     return lines.length > 0 ? lines : ['This page content is empty. Please update it from Admin > Settings > Company & Legal Pages.'];
   }, [body]);
 
+  const metaDescription = useMemo(() => {
+    const excerpt = paragraphs.join(' ').replace(/\s+/g, ' ').trim();
+    if (!excerpt) return 'Read more information from Noklity.';
+    return excerpt.length > 160 ? `${excerpt.slice(0, 157).trim()}...` : excerpt;
+  }, [paragraphs]);
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <SeoHead
+        title={`${title || 'Information'} | Noklity`}
+        description={metaDescription}
+        path={`/page/${safeSlug}`}
+        robots={notFound ? 'noindex, nofollow' : 'index, follow'}
+      />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <p className="text-xs font-black uppercase tracking-widest text-primary">Company & Legal</p>

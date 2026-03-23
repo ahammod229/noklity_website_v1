@@ -3,6 +3,11 @@ import { supabase } from '../lib/supabase';
 import { Product } from '../types';
 import { canUseFeature } from './tenantConfigService';
 
+export const isCatalogVisibleProductRow = (row: any) => {
+  const normalizedStatus = String(row?.status || '').trim().toLowerCase();
+  return normalizedStatus !== 'inactive' && row?.is_active !== false;
+};
+
 // Helper to map DB row to Product type
 const mapProduct = (row: any): Product => ({
   id: row.id,
@@ -49,7 +54,6 @@ export const getProducts = async (category?: string | null): Promise<Product[]> 
     let query = supabase
       .from('products')
       .select('*')
-      .eq('status', 'active')
       .order('created_at', { ascending: false });
 
     if (category) {
@@ -68,7 +72,7 @@ export const getProducts = async (category?: string | null): Promise<Product[]> 
       return [];
     }
 
-    return (data || []).map(mapProduct);
+    return (data || []).filter(isCatalogVisibleProductRow).map(mapProduct);
   } catch (err) {
     console.error('Unexpected error in getProducts:', err);
     return [];
@@ -85,7 +89,6 @@ export const getProductById = async (id: string): Promise<Product | null> => {
       .from('products')
       .select('*')
       .eq('id', id)
-      .eq('status', 'active')
       .single();
 
     if (error) {
@@ -96,7 +99,7 @@ export const getProductById = async (id: string): Promise<Product | null> => {
       }
       return null;
     }
-    return data ? mapProduct(data) : null;
+    return data && isCatalogVisibleProductRow(data) ? mapProduct(data) : null;
   } catch (err) {
     console.error(`Unexpected error fetching product ${id}:`, err);
     return null;
@@ -112,8 +115,7 @@ export const getFlashSaleProducts = async (): Promise<Product[]> => {
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('is_flash_sale', true)
-      .eq('status', 'active');
+      .eq('is_flash_sale', true);
 
     if (error) {
       if (error.message && error.message.includes('Failed to fetch')) {
@@ -123,7 +125,7 @@ export const getFlashSaleProducts = async (): Promise<Product[]> => {
       }
       return [];
     }
-    return (data || []).map(mapProduct);
+    return (data || []).filter(isCatalogVisibleProductRow).map(mapProduct);
   } catch (err) {
     console.error('Unexpected error fetching flash sales:', err);
     return [];

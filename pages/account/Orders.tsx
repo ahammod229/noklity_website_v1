@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { getOrders } from '../../services/orderService';
 import { useCurrency } from '../../hooks/useCurrency';
+import OptimizedImage from '../../components/ui/OptimizedImage';
 
 interface OrdersProps {
   onLoginClick: () => void;
@@ -143,7 +144,15 @@ const Orders: React.FC<OrdersProps> = ({
                         <div className="flex items-center gap-6">
                           <div className="w-20 h-20 bg-gray-50 rounded-2xl border border-gray-100 flex-shrink-0 overflow-hidden">
                             {order.previewImage ? (
-                              <img src={order.previewImage} alt="" className="w-full h-full object-cover mix-blend-multiply" />
+                              <OptimizedImage
+                                src={order.previewImage}
+                                alt={order.previewName || 'Ordered product'}
+                                className="w-full h-full object-cover mix-blend-multiply"
+                                width={80}
+                                height={80}
+                                responsiveWidths={[400, 800]}
+                                sizes="80px"
+                              />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-300">
                                 <Package className="w-8 h-8" />

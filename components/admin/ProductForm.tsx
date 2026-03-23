@@ -3,7 +3,10 @@ import { X, Loader2, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-rea
 import { Product } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
-import { optimizeImageByGuide } from '../../utils/imageOptimization';
+import {
+  buildResponsiveProductUploadBundle,
+  getResponsiveUploadTargetWidths
+} from '../../utils/imageOptimization';
 
 export interface ProductFormData {
   name: string;
@@ -15,7 +18,6 @@ export interface ProductFormData {
   regularPrice: number;
   salePrice: number | null;
   stock: number;
-  taxPercent: number;
   defaultDeliveryFee: number;
   isActive: boolean;
   image: string;
@@ -71,6 +73,34 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 
+const uploadProductImageBundle = async (file: File, fileNamePrefix: string) => {
+  const bundle = await buildResponsiveProductUploadBundle(file, {
+    fileNamePrefix,
+    widths: getResponsiveUploadTargetWidths(),
+    fit: 'contain'
+  });
+
+  const filesToUpload = [bundle.master.file, ...bundle.assets.map((asset) => asset.file)];
+  await Promise.all(
+    filesToUpload.map(async (assetFile) => {
+      const filePath = `products/${assetFile.name}`;
+      const { error } = await supabase.storage.from('assets').upload(filePath, assetFile, {
+        upsert: false,
+        contentType: assetFile.type || undefined
+      });
+      if (error) throw error;
+    })
+  );
+
+  const filePath = `products/${bundle.master.file.name}`;
+  const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
+
+  return {
+    bundle,
+    publicUrl: data.publicUrl
+  };
+};
+
 const ProductForm: React.FC<ProductFormProps> = ({
   initialData,
   onSubmit,
@@ -89,7 +119,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
     regularPrice: 0,
     salePrice: null,
     stock: 0,
-    taxPercent: 0,
     defaultDeliveryFee: 0,
     isActive: true,
     image: '',
@@ -138,7 +167,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
         regularPrice: initialData.originalPrice || initialData.price,
         salePrice: initialData.originalPrice ? initialData.price : null,
         stock: initialData.stock || 0,
-        taxPercent: Number(initialData.taxPercent || 0),
         defaultDeliveryFee: Number(initialData.defaultDeliveryFee || 0),
         isActive: initialData.isActive !== false,
         image: initialData.image,
@@ -235,19 +263,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
         setFormMessage({ type: 'error', text: validation.message });
         return;
       }
-      const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.productPrimary, {
-        fileNamePrefix: 'product-primary'
-      });
-      const filePath = `products/${optimized.file.name}`;
-      const { error } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
-      if (error) throw error;
-      const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-      setFormData((prev) => ({ ...prev, image: data.publicUrl }));
+      const { bundle, publicUrl } = await uploadProductImageBundle(file, 'product-primary');
+      setFormData((prev) => ({ ...prev, image: publicUrl }));
       setFormMessage({
         type: 'success',
-        text: `${validation.message} Optimized ${optimized.reducedPercent}% smaller (${Math.round(
-          optimized.optimizedBytes / 1024
-        )}KB).`
+        text: `${validation.message} Optimized ${bundle.master.reducedPercent}% smaller (${Math.round(
+          bundle.master.optimizedBytes / 1024
+        )}KB) with ${bundle.supportsAvif ? 'AVIF/WebP' : 'WebP'} responsive variants.`
       });
     } catch (error) {
       console.error('Primary image upload failed:', error);
@@ -277,14 +299,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
       const uploadedUrls: string[] = [];
       for (const file of filesArray) {
-        const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.productGallery, {
-          fileNamePrefix: 'product-gallery'
-        });
-        const filePath = `products/${optimized.file.name}`;
-        const { error } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
-        if (error) throw error;
-        const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-        uploadedUrls.push(data.publicUrl);
+        const { publicUrl } = await uploadProductImageBundle(file, 'product-gallery');
+        uploadedUrls.push(publicUrl);
       }
 
       setFormData((prev) => {
@@ -402,9 +418,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
                   </Field>
                   <Field label="Delivery Fee (৳)">
                     <input type="number" min="0" step="0.01" value={formData.defaultDeliveryFee} onChange={(e) => setFormData((p) => ({ ...p, defaultDeliveryFee: parseFloat(e.target.value) || 0 }))} className="field-input" />
-                  </Field>
-                  <Field label="Tax (%)">
-                    <input type="number" min="0" step="0.01" value={formData.taxPercent} onChange={(e) => setFormData((p) => ({ ...p, taxPercent: parseFloat(e.target.value) || 0 }))} className="field-input" />
                   </Field>
                   <Field label="Status">
                     <select

@@ -2,6 +2,7 @@ import React from 'react';
 import { Minus, Plus, ShoppingBag, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { CartItem } from '../types';
 import { useCurrency } from '../hooks/useCurrency';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 interface CartPageProps {
   items: CartItem[];
@@ -59,11 +60,14 @@ const CartPage: React.FC<CartPageProps> = ({ items, onUpdateQuantity, onRemoveIt
                   onClick={() => onNavigate('product-details', item.id)}
                   className="h-20 w-20 overflow-hidden rounded-lg border border-gray-200 bg-white sm:h-24 sm:w-24"
                 >
-                  <img
+                  <OptimizedImage
                     src={item.image}
                     alt={item.name}
                     className="h-full w-full object-cover"
-                    loading="lazy"
+                    width={192}
+                    height={192}
+                    responsiveWidths={[400, 800]}
+                    sizes="96px"
                   />
                 </button>
 

@@ -6,6 +6,7 @@
    - `npm run setup:single-tenant`
 3. Edit `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/.env.local` with:
    - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_ADMIN_EMAILS`
    - `VITE_SUPER_ADMIN_EMAILS`

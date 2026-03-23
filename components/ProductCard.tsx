@@ -88,8 +88,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
           src={product.image} 
           alt={product.name} 
           width={640}
-          responsiveWidths={[320, 480, 640, 768, 960]}
-          quality={82}
+          height={640}
+          responsiveWidths={[400, 800, 1200, 1600]}
+          sizes={horizontal ? '(max-width: 768px) 280px, 320px' : '(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw'}
           className={`w-full h-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out ${
             theme === 'dark' ? 'mix-blend-normal' : 'mix-blend-multiply'
           }`}

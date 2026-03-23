@@ -18,6 +18,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { Order } from '../types';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 interface AccountOrdersProps {
   onLoginClick: () => void;
@@ -132,7 +133,15 @@ const AccountOrders: React.FC<AccountOrdersProps> = ({
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                       <div className="flex items-center gap-6">
                         <div className="w-20 h-20 bg-gray-50 rounded-2xl border border-gray-100 flex-shrink-0 overflow-hidden">
-                          <img src={order.previewImage} alt="" className="w-full h-full object-cover mix-blend-multiply" />
+                          <OptimizedImage
+                            src={order.previewImage}
+                            alt={order.previewName || 'Ordered product'}
+                            className="w-full h-full object-cover mix-blend-multiply"
+                            width={80}
+                            height={80}
+                            responsiveWidths={[400, 800]}
+                            sizes="80px"
+                          />
                         </div>
                         <div>
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order #{order.id}</p>
@@ -216,7 +225,15 @@ const AccountOrders: React.FC<AccountOrdersProps> = ({
                     {selectedOrder.items.map((item: any) => (
                       <div key={item.id} className="flex gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
                         <div className="w-16 h-16 bg-white rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
-                          <img src={item.image} alt="" className="w-full h-full object-contain mix-blend-multiply" />
+                          <OptimizedImage
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-contain mix-blend-multiply"
+                            width={64}
+                            height={64}
+                            responsiveWidths={[400, 800]}
+                            sizes="64px"
+                          />
                         </div>
                         <div className="flex-1">
                           <p className="font-bold text-gray-900 text-sm">{item.name}</p>

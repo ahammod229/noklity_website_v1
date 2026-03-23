@@ -9,6 +9,7 @@ import { Product } from '../types';
 import { getProducts } from '../services/productService';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
+import SeoHead from '../components/SeoHead';
 
 interface HomeProps {
   onLoginClick: () => void;
@@ -139,6 +140,12 @@ const Home: React.FC<HomeProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
+      <SeoHead
+        title="Noklity | Electronics, Tools, Tyres & Parts – Bangladesh"
+        description="Shop imported electronics, tools, tyres and parts at Noklity. Browse categories, flash deals, and featured products across Bangladesh."
+        path="/"
+        keywords="Noklity, electronics Bangladesh, tyres Bangladesh, tools Bangladesh, imported parts, Bangladesh ecommerce"
+      />
       <main className="flex-grow space-y-3 sm:space-y-4">
         {!activeCategory && (
           <Hero

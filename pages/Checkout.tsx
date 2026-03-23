@@ -11,6 +11,7 @@ import { useCurrency } from '../hooks/useCurrency';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 import { optimizeImageForUpload } from '../utils/imageOptimization';
+import OptimizedImage from '../components/ui/OptimizedImage';
 import { 
   ChevronLeft, 
   MapPin, 
@@ -62,8 +63,6 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [checkoutMessage, setCheckoutMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const initialSiteConfig = getPublicSiteConfigSnapshot();
   const [billingConfig, setBillingConfig] = useState(() => ({
-    taxEnabled: initialSiteConfig.taxEnabled,
-    taxRate: initialSiteConfig.defaultTaxRate,
     shippingFee: initialSiteConfig.defaultShippingFee
   }));
   const configuredCodeSet = new Set(paymentMethods.map((m) => m.code));
@@ -79,12 +78,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   // Calculations
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shippingCost = cart.length > 0 ? Math.max(0, Number(billingConfig.shippingFee) || 0) : 0;
-  const normalizedTaxRate = Math.max(0, Number(billingConfig.taxRate) || 0);
-  const tax = billingConfig.taxEnabled ? subtotal * (normalizedTaxRate / 100) : 0;
-  const total = subtotal + shippingCost + tax;
-  const taxLabelPercent = Number.isInteger(normalizedTaxRate)
-    ? String(normalizedTaxRate)
-    : normalizedTaxRate.toFixed(2).replace(/\.?0+$/, '');
+  const total = subtotal + shippingCost;
   const stockIssues = useMemo(
     () =>
       cart.filter((item) => {
@@ -105,8 +99,6 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
     const applyConfig = (nextConfig: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
       if (!mounted) return;
       setBillingConfig({
-        taxEnabled: nextConfig.taxEnabled,
-        taxRate: nextConfig.defaultTaxRate,
         shippingFee: nextConfig.defaultShippingFee
       });
     };
@@ -699,7 +691,15 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                     {cart.map((item) => (
                         <div key={item.id} className="flex gap-4">
                             <div className="w-16 h-16 bg-gray-50 rounded-xl overflow-hidden border border-gray-100 flex-shrink-0">
-                                <img src={item.image} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
+                                <OptimizedImage
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover mix-blend-multiply"
+                                  width={64}
+                                  height={64}
+                                  responsiveWidths={[400, 800]}
+                                  sizes="64px"
+                                />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-bold text-gray-900 line-clamp-2 leading-tight">{item.name}</p>
@@ -722,12 +722,6 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                         <span className="text-gray-500 font-medium">Shipping Estimate</span>
                         <span className="font-bold text-gray-900">{formatCurrency(shippingCost)}</span>
                     </div>
-                    {billingConfig.taxEnabled && (
-                      <div className="flex justify-between text-sm">
-                          <span className="text-gray-500 font-medium">Tax ({taxLabelPercent}%)</span>
-                          <span className="font-bold text-gray-900">{formatCurrency(tax)}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200">
                         <span className="text-lg font-black text-gray-900 tracking-tight">Total</span>
                         <span className="text-2xl font-black text-primary tracking-tighter">{formatCurrency(total)}</span>

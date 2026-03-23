@@ -141,8 +141,8 @@ const DEFAULT_CONFIG: PublicSiteConfig = {
   exchangeRateUsd: 121.5,
   exchangeRateInr: 1.45,
   allowGuestCheckout: true,
-  taxEnabled: true,
-  defaultTaxRate: 8,
+  taxEnabled: false,
+  defaultTaxRate: 0,
   defaultShippingFee: 15,
   invoicePrefix: 'INV',
   companyAboutTitle: 'About',
@@ -396,6 +396,8 @@ let cachedConfig: PublicSiteConfig | null = null;
 let cacheUpdatedAt = 0;
 const CACHE_TTL_MS = 60_000;
 const SITE_CONFIG_CACHE_KEY = 'noklity_public_site_config_v1';
+const SITE_CONFIG_SIGNAL_KEY = 'noklity_public_site_config_signal_v1';
+const SITE_CONFIG_CHANNEL_NAME = 'noklity_public_site_config_channel_v1';
 
 const parsePositiveNumber = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
@@ -454,12 +456,32 @@ const persistConfigToStorage = (config: PublicSiteConfig) => {
   }
 };
 
+const broadcastPublicSiteConfigSignal = () => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(SITE_CONFIG_SIGNAL_KEY, String(Date.now()));
+  } catch {
+    // Ignore storage errors in private mode/quota limits.
+  }
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const channel = new BroadcastChannel(SITE_CONFIG_CHANNEL_NAME);
+      channel.postMessage({ type: 'site-config-updated', at: Date.now() });
+      channel.close();
+    } catch {
+      // Ignore BroadcastChannel failures and rely on storage/custom events.
+    }
+  }
+};
+
 export const getPublicSiteConfigSnapshot = (): PublicSiteConfig => {
   if (cachedConfig) return cachedConfig;
   const stored = loadConfigFromStorage();
   if (stored) {
     cachedConfig = stored;
-    cacheUpdatedAt = Date.now();
+    cacheUpdatedAt = 0;
     return stored;
   }
   return DEFAULT_CONFIG;
@@ -474,7 +496,7 @@ export const getPublicSiteConfig = async (): Promise<PublicSiteConfig> => {
     const stored = loadConfigFromStorage();
     if (stored) {
       cachedConfig = stored;
-      cacheUpdatedAt = Date.now();
+      cacheUpdatedAt = 0;
     }
   }
 
@@ -521,8 +543,8 @@ export const getPublicSiteConfig = async (): Promise<PublicSiteConfig> => {
     exchangeRateUsd: parsePositiveNumber(map.get('exchange_rate_usd'), DEFAULT_CONFIG.exchangeRateUsd),
     exchangeRateInr: parsePositiveNumber(map.get('exchange_rate_inr'), DEFAULT_CONFIG.exchangeRateInr),
     allowGuestCheckout: parseBoolean(map.get('allow_guest_checkout'), DEFAULT_CONFIG.allowGuestCheckout),
-    taxEnabled: parseBoolean(map.get('tax_enabled'), DEFAULT_CONFIG.taxEnabled),
-    defaultTaxRate: parseNonNegativeNumber(map.get('default_tax_rate'), DEFAULT_CONFIG.defaultTaxRate),
+    taxEnabled: false,
+    defaultTaxRate: 0,
     defaultShippingFee: parseNonNegativeNumber(map.get('default_shipping_fee'), DEFAULT_CONFIG.defaultShippingFee),
     invoicePrefix: map.get('invoice_prefix') || DEFAULT_CONFIG.invoicePrefix,
     companyAboutTitle: map.get('company_about_title') || DEFAULT_CONFIG.companyAboutTitle,
@@ -574,7 +596,38 @@ export const getPublicSiteConfig = async (): Promise<PublicSiteConfig> => {
   return cachedConfig;
 };
 
-export const clearPublicSiteConfigCache = () => {
+export const subscribeToPublicSiteConfigSignals = (callback: () => void) => {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === SITE_CONFIG_SIGNAL_KEY) {
+      callback();
+    }
+  };
+
+  window.addEventListener('storage', handleStorage);
+
+  let channel: BroadcastChannel | null = null;
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      channel = new BroadcastChannel(SITE_CONFIG_CHANNEL_NAME);
+      channel.onmessage = () => callback();
+    } catch {
+      channel = null;
+    }
+  }
+
+  return () => {
+    window.removeEventListener('storage', handleStorage);
+    if (channel) {
+      channel.close();
+    }
+  };
+};
+
+export const clearPublicSiteConfigCache = (options?: { broadcast?: boolean }) => {
   cachedConfig = null;
   cacheUpdatedAt = 0;
   if (typeof window !== 'undefined') {
@@ -583,6 +636,9 @@ export const clearPublicSiteConfigCache = () => {
     } catch {
       // Ignore storage errors.
     }
+  }
+  if (options?.broadcast !== false) {
+    broadcastPublicSiteConfigSignal();
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('site-config-updated'));

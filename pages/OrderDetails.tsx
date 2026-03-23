@@ -22,11 +22,11 @@ import { downloadInvoicePDF } from '../services/invoiceService';
 import { supabase } from '../lib/supabase';
 import { useCurrency } from '../hooks/useCurrency';
 import { formatShortOrderId } from '../utils/orderId';
-import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 import {
   SteadfastDeliveryStatus,
   syncSteadfastTrackingForOrder
 } from '../services/steadfastDeliveryService';
+import OptimizedImage from '../components/ui/OptimizedImage';
 
 interface OrderDetailsProps {
   onLoginClick: () => void;
@@ -67,17 +67,12 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
   orderId
 }) => {
   const { formatCurrency } = useCurrency();
-  const initialSiteConfig = getPublicSiteConfigSnapshot();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submittingReviewFor, setSubmittingReviewFor] = useState<string | null>(null);
   const [trackingSyncing, setTrackingSyncing] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
-  const [billingConfig, setBillingConfig] = useState(() => ({
-    taxEnabled: initialSiteConfig.taxEnabled,
-    taxRate: initialSiteConfig.defaultTaxRate
-  }));
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -105,40 +100,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
 
     fetchOrder();
   }, [orderId]);
-
-  useEffect(() => {
-    let mounted = true;
-    const applyConfig = (nextConfig: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
-      if (!mounted) return;
-      setBillingConfig({
-        taxEnabled: nextConfig.taxEnabled,
-        taxRate: nextConfig.defaultTaxRate
-      });
-    };
-
-    const refreshConfig = async () => {
-      try {
-        const liveConfig = await getPublicSiteConfig();
-        applyConfig(liveConfig);
-      } catch (cfgErr) {
-        console.warn('Failed to refresh order tax config:', cfgErr);
-      }
-    };
-
-    applyConfig(getPublicSiteConfigSnapshot());
-    void refreshConfig();
-
-    const handleConfigUpdated = () => {
-      applyConfig(getPublicSiteConfigSnapshot());
-      void refreshConfig();
-    };
-
-    window.addEventListener('site-config-updated', handleConfigUpdated as EventListener);
-    return () => {
-      mounted = false;
-      window.removeEventListener('site-config-updated', handleConfigUpdated as EventListener);
-    };
-  }, []);
 
   const canTrackParcel = Boolean(order?.deliveryProvider === 'steadfast' || order?.deliveryConsignmentId);
 
@@ -260,11 +221,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
   const progressWidth = isCancelled 
     ? '0%' 
     : `${Math.max(0, Math.min(100, (currentStatusIdx / (steps.length - 1)) * 100))}%`;
-  const normalizedTaxRate = Math.max(0, Number(billingConfig.taxRate) || 0);
-  const taxLabelPercent = Number.isInteger(normalizedTaxRate)
-    ? String(normalizedTaxRate)
-    : normalizedTaxRate.toFixed(2).replace(/\.?0+$/, '');
-
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       <main className="flex-grow py-8 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full">
@@ -407,7 +363,15 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                             <div key={item.id} className="p-6 flex flex-col sm:flex-row gap-6">
                                 <div className="w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden flex-shrink-0">
                                     {item.image ? (
-                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
+                                        <OptimizedImage
+                                          src={item.image}
+                                          alt={item.name}
+                                          className="w-full h-full object-cover mix-blend-multiply"
+                                          width={88}
+                                          height={88}
+                                          responsiveWidths={[400, 800]}
+                                          sizes="88px"
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-gray-300">
                                             <Package className="w-8 h-8" />
@@ -460,12 +424,6 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                             <span className="text-gray-600">Shipping</span>
                             <span className="font-medium text-gray-900">{formatCurrency(order.shipping)}</span>
                         </div>
-                        {billingConfig.taxEnabled && (
-                          <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Tax ({taxLabelPercent}%)</span>
-                              <span className="font-medium text-gray-900">{formatCurrency(order.tax)}</span>
-                          </div>
-                        )}
                     </div>
                     <div className="flex justify-between items-center pt-4 mb-6">
                         <span className="text-lg font-bold text-gray-900">Total</span>

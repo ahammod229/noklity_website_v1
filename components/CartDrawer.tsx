@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
 import { CartItem } from '../types';
 import { useCurrency } from '../hooks/useCurrency';
+import OptimizedImage from './ui/OptimizedImage';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -64,10 +65,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
             items.map((item) => (
               <div key={item.id} className="flex gap-4 group">
                 <div className="w-20 h-20 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
-                  <img 
-                    src={item.image} 
-                    alt={item.name} 
-                    className="w-full h-full object-cover mix-blend-multiply" 
+                  <OptimizedImage
+                    src={item.image}
+                    alt={item.name}
+                    className="w-full h-full object-cover mix-blend-multiply"
+                    width={160}
+                    height={160}
+                    responsiveWidths={[400, 800]}
+                    sizes="80px"
                   />
                 </div>
                 <div className="flex-1 flex flex-col justify-between">
@@ -120,7 +125,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
               <span className="text-gray-500 text-sm">Subtotal</span>
               <span className="text-xl font-extrabold text-gray-900">{formatCurrency(total)}</span>
             </div>
-            <p className="text-xs text-gray-400 mb-6 text-center">Shipping and taxes calculated at checkout.</p>
+            <p className="text-xs text-gray-400 mb-6 text-center">Shipping calculated at checkout.</p>
             <button 
               onClick={() => {
                 onClose();

@@ -240,8 +240,6 @@ const TABS: TabConfig[] = [
     id: 'billing',
     label: 'Payment & Billing',
     fields: [
-      { key: 'tax_enabled', label: 'Enable tax/VAT section', type: 'switch' },
-      { key: 'default_tax_rate', label: 'Default tax rate (%)', type: 'number' },
       { key: 'default_shipping_fee', label: 'Default shipping fee (base currency)', type: 'number' },
       { key: 'invoice_prefix', label: 'Invoice prefix', type: 'text' },
       { key: 'payment_auto_confirm', label: 'Auto-confirm digital payments', type: 'switch' }
@@ -458,8 +456,8 @@ const DEFAULT_VALUES: Record<string, string> = {
   notify_new_customer: 'false',
   notify_support_ticket: 'true',
 
-  tax_enabled: 'true',
-  default_tax_rate: '8',
+  tax_enabled: 'false',
+  default_tax_rate: '0',
   default_shipping_fee: '15',
   invoice_prefix: 'INV',
   payment_auto_confirm: 'false',

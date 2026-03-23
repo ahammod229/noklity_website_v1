@@ -93,7 +93,6 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
     product.deliveryCharge || product.defaultDeliveryFee || product.deliveryCharges?.Dhaka || 0
   );
   const baseDeliveryFeeValue = Number(product.defaultDeliveryFee || 0);
-  const taxPercent = Number(product.taxPercent || 0);
 
   const openImageViewer = () => {
     setPreviewZoom(1);
@@ -369,8 +368,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                     alt={product.name}
                     className="w-full h-full object-contain p-4"
                     width={900}
-                    responsiveWidths={[360, 540, 720, 900]}
-                    quality={88}
+                    height={900}
+                    responsiveWidths={[400, 800, 1200, 1600]}
+                    sizes="100vw"
                     loading="eager"
                   />
                   <span className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white opacity-90">
@@ -396,8 +396,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                         alt={`Product ${index + 1}`}
                         className="w-full h-full object-contain p-1.5 bg-white"
                         width={120}
-                        responsiveWidths={[80, 120]}
-                        quality={82}
+                        height={120}
+                        responsiveWidths={[400, 800]}
+                        sizes="56px"
                       />
                     </button>
                   ))}
@@ -462,7 +463,6 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             <h3 className="text-xs uppercase tracking-widest text-gray-500 font-black">Delivery & Warranty</h3>
             <p className="text-sm font-bold text-gray-800">Delivery Charge: {formatCurrency(deliveryChargeValue)}</p>
             <p className="text-sm font-bold text-gray-800">Base Delivery Fee: {formatCurrency(baseDeliveryFeeValue)}</p>
-            <p className="text-sm font-bold text-gray-800">Tax: {taxPercent.toFixed(2)}%</p>
             <p className="text-sm font-bold text-gray-800">Warranty: {product.warranty || `${product.warrantyMonths || 0} months`}</p>
             {product.shippingInfo && <p className="text-xs text-gray-600">{product.shippingInfo}</p>}
             {product.returnPolicy && <p className="text-xs text-gray-600">Return policy: {product.returnPolicy}</p>}
@@ -527,8 +527,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                     alt={product.name}
                     className="w-full h-full object-contain p-4 transition-transform duration-300 group-hover:scale-110"
                     width={1200}
-                    responsiveWidths={[480, 720, 960, 1200]}
-                    quality={90}
+                    height={1200}
+                    responsiveWidths={[400, 800, 1200, 1600]}
+                    sizes="(max-width: 1024px) 100vw, 40vw"
                     loading="eager"
                   />
                   <span className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
@@ -554,8 +555,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                         alt={`Preview ${index + 1}`}
                         className="w-full h-full object-contain p-1.5 bg-white"
                         width={120}
-                        responsiveWidths={[80, 120]}
-                        quality={82}
+                        height={120}
+                        responsiveWidths={[400, 800]}
+                        sizes="56px"
                       />
                     </button>
                   ))}
@@ -744,8 +746,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                 className="max-h-[calc(100vh-150px)] sm:max-h-[calc(100vh-170px)] max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-5rem)] object-contain transition-transform duration-150 cursor-zoom-in select-none"
                 style={{ transform: `scale(${previewZoom})` }}
                 width={1600}
-                responsiveWidths={[640, 960, 1280, 1600]}
-                quality={92}
+                height={1600}
+                responsiveWidths={[400, 800, 1200, 1600]}
+                sizes="100vw"
                 loading="eager"
               />
             </div>
@@ -767,8 +770,9 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                         alt={`Image ${index + 1}`}
                         className="w-full h-full object-cover"
                         width={120}
-                        responsiveWidths={[80, 120]}
-                        quality={80}
+                        height={120}
+                        responsiveWidths={[400, 800]}
+                        sizes="56px"
                       />
                     </button>
                   ))}

@@ -361,3 +361,9 @@ html.dark .product-card-image-surface:hover {
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
 }
+
+.flash-sale-scroll {
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2, ShoppingCart } from 'lucide-react';
 import { useCurrency } from '../hooks/useCurrency';
+import OptimizedImage from './ui/OptimizedImage';
 
 interface WishlistCardProps {
   image: string;
@@ -28,10 +29,14 @@ const WishlistCard: React.FC<WishlistCardProps> = ({
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl hover:border-gray-200 transition-all duration-300 group flex flex-col h-full">
       {/* Image Section */}
       <div className="relative aspect-[4/3] bg-gray-50 p-6 overflow-hidden">
-        <img 
-          src={image} 
-          alt={title} 
+        <OptimizedImage
+          src={image}
+          alt={title}
           className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-700"
+          width={640}
+          height={480}
+          responsiveWidths={[400, 800, 1200, 1600]}
+          sizes="(max-width: 768px) 100vw, 33vw"
         />
         {isNew && (
           <div className="absolute top-3 left-3 bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">

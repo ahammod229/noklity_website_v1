@@ -57,7 +57,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart, onSh
 
       {/* Horizontal Scroll Container */}
       <div className="relative">
-          <div className="touch-pan-x flex overflow-x-auto gap-4 sm:gap-6 pb-6 sm:pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
+          <div className="flash-sale-scroll flex overflow-x-auto gap-4 sm:gap-6 pb-6 sm:pb-8 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
             {products.map(product => (
                 <div key={product.id} className="min-w-[82vw] sm:min-w-[260px] md:min-w-[280px] snap-start h-full">
                     <ProductCard 

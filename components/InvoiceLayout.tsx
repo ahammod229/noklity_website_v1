@@ -103,7 +103,7 @@ const InvoiceLayout: React.FC<InvoiceLayoutProps> = ({
         </div>
 
         <div className="text-left md:text-right space-y-1 print:space-y-0.5">
-          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter print:text-xl">Tax Invoice</h1>
+          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter print:text-xl">Invoice</h1>
           <p className="text-sm font-bold text-gray-500 print:text-xs">Invoice: <span className="text-gray-900 font-mono">{invoiceNumber}</span></p>
           <p className="text-sm font-bold text-gray-500 print:text-xs">Order ID: <span className="text-gray-900 font-mono">{getShortOrderId(orderId)}</span></p>
           <p className="text-sm font-bold text-gray-500 print:text-xs">Date: <span className="text-gray-900">{date}</span></p>

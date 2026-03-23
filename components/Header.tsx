@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 import { getSearchSuggestions, SearchSuggestion } from '../services/searchService';
+import OptimizedImage from './ui/OptimizedImage';
 
 interface HeaderProps {
   onLoginClick?: () => void;
@@ -35,7 +36,6 @@ const Header: React.FC<HeaderProps> = ({
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
   const { config: tenantConfig } = useTenantConfig();
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [desktopSearchQuery, setDesktopSearchQuery] = useState(() => getQueryFromUrl());
   const [mobileSearchQuery, setMobileSearchQuery] = useState(() => getQueryFromUrl());
   const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
@@ -52,22 +52,18 @@ const Header: React.FC<HeaderProps> = ({
   const [logoSrc, setLogoSrc] = useState(initialLogo);
   const [siteName, setSiteName] = useState(initialConfig.siteName || tenantConfig.brandName || 'Storefront');
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
-  const textColor = theme === 'dark' ? '%23F8FAFC' : '%23111827';
-  const fallbackLogo = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 52'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 47 L30 47 L40 5 Z'/%3E%3Ctext x='52' y='39' font-family='sans-serif' font-weight='900' font-size='32' fill='${textColor}' letter-spacing='-1'%3E${encodeURIComponent(siteName || tenantConfig.brandName || 'Storefront')}%3C/text%3E%3C/svg%3E`;
-  const activeLogoSrc = !logoLoadFailed && logoSrc ? logoSrc : fallbackLogo;
+  const hasUploadedLogo = Boolean(logoSrc && !logoLoadFailed);
 
   const isLoggedIn = !!user;
   const handleLogout = async () => {
     try {
       await signOut();
-      setIsMobileSearchOpen(false);
     } catch (error) {
       console.error('Logout failed:', error);
     }
   };
 
   const closeMobileOverlays = () => {
-    setIsMobileSearchOpen(false);
     setIsMobileSearchFocused(false);
   };
 
@@ -80,7 +76,6 @@ const Header: React.FC<HeaderProps> = ({
     setMobileSearchQuery(next);
     setIsDesktopSearchFocused(false);
     if (closeMobile) {
-      setIsMobileSearchOpen(false);
       setIsMobileSearchFocused(false);
     }
   };
@@ -91,7 +86,6 @@ const Header: React.FC<HeaderProps> = ({
     window.dispatchEvent(new PopStateEvent('popstate'));
     setIsDesktopSearchFocused(false);
     setIsMobileSearchFocused(false);
-    setIsMobileSearchOpen(false);
   };
 
   useEffect(() => {
@@ -141,14 +135,6 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isMobileSearchOpen) return;
-    const timer = window.setTimeout(() => {
-      mobileSearchInputRef.current?.focus();
-    }, 50);
-    return () => window.clearTimeout(timer);
-  }, [isMobileSearchOpen]);
-
-  useEffect(() => {
     const onResize = () => {
       if (window.innerWidth >= 768) {
         closeMobileOverlays();
@@ -174,7 +160,11 @@ const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const activeQuery = (isMobileSearchOpen ? mobileSearchQuery : desktopSearchQuery).trim();
+  const activeQuery = isMobileSearchFocused
+    ? mobileSearchQuery.trim()
+    : isDesktopSearchFocused
+      ? desktopSearchQuery.trim()
+      : '';
   useEffect(() => {
     if (!activeQuery) {
       setSearchSuggestions([]);
@@ -195,7 +185,7 @@ const Header: React.FC<HeaderProps> = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeQuery, isMobileSearchOpen]);
+  }, [activeQuery]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 h-[68px] sm:h-[72px] md:h-[80px] font-sans transition-all duration-300">
@@ -204,83 +194,89 @@ const Header: React.FC<HeaderProps> = ({
           
           {/* LEFT: Logo (Image Based) */}
           <a href="/" onClick={closeMobileOverlays} className="flex-shrink-0 min-w-0 flex items-center gap-3 group relative z-50">
-            <img 
-              src={activeLogoSrc}
-              alt={siteName} 
-              className={`w-auto object-contain transition-transform duration-300 group-hover:scale-105 ${
-                isMobileSearchOpen
-                  ? 'h-[26px] max-w-[88px]'
-                  : 'h-[34px] sm:h-[40px] md:h-[48px] max-w-[180px] sm:max-w-[260px] md:max-w-[340px]'
-              }`}
-              onError={() => {
-                if (activeLogoSrc !== fallbackLogo) {
+            {hasUploadedLogo ? (
+              <img 
+                src={logoSrc}
+                alt={siteName} 
+                className="w-auto object-contain transition-transform duration-300 group-hover:scale-105 h-[34px] sm:h-[34px] md:h-[48px] max-w-[150px] sm:max-w-[180px] md:max-w-[340px]"
+                onError={() => {
                   setLogoLoadFailed(true);
-                }
-              }}
-            />
+                }}
+              />
+            ) : (
+              <span className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-gray-900 truncate">
+                {siteName}
+              </span>
+            )}
           </a>
 
           {/* Mobile Inline Search (beside logo) */}
-          {isMobileSearchOpen && (
-            <div ref={mobileSearchWrapperRef} className="md:hidden flex-1 min-w-0">
-              <div className="relative">
-                <input
-                  ref={mobileSearchInputRef}
-                  type="text"
-                  placeholder="Search for products..."
-                  value={mobileSearchQuery}
-                  onFocus={() => setIsMobileSearchFocused(true)}
-                  onChange={(e) => setMobileSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      submitSearch(mobileSearchQuery, true);
-                    }
-                  }}
-                  className="w-full h-10 bg-gray-50 border border-gray-200 rounded-full pl-3 pr-9 text-sm font-semibold text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => submitSearch(mobileSearchQuery, true)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-primary"
-                  aria-label="Submit search"
-                >
-                  <Search className="h-4 w-4" />
-                </button>
+          <div ref={mobileSearchWrapperRef} className="md:hidden flex-1 min-w-0">
+            <div className="relative">
+              <input
+                ref={mobileSearchInputRef}
+                type="text"
+                placeholder="Search products"
+                value={mobileSearchQuery}
+                onFocus={() => setIsMobileSearchFocused(true)}
+                onChange={(e) => setMobileSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    submitSearch(mobileSearchQuery, true);
+                  }
+                }}
+                className="w-full h-12 bg-white border border-gray-300 rounded-full pl-4 pr-12 text-[14px] font-semibold text-gray-900 placeholder:text-[13px] placeholder:text-gray-400 shadow-sm focus:border-gray-400 focus:outline-none focus:ring-0"
+              />
+              <button
+                type="button"
+                onClick={() => submitSearch(mobileSearchQuery, true)}
+                className="absolute inset-y-0 right-0 w-12 flex items-center justify-center text-gray-500 hover:text-primary transition-colors"
+                aria-label="Submit search"
+              >
+                <Search className="h-6 w-6" />
+              </button>
 
-                {isMobileSearchFocused && activeQuery.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden z-50">
-                    {isSuggestionsLoading ? (
-                      <div className="px-4 py-3 text-xs font-bold text-gray-500">Searching products...</div>
-                    ) : searchSuggestions.length > 0 ? (
-                      searchSuggestions.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            openSuggestion(item.id);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="w-9 h-9 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                            {item.image ? (
-                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                            ) : null}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
-                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide truncate">{item.category}</p>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-xs font-bold text-gray-500">No matching products.</div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {isMobileSearchFocused && activeQuery.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden z-50">
+                  {isSuggestionsLoading ? (
+                    <div className="px-4 py-3 text-xs font-bold text-gray-500">Searching products...</div>
+                  ) : searchSuggestions.length > 0 ? (
+                    searchSuggestions.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          openSuggestion(item.id);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                          {item.image ? (
+                            <OptimizedImage
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                              width={40}
+                              height={40}
+                              responsiveWidths={[400, 800]}
+                              sizes="36px"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
+                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide truncate">{item.category}</p>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-xs font-bold text-gray-500">No matching products.</div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* CENTER: Search Bar (Desktop) */}
           <div className="hidden md:flex flex-1 max-w-3xl px-4 lg:px-12">
@@ -324,7 +320,15 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
                           {item.image ? (
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            <OptimizedImage
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                              width={40}
+                              height={40}
+                              responsiveWidths={[400, 800]}
+                              sizes="40px"
+                            />
                           ) : null}
                         </div>
                         <div className="min-w-0">
@@ -376,29 +380,7 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Mobile Actions */}
-            <div className="flex md:hidden items-center z-50">
-              <button 
-                onClick={() => {
-                  setIsMobileSearchOpen((prev) => {
-                    const next = !prev;
-                    if (next) {
-                      setMobileSearchQuery(desktopSearchQuery);
-                      setIsMobileSearchFocused(true);
-                    } else {
-                      setIsMobileSearchFocused(false);
-                    }
-                    return next;
-                  });
-                }}
-                className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors active:scale-90 ${
-                  isMobileSearchOpen ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-primary hover:bg-gray-100'
-                }`}
-                aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
-              >
-                {isMobileSearchOpen ? <X size={24} /> : <Search size={24} />}
-              </button>
-            </div>
+            <div className="hidden md:flex items-center z-50" />
           </div>
         </div>
       </div>

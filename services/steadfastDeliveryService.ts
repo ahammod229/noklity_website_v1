@@ -88,7 +88,8 @@ const getSupabaseFunctionEndpoint = () => {
   return `${baseUrl}/functions/v1/steadfast-delivery`;
 };
 
-const getSupabaseAnonKey = () => getEnvVar('VITE_SUPABASE_ANON_KEY').trim();
+const getSupabaseAnonKey = () =>
+  (getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY')).trim();
 
 const isRelayLikeError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;

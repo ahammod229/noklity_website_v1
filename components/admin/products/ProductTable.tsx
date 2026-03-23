@@ -9,6 +9,7 @@ interface ProductTableProps {
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
   onToggleFlashSale: (product: Product, e: React.MouseEvent) => void;
+  deletingProductId?: string | null;
 }
 
 export const ProductTable: React.FC<ProductTableProps> = ({ 
@@ -16,7 +17,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   isLoading, 
   onEdit, 
   onDelete, 
-  onToggleFlashSale 
+  onToggleFlashSale,
+  deletingProductId = null
 }) => {
   const { formatCurrency } = useCurrency();
   if (isLoading) {
@@ -106,8 +108,16 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                   <button onClick={() => onEdit(product)} className="p-1.5 text-gray-400 hover:text-primary transition-colors">
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => onDelete(product.id)} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors">
-                    <Trash2 className="w-4 h-4" />
+                  <button
+                    onClick={() => onDelete(product.id)}
+                    disabled={deletingProductId === product.id}
+                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deletingProductId === product.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </td>

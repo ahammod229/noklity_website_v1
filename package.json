@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "generate:og-image": "python3 scripts/generate-og-image.py",
+    "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "firebase:deploy": "npm run build && firebase deploy --only hosting",
     "setup:single-tenant": "bash scripts/setup-single-tenant.sh",
     "check:prepublish": "node scripts/prepublish-check.mjs",
     "test:productization": "node scripts/productization-check.mjs",

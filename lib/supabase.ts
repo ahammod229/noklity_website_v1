@@ -15,7 +15,8 @@ const getEnvVar = (key: string) => {
 };
 
 let supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
+const supabasePublishableKey =
+  getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY');
 
 // Ensure URL has protocol
 if (supabaseUrl && !supabaseUrl.startsWith('http')) {
@@ -32,8 +33,8 @@ const isValidHttpUrl = (value: string) => {
 };
 
 export const SUPABASE_CONFIG_ERROR =
-  !supabaseUrl || !supabaseAnonKey
-    ? 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.'
+  !supabaseUrl || !supabasePublishableKey
+    ? 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) to your environment.'
     : !isValidHttpUrl(supabaseUrl)
       ? `Supabase URL is invalid: ${supabaseUrl}`
       : null;
@@ -43,7 +44,7 @@ if (SUPABASE_CONFIG_ERROR) {
 }
 
 const validUrl = supabaseUrl || 'http://localhost:54321';
-const validKey = supabaseAnonKey || 'invalid-anon-key';
+const validKey = supabasePublishableKey || 'invalid-publishable-key';
 
 const noOpAuthLock = async <T,>(
   _name: string,
