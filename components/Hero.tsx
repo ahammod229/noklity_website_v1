@@ -259,7 +259,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className="relative rounded-2xl sm:rounded-[2.5rem] overflow-hidden h-[240px] xs:h-[280px] sm:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
+        className="relative rounded-2xl sm:rounded-[2.5rem] overflow-hidden h-[240px] sm:h-[280px] md:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
       >
         {isLoading ? (
           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
@@ -284,14 +284,28 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                     responsiveWidths={[400, 800, 1200, 1600]}
                     sizes="100vw"
                     loading="eager"
-                    className="w-full h-full object-contain sm:object-cover object-center transform transition-transform duration-[20s] sm:group-hover:scale-105"
+                    fetchPriority="high"
+                    className={`w-full h-full object-contain md:object-cover object-center transform transition-transform duration-[20s] md:group-hover:scale-105 ${banner.mobile_image_url ? 'hidden md:block' : ''}`}
                   />
-                  <div className="absolute inset-0 bg-transparent sm:bg-gradient-to-r sm:from-gray-950/90 sm:via-gray-900/50 sm:to-transparent" />
+                  {banner.mobile_image_url && (
+                    <OptimizedImage
+                      src={banner.mobile_image_url}
+                      alt={`${banner.title} mobile view`}
+                      width={800}
+                      height={1200}
+                      responsiveWidths={[400, 800]}
+                      sizes="100vw"
+                      loading="eager"
+                      fetchPriority="high"
+                      className="w-full h-full object-cover object-center transform transition-transform duration-[20s] block md:hidden"
+                    />
+                  )}
+                  <div className="hidden md:block absolute inset-0 md:bg-gradient-to-r md:from-gray-950/90 md:via-gray-900/50 md:to-transparent" />
                 </div>
               ))}
             </div>
 
-            <div className="relative hidden h-full items-center px-6 md:px-12 lg:px-16 sm:flex">
+            <div className="relative hidden h-full items-center px-6 md:px-12 lg:px-16 md:flex">
               <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl max-w-[98%] sm:max-w-lg w-full text-white shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
                 <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-primary/40 rounded-full blur-[60px] pointer-events-none" />
 

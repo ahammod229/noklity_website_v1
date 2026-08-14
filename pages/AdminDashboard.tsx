@@ -9,6 +9,8 @@ import {
   Zap, 
   LogOut, 
   ChevronLeft, 
+  Menu,
+  X,
   LifeBuoy, 
   Settings, 
   Languages,
@@ -26,6 +28,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { logoutUser } from '../services/authService';
 import { ToastType } from '../components/Toast';
 import { useTheme } from '../contexts/ThemeContext';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
@@ -47,6 +50,7 @@ import MediaControl from './admin/MediaControl';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
 import { useAuth } from '../contexts/AuthContext';
 import { FeatureKey } from '../types/tenant';
+import { BREAKPOINTS } from '../constants/breakpoints';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -132,9 +136,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [adminNotifications, setAdminNotifications] = useState<AdminNotificationItem[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement | null>(null);
-  const fallbackLogo = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 52'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 47 L30 47 L40 5 Z'/%3E%3Ctext x='52' y='39' font-family='sans-serif' font-weight='900' font-size='32' fill='${theme === 'dark' ? '%23F8FAFC' : '%23111827'}' letter-spacing='-1'%3E${encodeURIComponent(tenantConfig.brandName || 'Storefront')}%3C/text%3E%3C/svg%3E`;
-  const activeBrandLogoSrc = !brandLogoLoadFailed && brandLogoSrc ? brandLogoSrc : fallbackLogo;
+  const activeBrandLogoSrc = !brandLogoLoadFailed && brandLogoSrc ? brandLogoSrc : '';
   const adminDisplayName = profile?.full_name || user?.user_metadata?.full_name || 'Admin User';
   const adminEmail = user?.email || profile?.email || tenantConfig.supportEmail || 'admin@example.com';
   const adminInitial = (adminDisplayName || 'A').charAt(0).toUpperCase();
@@ -156,8 +160,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
     return required ? canUseFeature(required) : true;
   };
 
+  const openView = (view: View) => {
+    setActiveView(view);
+    setIsSidebarOpen(false);
+  };
+
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    setIsSidebarOpen(false);
+    await logoutUser();
     onLogout();
   };
 
@@ -230,10 +240,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
             .limit(20)
         ),
         safeSelect<NewCustomerRow>(
-          'profiles',
+          'users',
           supabase
-            .from('profiles')
-            .select('id,full_name,email,created_at')
+            .from('users')
+            .select('uid,display_name,email,created_at')
             .gte('created_at', oneDayAgoIso)
             .order('created_at', { ascending: false })
             .limit(20)
@@ -379,6 +389,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
     }
   }, [activeView, tenantConfig.featureFlags]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= BREAKPOINTS.lg) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const renderView = () => {
     if (!canAccessView(activeView)) {
       return (
@@ -413,18 +434,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+      <div
+        className={`fixed inset-0 z-30 bg-gray-950/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          isSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => setIsSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col fixed inset-y-0 left-0 z-20">
-        <a href="/" className="p-6 border-b border-gray-100 flex items-center gap-3 group">
-          <img
-            src={activeBrandLogoSrc}
-            alt={brandSiteName}
-            className="h-[34px] md:h-[38px] w-auto max-w-[210px] object-contain transition-transform duration-300 group-hover:scale-105"
-            onError={() => {
-              setBrandLogoLoadFailed(true);
-            }}
-          />
-        </a>
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-[88vw] max-w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-300 lg:z-20 lg:w-64 ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between gap-3">
+          <a href="/" className="min-w-0 flex items-center gap-3 group" onClick={() => setIsSidebarOpen(false)}>
+            {activeBrandLogoSrc ? (
+              <img
+                src={activeBrandLogoSrc}
+                alt={brandSiteName}
+                className="h-[34px] md:h-[38px] w-auto max-w-[210px] object-contain transition-transform duration-300 group-hover:scale-105"
+                onError={() => {
+                  setBrandLogoLoadFailed(true);
+                }}
+              />
+            ) : (
+              <span className="text-2xl font-black tracking-tight text-gray-900 truncate">{brandSiteName}</span>
+            )}
+          </a>
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-gray-900"
+            aria-label="Close admin navigation"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
         
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
           <div className="pt-1 pb-1 pl-4 text-xs font-black text-gray-500 uppercase tracking-wider">Analytics</div>
@@ -432,13 +479,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
             icon={LayoutDashboard} 
             label="Overview" 
             active={activeView === 'overview'} 
-            onClick={() => setActiveView('overview')} 
+            onClick={() => openView('overview')} 
           />
           <NavItem
             icon={Wallet}
             label="Finance"
             active={activeView === 'finance'}
-            onClick={() => setActiveView('finance')}
+            onClick={() => openView('finance')}
             hidden={!canAccessView('finance')}
           />
           <div className="pt-4 pb-1 pl-4 text-xs font-black text-gray-500 uppercase tracking-wider">Store Management</div>
@@ -446,46 +493,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
             icon={Package} 
             label="Products" 
             active={activeView === 'products'} 
-            onClick={() => setActiveView('products')} 
+            onClick={() => openView('products')} 
           />
           <NavItem 
             icon={ShoppingBag} 
             label="Orders" 
             active={activeView === 'orders'} 
-            onClick={() => setActiveView('orders')} 
+            onClick={() => openView('orders')} 
           />
           <NavItem 
             icon={Layers} 
             label="Categories" 
             active={activeView === 'categories'} 
-            onClick={() => setActiveView('categories')} 
+            onClick={() => openView('categories')} 
           />
           <NavItem
             icon={Image}
             label="Hero Banners"
             active={activeView === 'hero'}
-            onClick={() => setActiveView('hero')}
+            onClick={() => openView('hero')}
             hidden={!canAccessView('hero')}
           />
           <NavItem
             icon={Images}
             label="Media Control"
             active={activeView === 'media'}
-            onClick={() => setActiveView('media')}
+            onClick={() => openView('media')}
             hidden={!canAccessView('media')}
           />
           <NavItem 
             icon={Zap} 
             label="Flash Sales" 
             active={activeView === 'flash'} 
-            onClick={() => setActiveView('flash')} 
+            onClick={() => openView('flash')} 
             hidden={!canAccessView('flash')}
           />
           <NavItem 
             icon={Star} 
             label="Reviews" 
             active={activeView === 'reviews'} 
-            onClick={() => setActiveView('reviews')} 
+            onClick={() => openView('reviews')} 
             hidden={!canAccessView('reviews')}
           />
           <div className="pt-4 pb-1 pl-4 text-xs font-black text-gray-500 uppercase tracking-wider">Platform</div>
@@ -493,40 +540,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
             icon={Users} 
             label="Customers" 
             active={activeView === 'customers'}
-            onClick={() => setActiveView('customers')} 
+            onClick={() => openView('customers')} 
             hidden={!canAccessView('customers')}
           />
           <NavItem 
             icon={LifeBuoy} 
             label="Support" 
             active={activeView === 'support'} 
-            onClick={() => setActiveView('support')} 
+            onClick={() => openView('support')} 
             hidden={!canAccessView('support')}
           />
           <NavItem 
             icon={Languages} 
             label="Translations" 
             active={activeView === 'language'} 
-            onClick={() => setActiveView('language')} 
+            onClick={() => openView('language')} 
           />
           <NavItem 
             icon={Settings} 
             label="Settings" 
             active={activeView === 'settings'} 
-            onClick={() => setActiveView('settings')} 
+            onClick={() => openView('settings')} 
           />
           <NavItem 
             icon={CreditCard} 
             label="Payment Methods" 
             active={activeView === 'payments'} 
-            onClick={() => setActiveView('payments')} 
+            onClick={() => openView('payments')} 
             hidden={!canAccessView('payments')}
           />
           <NavItem 
             icon={Database} 
             label="API Management" 
             active={activeView === 'api'} 
-            onClick={() => setActiveView('api')} 
+            onClick={() => openView('api')} 
             hidden={!canAccessView('api')}
           />
         </nav>
@@ -552,19 +599,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
       </aside>
 
       {/* Main Content */}
-      <main className="min-h-screen ml-64 w-[calc(100%-16rem)] p-4 sm:p-6 lg:p-8 overflow-x-hidden">
+      <main className="min-h-screen p-4 sm:p-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:p-8 overflow-x-hidden">
         {/* Top Bar */}
         <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-8 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Admin</p>
-            <h1 className="text-2xl font-black text-gray-900 capitalize">{activeView.replace('-', ' ')}</h1>
-            {!tenantConfig.licenseValid && (
-              <p className="mt-1 text-xs font-black text-amber-700">
-                License invalid or inactive. Running in Basic fallback mode.
-              </p>
-            )}
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:text-gray-900"
+              aria-label="Open admin navigation"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-gray-400">Admin</p>
+              <h1 className="text-2xl font-black text-gray-900 capitalize">{activeView.replace('-', ' ')}</h1>
+              {!tenantConfig.licenseValid && (
+                <p className="mt-1 text-xs font-black text-amber-700">
+                  License invalid or inactive. Running in Basic fallback mode.
+                </p>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
             <div className="relative w-full lg:w-72 min-w-0">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -598,7 +655,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
                 )}
               </button>
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-[360px] rounded-2xl border border-gray-200 bg-white shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-gray-200 bg-white shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-widest text-gray-400 font-black">Notifications</p>
@@ -627,7 +684,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
                         <button
                           key={item.id}
                           onClick={() => {
-                            setActiveView(item.targetView);
+                            openView(item.targetView);
                             setNotificationsOpen(false);
                           }}
                           className="w-full text-left px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"

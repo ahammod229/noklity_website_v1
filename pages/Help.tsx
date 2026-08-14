@@ -218,7 +218,7 @@ const Help: React.FC<HelpProps> = () => {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Email Support</h3>
               <p className="text-gray-500 mb-6 font-medium">Send us a detailed message.</p>
-              <a href={`mailto:${supportEmail}`} className="text-lg font-bold text-gray-900 hover:text-primary transition-colors flex items-center gap-2">
+              <a href={`mailto:${supportEmail}`} className="text-sm sm:text-lg font-bold text-gray-900 hover:text-primary transition-colors flex items-center gap-2 break-all">
                 {supportEmail} <ArrowRight className="w-4 h-4" />
               </a>
             </div>

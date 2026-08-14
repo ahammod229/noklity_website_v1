@@ -8,6 +8,7 @@ import { useTenantConfig } from '../contexts/TenantConfigContext';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 import { getSearchSuggestions, SearchSuggestion } from '../services/searchService';
 import OptimizedImage from './ui/OptimizedImage';
+import { BREAKPOINTS } from '../constants/breakpoints';
 
 interface HeaderProps {
   onLoginClick?: () => void;
@@ -136,7 +137,7 @@ const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 768) {
+      if (window.innerWidth >= BREAKPOINTS.md) {
         closeMobileOverlays();
       }
     };
@@ -198,6 +199,8 @@ const Header: React.FC<HeaderProps> = ({
               <img 
                 src={logoSrc}
                 alt={siteName} 
+                width={244}
+                height={70}
                 className="w-auto object-contain transition-transform duration-300 group-hover:scale-105 h-[34px] sm:h-[34px] md:h-[48px] max-w-[150px] sm:max-w-[180px] md:max-w-[340px]"
                 onError={() => {
                   setLogoLoadFailed(true);

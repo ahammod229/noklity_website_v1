@@ -169,7 +169,7 @@ const Home: React.FC<HomeProps> = ({
         )}
         
         {/* Featured / Catalog Section */}
-        <section id="products-section" className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-0 sm:min-h-[600px]">
+        <section id="products-section" className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-[620px] sm:min-h-[600px]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 mb-6 sm:mb-10">
             <div>
               <span className="text-primary font-bold uppercase tracking-widest text-xs mb-2 block">

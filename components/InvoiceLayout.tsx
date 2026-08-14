@@ -21,6 +21,7 @@ const InvoiceLayout: React.FC<InvoiceLayoutProps> = ({
 }) => {
   const { config } = useTenantConfig();
   const initialSiteConfig = getPublicSiteConfigSnapshot();
+  const [brandName, setBrandName] = useState(initialSiteConfig.siteName || config.brandName || 'Storefront');
   const [logoState, setLogoState] = useState(() => ({
     logoUrl: initialSiteConfig.headerLogoLight || initialSiteConfig.headerLogoDark || config.brandLogoUrl || '',
     version: Date.now()
@@ -40,6 +41,7 @@ const InvoiceLayout: React.FC<InvoiceLayoutProps> = ({
 
     const applySiteConfig = (nextConfig: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
       if (!mounted) return;
+      setBrandName(nextConfig.siteName || config.brandName || 'Storefront');
       setLogoState((prev) => ({
         logoUrl: nextConfig.headerLogoLight || nextConfig.headerLogoDark || config.brandLogoUrl || '',
         version: prev.version + 1
@@ -75,20 +77,22 @@ const InvoiceLayout: React.FC<InvoiceLayoutProps> = ({
     };
   }, [config.companyPhone, config.domain, config.supportEmail]);
 
-  const encodedName = encodeURIComponent(config.brandName || 'Storefront');
-  const fallbackLogo = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 52'%3E%3Cpath fill='%23DC2626' d='M15 5 L5 47 L30 47 L40 5 Z'/%3E%3Ctext x='52' y='39' font-family='sans-serif' font-weight='900' font-size='32' fill='%23111827' letter-spacing='-1'%3E${encodedName}%3C/text%3E%3C/svg%3E`;
-  const logoSrcBase = logoState.logoUrl || fallbackLogo;
+  const logoSrcBase = logoState.logoUrl || '';
   const logoSrc =
-    logoSrcBase.startsWith('data:image')
-      ? logoSrcBase
-      : `${logoSrcBase}${logoSrcBase.includes('?') ? '&' : '?'}v=${logoState.version}`;
+    logoSrcBase
+      ? `${logoSrcBase}${logoSrcBase.includes('?') ? '&' : '?'}v=${logoState.version}`
+      : '';
 
   return (
     <div className="bg-white p-8 md:p-12 shadow-sm border border-gray-100 max-w-[800px] mx-auto print:shadow-none print:border-none print:p-0 print:max-w-none">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12 border-b border-gray-100 pb-8 print:gap-4 print:mb-5 print:pb-4">
         <div>
-          <img src={logoSrc} alt={config.brandName} className="h-10 mb-4 print:h-8 print:mb-2" />
+          {logoSrc ? (
+            <img src={logoSrc} alt={brandName} className="h-10 mb-4 print:h-8 print:mb-2" />
+          ) : (
+            <div className="mb-4 print:mb-2 text-2xl font-black tracking-tight text-gray-900 print:text-xl">{brandName}</div>
+          )}
           <div className="space-y-1 text-sm text-gray-500 font-medium print:text-xs">
             <p className="flex items-center gap-2">
               <Mail className="w-3.5 h-3.5 text-primary" /> {invoiceContact.supportEmail}
@@ -121,7 +125,7 @@ const InvoiceLayout: React.FC<InvoiceLayoutProps> = ({
 
       {/* Footer */}
       <div className="mt-16 pt-8 border-t border-gray-100 text-center print:mt-6 print:pt-4">
-        <p className="text-sm font-bold text-gray-900 mb-1 print:text-xs">Thank you for choosing {config.brandName}!</p>
+        <p className="text-sm font-bold text-gray-900 mb-1 print:text-xs">Thank you for choosing {brandName}!</p>
         <p className="text-xs text-gray-400 font-medium mb-4 print:mb-2">This is a system-generated invoice and does not require a physical signature.</p>
         <div className="bg-gray-50 rounded-xl p-4 inline-block text-[11px] text-gray-500 font-bold max-w-md print:p-2 print:text-[10px] print:rounded-lg">
           Returns & Support: Items must be in original packaging for returns. Contact {invoiceContact.supportEmail} for any discrepancies within 48 hours of delivery.

@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Noklity | Electronics, Tools, Tyres &amp; Parts – Bangladesh</title>
     <meta
@@ -13,44 +15,123 @@
       name="keywords"
       content="Noklity, electronics Bangladesh, tools Bangladesh, tyres Bangladesh, parts Bangladesh, imported electronics, imported tools"
     />
-    <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://noklity.com/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="canonical" href="https://www.noklity.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Noklity" />
+    <meta property="og:locale" content="en_BD" />
     <meta property="og:title" content="Noklity | Electronics, Tools, Tyres &amp; Parts – Bangladesh" />
     <meta property="og:description" content="Shop imported electronics, tools, tyres and parts at Noklity. Quality products delivered across Bangladesh." />
-    <meta property="og:url" content="https://noklity.com/" />
-    <meta property="og:image" content="https://noklity.com/og-image.png" />
+    <meta property="og:url" content="https://www.noklity.com/" />
+    <meta property="og:image" content="https://www.noklity.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="Noklity electronics, tools, tyres and parts social share image" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@noklity" />
     <meta name="twitter:title" content="Noklity | Electronics, Tools, Tyres &amp; Parts – Bangladesh" />
     <meta name="twitter:description" content="Shop imported electronics, tools, tyres and parts at Noklity. Quality products delivered across Bangladesh." />
-    <meta name="twitter:image" content="https://noklity.com/og-image.png" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
-            colors: {
-              primary: 'rgb(var(--color-primary-rgb) / <alpha-value>)',
-              secondary: 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
-              accent: 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
-              background: 'rgb(var(--background-current-rgb) / <alpha-value>)',
-              foreground: 'rgb(var(--text-current-rgb) / <alpha-value>)',
-              popover: 'rgb(var(--surface-current-rgb) / <alpha-value>)',
-              'popover-foreground': 'rgb(var(--text-current-rgb) / <alpha-value>)',
-              border: 'rgb(var(--border-current-rgb) / <alpha-value>)',
-            }
+    <meta name="twitter:image" content="https://www.noklity.com/og-image.png" />
+    <script type="application/ld+json">
+      [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "name": "Noklity",
+          "url": "https://www.noklity.com",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://www.noklity.com/search?q={search_term_string}",
+            "query-input": "required name=search_term_string"
           }
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "Noklity",
+          "url": "https://www.noklity.com",
+          "logo": "https://www.noklity.com/favicon.svg"
         }
-      }
+      ]
     </script>
+    <script>
+      (function applyInitialFavicon() {
+        var CACHE_KEY = 'noklity_public_site_config_v1';
+        var DEFAULT_FAVICON = '/favicon.svg';
+
+        var inferType = function (href) {
+          var normalized = String(href || '').toLowerCase().split('?')[0].split('#')[0];
+          if (normalized.endsWith('.svg')) return 'image/svg+xml';
+          if (normalized.endsWith('.png')) return 'image/png';
+          if (normalized.endsWith('.ico')) return 'image/x-icon';
+          if (normalized.endsWith('.webp')) return 'image/webp';
+          if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
+          return '';
+        };
+
+        var upsertLink = function (rel, href, type) {
+          var selector = 'link[rel="' + rel + '"]';
+          var link = document.head.querySelector(selector);
+          if (!link) {
+            link = document.createElement('link');
+            link.setAttribute('rel', rel);
+            document.head.appendChild(link);
+          }
+          link.setAttribute('href', href);
+          if (type) {
+            link.setAttribute('type', type);
+          } else {
+            link.removeAttribute('type');
+          }
+        };
+
+        try {
+          var raw = window.localStorage.getItem(CACHE_KEY);
+          var parsed = raw ? JSON.parse(raw) : null;
+          var faviconUrl =
+            parsed && typeof parsed.faviconUrl === 'string' && parsed.faviconUrl.trim()
+              ? parsed.faviconUrl.trim()
+              : DEFAULT_FAVICON;
+          var iconType = inferType(faviconUrl);
+
+          upsertLink('icon', faviconUrl, iconType);
+          upsertLink('shortcut icon', faviconUrl, iconType);
+          upsertLink('apple-touch-icon', faviconUrl, '');
+        } catch (error) {
+          var defaultType = inferType(DEFAULT_FAVICON);
+          upsertLink('icon', DEFAULT_FAVICON, defaultType);
+          upsertLink('shortcut icon', DEFAULT_FAVICON, defaultType);
+          upsertLink('apple-touch-icon', DEFAULT_FAVICON, '');
+        }
+      })();
+    </script>
+    <script>
+      (function redirectToPreferredHost() {
+        try {
+          var host = window.location.hostname.toLowerCase();
+          var preferred = 'www.noklity.com';
+          var redirectHosts = {
+            'noklity.com': true,
+            'noklity-fd082.web.app': true,
+            'noklity-fd082.firebaseapp.com': true
+          };
+
+          if (redirectHosts[host]) {
+            var nextUrl = 'https://' + preferred + window.location.pathname + window.location.search + window.location.hash;
+            window.location.replace(nextUrl);
+          }
+        } catch (error) {
+          // Ignore redirect errors and let the app load normally.
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://itcrzohckqrfhfxgtemx.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://itcrzohckqrfhfxgtemx.supabase.co" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       (function applyInitialTheme() {
         try {
@@ -73,17 +154,6 @@
         color: var(--noklity-text, #111827);
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.90.1"
-  }
-}
-</script>
 </head>
   <body>
     <div id="root"></div>

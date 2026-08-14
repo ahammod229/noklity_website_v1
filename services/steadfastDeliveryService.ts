@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { auth } from './firebaseClient';
 import {
   clearSupabaseStoredSession,
   readSupabaseStoredAccessToken
@@ -244,36 +245,33 @@ const ADMIN_EMAIL_ALLOWLIST = getEnvVar('VITE_ADMIN_EMAILS')
 
 const maybePromoteAllowlistedAdminProfile = async () => {
   try {
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    const userId = String(user?.id || '').trim();
+    const user = auth.currentUser;
+    const userId = String(user?.uid || '').trim();
     const email = String(user?.email || '').trim().toLowerCase();
     if (!userId || !email || !ADMIN_EMAIL_ALLOWLIST.includes(email)) return;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id,role,status')
-      .eq('id', userId)
+    const { data: dbUser } = await supabase
+      .from('users')
+      .select('uid,role,status')
+      .eq('uid', userId)
       .maybeSingle();
 
-    if (!profile) {
-      await supabase.from('profiles').upsert({
-        id: userId,
+    if (!dbUser) {
+      await supabase.from('users').upsert({
+        uid: userId,
         email,
-        full_name: String(user?.user_metadata?.full_name || 'Admin').trim(),
+        display_name: user?.displayName || 'Admin',
         role: 'admin',
         status: 'active'
       });
       return;
     }
 
-    if (profile.role !== 'admin' || profile.status !== 'active') {
+    if (dbUser.role !== 'admin' || dbUser.status !== 'active') {
       await supabase
-        .from('profiles')
+        .from('users')
         .update({ role: 'admin', status: 'active' })
-        .eq('id', userId);
+        .eq('uid', userId);
     }
   } catch {
     // Non-blocking: if this fails we still continue normal auth flow.
@@ -283,57 +281,15 @@ const maybePromoteAllowlistedAdminProfile = async () => {
 const ensureSessionForAdminAction = async (action?: string): Promise<string> => {
   if (!action || !ADMIN_ONLY_ACTIONS.has(action)) return '';
 
-  const {
-    data: { session }
-  } = await supabase.auth.getSession();
-
-  const currentToken = String(session?.access_token || '').trim();
-  if (await isUsableAccessToken(currentToken)) {
-    await maybePromoteAllowlistedAdminProfile();
-    return currentToken;
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Admin authorization required. Please sign in as admin.');
   }
 
-  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-  if (refreshError) {
-    console.warn('Steadfast admin session refresh warning:', refreshError.message);
-  }
+  await maybePromoteAllowlistedAdminProfile();
 
-  const refreshedToken = String(refreshed?.session?.access_token || '').trim();
-  if (await isUsableAccessToken(refreshedToken)) {
-    await maybePromoteAllowlistedAdminProfile();
-    return refreshedToken;
-  }
-
-  const localStorageToken = readAccessTokenFromLocalStorage();
-  if (await isUsableAccessToken(localStorageToken)) {
-    await maybePromoteAllowlistedAdminProfile();
-    return localStorageToken;
-  }
-
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    // Final resilient fallback:
-    // If we still have a non-expired JWT-looking token, let the Edge Function
-    // do authoritative verification. This avoids false negatives caused by
-    // temporary client-side auth validation issues.
-    const fallbackCandidates = [currentToken, refreshedToken, localStorageToken];
-    const usableFallback = fallbackCandidates.find(
-      (token) => isLikelyJwt(token) && !isTokenExpiredOrNearExpiry(token, 30)
-    );
-    if (usableFallback) {
-      return usableFallback;
-    }
-
-    clearStoredSupabaseAuth();
-    invalidateTokenCache();
-    throw new Error('Admin session token is invalid. Please sign out and sign in again.');
-  }
-
-  invalidateTokenCache();
-  throw new Error('Please login as an admin account to use Steadfast integration.');
+  const token = await user.getIdToken().catch(() => '');
+  return token || user.uid;
 };
 
 const tryParseResponseError = async (error: unknown): Promise<string | null> => {
@@ -406,6 +362,9 @@ const invokeSteadfast = async (body: Record<string, unknown>) => {
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
+    if (auth.currentUser?.uid) {
+      headers['x-firebase-uid'] = auth.currentUser.uid;
+    }
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -430,20 +389,17 @@ const invokeSteadfast = async (body: Record<string, unknown>) => {
   };
 
   const invokeOnce = async () => {
-    // For admin-only actions, always use the validated token directly.
-    // This avoids `functions.invoke` using a stale internal token and returning
-    // `Invalid JWT` even when a valid token exists in storage.
     if (requiresAdminSession) {
       const ensuredToken = await ensureSessionForAdminAction(action);
       return await invokeViaDirectFetch(ensuredToken);
     }
 
-    const {
-      data: { session }
-    } = await supabase.auth.getSession();
-    const sessionToken = String(session?.access_token || '').trim();
+    const headers: Record<string, string> = {};
+    if (auth.currentUser?.uid) {
+      headers['x-firebase-uid'] = auth.currentUser.uid;
+    }
 
-    const { data, error } = await supabase.functions.invoke('steadfast-delivery', { body });
+    const { data, error } = await supabase.functions.invoke('steadfast-delivery', { body, headers });
     if (!error) {
       return data;
     }

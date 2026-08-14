@@ -107,13 +107,43 @@ const defaultLocaleByCurrency: Record<string, string> = {
   EUR: 'en-IE',
   GBP: 'en-GB'
 };
+const PREFERRED_PUBLIC_HOST = 'www.noklity.com';
+const ALIAS_PUBLIC_HOSTS = new Set([
+  'noklity.com',
+  'www.noklity.com',
+  'noklity-fd082.web.app',
+  'noklity-fd082.firebaseapp.com'
+]);
+
+const normalizePublicSiteUrl = (rawUrl: string) => {
+  const fallback = `https://${PREFERRED_PUBLIC_HOST}`;
+  if (!rawUrl) return fallback;
+
+  try {
+    const parsed = new URL(rawUrl);
+    const normalizedHost = parsed.hostname.toLowerCase();
+
+    if (ALIAS_PUBLIC_HOSTS.has(normalizedHost)) {
+      parsed.protocol = 'https:';
+      parsed.hostname = PREFERRED_PUBLIC_HOST;
+      parsed.port = '';
+      parsed.pathname = '/';
+      parsed.search = '';
+      parsed.hash = '';
+    }
+
+    return parsed.toString().replace(/\/+$/, '') || fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const DEFAULT_CONFIG: PublicSiteConfig = {
   headerLogoLight: '',
   headerLogoDark: '',
   footerLogo: '',
   faviconUrl: '',
-  siteUrl: `https://${tenantDefaults.domain || 'localhost'}`,
+  siteUrl: normalizePublicSiteUrl(`https://${tenantDefaults.domain || 'localhost'}`),
   siteUrlName: tenantDefaults.domain || 'localhost',
   linkBarImageUrl: '',
   linkBarImageLink: '',
@@ -394,6 +424,7 @@ DEFAULT_CONFIG.shopLinks = normalizeShopLinks(DEFAULT_CONFIG.shopLinks);
 
 let cachedConfig: PublicSiteConfig | null = null;
 let cacheUpdatedAt = 0;
+let inflightConfigPromise: Promise<PublicSiteConfig> | null = null;
 const CACHE_TTL_MS = 60_000;
 const SITE_CONFIG_CACHE_KEY = 'noklity_public_site_config_v1';
 const SITE_CONFIG_SIGNAL_KEY = 'noklity_public_site_config_signal_v1';
@@ -481,7 +512,9 @@ export const getPublicSiteConfigSnapshot = (): PublicSiteConfig => {
   const stored = loadConfigFromStorage();
   if (stored) {
     cachedConfig = stored;
-    cacheUpdatedAt = 0;
+    // Treat persisted config as warm cache so a hard refresh can render fast
+    // instead of triggering repeated duplicate startup fetches.
+    cacheUpdatedAt = Date.now();
     return stored;
   }
   return DEFAULT_CONFIG;
@@ -496,104 +529,115 @@ export const getPublicSiteConfig = async (): Promise<PublicSiteConfig> => {
     const stored = loadConfigFromStorage();
     if (stored) {
       cachedConfig = stored;
-      cacheUpdatedAt = 0;
+      cacheUpdatedAt = Date.now();
     }
   }
 
-  const { data, error } = await supabase.from('site_settings').select('key,value');
-  if (error || !data) {
-    return cachedConfig || loadConfigFromStorage() || DEFAULT_CONFIG;
+  if (inflightConfigPromise) {
+    return inflightConfigPromise;
   }
+  inflightConfigPromise = (async () => {
+    const { data, error } = await supabase.from('site_settings').select('key,value');
+    if (error || !data) {
+      return cachedConfig || loadConfigFromStorage() || DEFAULT_CONFIG;
+    }
 
-  const map = new Map<string, string>();
-  for (const row of data as Array<{ key: string; value: string }>) {
-    map.set(row.key, row.value || '');
+    const map = new Map<string, string>();
+    for (const row of data as Array<{ key: string; value: string }>) {
+      map.set(row.key, row.value || '');
+    }
+
+    const baseConfig: PublicSiteConfig = {
+      headerLogoLight: map.get('header_logo_light') || '',
+      headerLogoDark: map.get('header_logo_dark') || '',
+      footerLogo: map.get('footer_logo') || '',
+      faviconUrl: map.get('favicon_url') || '',
+      siteUrl: normalizePublicSiteUrl(map.get('site_url') || DEFAULT_CONFIG.siteUrl),
+      siteUrlName: map.get('site_url_name') || getUrlNameFromUrl(normalizePublicSiteUrl(map.get('site_url') || DEFAULT_CONFIG.siteUrl)) || DEFAULT_CONFIG.siteUrlName,
+      linkBarImageUrl: map.get('link_bar_image_url') || '',
+      linkBarImageLink: map.get('link_bar_image_link') || '',
+      siteName: map.get('site_name') || DEFAULT_CONFIG.siteName,
+      siteTagline: map.get('site_tagline') || DEFAULT_CONFIG.siteTagline,
+      footerText: map.get('footer_text') || DEFAULT_CONFIG.footerText,
+      supportEmail: map.get('support_email') || DEFAULT_CONFIG.supportEmail,
+      supportPhone: map.get('support_phone') || DEFAULT_CONFIG.supportPhone,
+      supportAddress: map.get('support_address') || DEFAULT_CONFIG.supportAddress,
+      whatsappNumber: map.get('whatsapp_number') || DEFAULT_CONFIG.whatsappNumber,
+      facebookUrl: map.get('facebook_url') || DEFAULT_CONFIG.facebookUrl,
+      instagramUrl: map.get('instagram_url') || DEFAULT_CONFIG.instagramUrl,
+      youtubeUrl: map.get('youtube_url') || DEFAULT_CONFIG.youtubeUrl,
+      twitterUrl: map.get('twitter_url') || DEFAULT_CONFIG.twitterUrl,
+      newsletterEnabled: parseBoolean(map.get('newsletter_enabled'), DEFAULT_CONFIG.newsletterEnabled),
+      newsletterBadgeText: map.get('newsletter_badge_text') || DEFAULT_CONFIG.newsletterBadgeText,
+      newsletterTitle: map.get('newsletter_title') || DEFAULT_CONFIG.newsletterTitle,
+      newsletterDescription: map.get('newsletter_description') || DEFAULT_CONFIG.newsletterDescription,
+      newsletterInputPlaceholder: map.get('newsletter_input_placeholder') || DEFAULT_CONFIG.newsletterInputPlaceholder,
+      newsletterButtonText: map.get('newsletter_button_text') || DEFAULT_CONFIG.newsletterButtonText,
+      newsletterBackgroundImageUrl: map.get('newsletter_background_image_url') || DEFAULT_CONFIG.newsletterBackgroundImageUrl,
+      currencyCode: map.get('currency_code') || DEFAULT_CONFIG.currencyCode,
+      currencyLocale: map.get('currency_locale') || DEFAULT_CONFIG.currencyLocale,
+      baseCurrencyCode: map.get('base_currency_code') || DEFAULT_CONFIG.baseCurrencyCode,
+      exchangeRateUsd: parsePositiveNumber(map.get('exchange_rate_usd'), DEFAULT_CONFIG.exchangeRateUsd),
+      exchangeRateInr: parsePositiveNumber(map.get('exchange_rate_inr'), DEFAULT_CONFIG.exchangeRateInr),
+      allowGuestCheckout: parseBoolean(map.get('allow_guest_checkout'), DEFAULT_CONFIG.allowGuestCheckout),
+      taxEnabled: false,
+      defaultTaxRate: 0,
+      defaultShippingFee: parseNonNegativeNumber(map.get('default_shipping_fee'), DEFAULT_CONFIG.defaultShippingFee),
+      invoicePrefix: map.get('invoice_prefix') || DEFAULT_CONFIG.invoicePrefix,
+      companyAboutTitle: map.get('company_about_title') || DEFAULT_CONFIG.companyAboutTitle,
+      companyAboutContent: map.get('company_about_content') || DEFAULT_CONFIG.companyAboutContent,
+      companyContactTitle: map.get('company_contact_title') || DEFAULT_CONFIG.companyContactTitle,
+      companyContactContent: map.get('company_contact_content') || DEFAULT_CONFIG.companyContactContent,
+      companySupportTitle: map.get('company_support_title') || DEFAULT_CONFIG.companySupportTitle,
+      companySupportContent: map.get('company_support_content') || DEFAULT_CONFIG.companySupportContent,
+      companyShippingPolicyTitle: map.get('company_shipping_policy_title') || DEFAULT_CONFIG.companyShippingPolicyTitle,
+      companyShippingPolicyContent: map.get('company_shipping_policy_content') || DEFAULT_CONFIG.companyShippingPolicyContent,
+      companyReturnPolicyTitle: map.get('company_return_policy_title') || DEFAULT_CONFIG.companyReturnPolicyTitle,
+      companyReturnPolicyContent: map.get('company_return_policy_content') || DEFAULT_CONFIG.companyReturnPolicyContent,
+      legalPrivacyPolicyTitle: map.get('legal_privacy_policy_title') || DEFAULT_CONFIG.legalPrivacyPolicyTitle,
+      legalPrivacyPolicyContent: map.get('legal_privacy_policy_content') || DEFAULT_CONFIG.legalPrivacyPolicyContent,
+      legalTermsOfServiceTitle: map.get('legal_terms_of_service_title') || DEFAULT_CONFIG.legalTermsOfServiceTitle,
+      legalTermsOfServiceContent: map.get('legal_terms_of_service_content') || DEFAULT_CONFIG.legalTermsOfServiceContent,
+      legalPaymentPolicyTitle: map.get('legal_payment_policy_title') || DEFAULT_CONFIG.legalPaymentPolicyTitle,
+      legalPaymentPolicyContent: map.get('legal_payment_policy_content') || DEFAULT_CONFIG.legalPaymentPolicyContent,
+      legalRefundPolicyTitle: map.get('legal_refund_policy_title') || DEFAULT_CONFIG.legalRefundPolicyTitle,
+      legalRefundPolicyContent: map.get('legal_refund_policy_content') || DEFAULT_CONFIG.legalRefundPolicyContent,
+      primaryColor: map.get('primary_color') || DEFAULT_CONFIG.primaryColor,
+      primaryHoverColor: map.get('primary_hover_color') || DEFAULT_CONFIG.primaryHoverColor,
+      accentColor: map.get('accent_color') || DEFAULT_CONFIG.accentColor,
+      successColor: map.get('success_color') || DEFAULT_CONFIG.successColor,
+      warningColor: map.get('warning_color') || DEFAULT_CONFIG.warningColor,
+      dangerColor: map.get('danger_color') || DEFAULT_CONFIG.dangerColor,
+      backgroundColorLight: map.get('background_color_light') || DEFAULT_CONFIG.backgroundColorLight,
+      backgroundColorDark: map.get('background_color_dark') || DEFAULT_CONFIG.backgroundColorDark,
+      surfaceColorLight: map.get('surface_color_light') || DEFAULT_CONFIG.surfaceColorLight,
+      surfaceColorDark: map.get('surface_color_dark') || DEFAULT_CONFIG.surfaceColorDark,
+      textColorLight: map.get('text_color_light') || DEFAULT_CONFIG.textColorLight,
+      textColorDark: map.get('text_color_dark') || DEFAULT_CONFIG.textColorDark,
+      mutedTextColorLight: map.get('muted_text_color_light') || DEFAULT_CONFIG.mutedTextColorLight,
+      mutedTextColorDark: map.get('muted_text_color_dark') || DEFAULT_CONFIG.mutedTextColorDark,
+      borderColorLight: map.get('border_color_light') || DEFAULT_CONFIG.borderColorLight,
+      borderColorDark: map.get('border_color_dark') || DEFAULT_CONFIG.borderColorDark,
+      borderRadiusPx: parseNonNegativeNumber(map.get('border_radius_px'), DEFAULT_CONFIG.borderRadiusPx),
+      managedPages: [],
+      shopLinks: []
+    };
+
+    const fallbackManagedPages = createLegacyManagedPages(baseConfig);
+    baseConfig.managedPages = sanitizeManagedPages(map.get('managed_pages'), fallbackManagedPages);
+    baseConfig.shopLinks = sanitizeShopLinks(map.get('footer_shop_links'), DEFAULT_CONFIG.shopLinks);
+    cachedConfig = baseConfig;
+    cacheUpdatedAt = Date.now();
+    persistConfigToStorage(cachedConfig);
+
+    return cachedConfig;
+  })();
+
+  try {
+    return await inflightConfigPromise;
+  } finally {
+    inflightConfigPromise = null;
   }
-
-  const baseConfig: PublicSiteConfig = {
-    headerLogoLight: map.get('header_logo_light') || '',
-    headerLogoDark: map.get('header_logo_dark') || '',
-    footerLogo: map.get('footer_logo') || '',
-    faviconUrl: map.get('favicon_url') || '',
-    siteUrl: map.get('site_url') || DEFAULT_CONFIG.siteUrl,
-    siteUrlName: map.get('site_url_name') || getUrlNameFromUrl(map.get('site_url') || DEFAULT_CONFIG.siteUrl) || DEFAULT_CONFIG.siteUrlName,
-    linkBarImageUrl: map.get('link_bar_image_url') || '',
-    linkBarImageLink: map.get('link_bar_image_link') || '',
-    siteName: map.get('site_name') || DEFAULT_CONFIG.siteName,
-    siteTagline: map.get('site_tagline') || DEFAULT_CONFIG.siteTagline,
-    footerText: map.get('footer_text') || DEFAULT_CONFIG.footerText,
-    supportEmail: map.get('support_email') || DEFAULT_CONFIG.supportEmail,
-    supportPhone: map.get('support_phone') || DEFAULT_CONFIG.supportPhone,
-    supportAddress: map.get('support_address') || DEFAULT_CONFIG.supportAddress,
-    whatsappNumber: map.get('whatsapp_number') || DEFAULT_CONFIG.whatsappNumber,
-    facebookUrl: map.get('facebook_url') || DEFAULT_CONFIG.facebookUrl,
-    instagramUrl: map.get('instagram_url') || DEFAULT_CONFIG.instagramUrl,
-    youtubeUrl: map.get('youtube_url') || DEFAULT_CONFIG.youtubeUrl,
-    twitterUrl: map.get('twitter_url') || DEFAULT_CONFIG.twitterUrl,
-    newsletterEnabled: parseBoolean(map.get('newsletter_enabled'), DEFAULT_CONFIG.newsletterEnabled),
-    newsletterBadgeText: map.get('newsletter_badge_text') || DEFAULT_CONFIG.newsletterBadgeText,
-    newsletterTitle: map.get('newsletter_title') || DEFAULT_CONFIG.newsletterTitle,
-    newsletterDescription: map.get('newsletter_description') || DEFAULT_CONFIG.newsletterDescription,
-    newsletterInputPlaceholder: map.get('newsletter_input_placeholder') || DEFAULT_CONFIG.newsletterInputPlaceholder,
-    newsletterButtonText: map.get('newsletter_button_text') || DEFAULT_CONFIG.newsletterButtonText,
-    newsletterBackgroundImageUrl: map.get('newsletter_background_image_url') || DEFAULT_CONFIG.newsletterBackgroundImageUrl,
-    currencyCode: map.get('currency_code') || DEFAULT_CONFIG.currencyCode,
-    currencyLocale: map.get('currency_locale') || DEFAULT_CONFIG.currencyLocale,
-    baseCurrencyCode: map.get('base_currency_code') || DEFAULT_CONFIG.baseCurrencyCode,
-    exchangeRateUsd: parsePositiveNumber(map.get('exchange_rate_usd'), DEFAULT_CONFIG.exchangeRateUsd),
-    exchangeRateInr: parsePositiveNumber(map.get('exchange_rate_inr'), DEFAULT_CONFIG.exchangeRateInr),
-    allowGuestCheckout: parseBoolean(map.get('allow_guest_checkout'), DEFAULT_CONFIG.allowGuestCheckout),
-    taxEnabled: false,
-    defaultTaxRate: 0,
-    defaultShippingFee: parseNonNegativeNumber(map.get('default_shipping_fee'), DEFAULT_CONFIG.defaultShippingFee),
-    invoicePrefix: map.get('invoice_prefix') || DEFAULT_CONFIG.invoicePrefix,
-    companyAboutTitle: map.get('company_about_title') || DEFAULT_CONFIG.companyAboutTitle,
-    companyAboutContent: map.get('company_about_content') || DEFAULT_CONFIG.companyAboutContent,
-    companyContactTitle: map.get('company_contact_title') || DEFAULT_CONFIG.companyContactTitle,
-    companyContactContent: map.get('company_contact_content') || DEFAULT_CONFIG.companyContactContent,
-    companySupportTitle: map.get('company_support_title') || DEFAULT_CONFIG.companySupportTitle,
-    companySupportContent: map.get('company_support_content') || DEFAULT_CONFIG.companySupportContent,
-    companyShippingPolicyTitle: map.get('company_shipping_policy_title') || DEFAULT_CONFIG.companyShippingPolicyTitle,
-    companyShippingPolicyContent: map.get('company_shipping_policy_content') || DEFAULT_CONFIG.companyShippingPolicyContent,
-    companyReturnPolicyTitle: map.get('company_return_policy_title') || DEFAULT_CONFIG.companyReturnPolicyTitle,
-    companyReturnPolicyContent: map.get('company_return_policy_content') || DEFAULT_CONFIG.companyReturnPolicyContent,
-    legalPrivacyPolicyTitle: map.get('legal_privacy_policy_title') || DEFAULT_CONFIG.legalPrivacyPolicyTitle,
-    legalPrivacyPolicyContent: map.get('legal_privacy_policy_content') || DEFAULT_CONFIG.legalPrivacyPolicyContent,
-    legalTermsOfServiceTitle: map.get('legal_terms_of_service_title') || DEFAULT_CONFIG.legalTermsOfServiceTitle,
-    legalTermsOfServiceContent: map.get('legal_terms_of_service_content') || DEFAULT_CONFIG.legalTermsOfServiceContent,
-    legalPaymentPolicyTitle: map.get('legal_payment_policy_title') || DEFAULT_CONFIG.legalPaymentPolicyTitle,
-    legalPaymentPolicyContent: map.get('legal_payment_policy_content') || DEFAULT_CONFIG.legalPaymentPolicyContent,
-    legalRefundPolicyTitle: map.get('legal_refund_policy_title') || DEFAULT_CONFIG.legalRefundPolicyTitle,
-    legalRefundPolicyContent: map.get('legal_refund_policy_content') || DEFAULT_CONFIG.legalRefundPolicyContent,
-    primaryColor: map.get('primary_color') || DEFAULT_CONFIG.primaryColor,
-    primaryHoverColor: map.get('primary_hover_color') || DEFAULT_CONFIG.primaryHoverColor,
-    accentColor: map.get('accent_color') || DEFAULT_CONFIG.accentColor,
-    successColor: map.get('success_color') || DEFAULT_CONFIG.successColor,
-    warningColor: map.get('warning_color') || DEFAULT_CONFIG.warningColor,
-    dangerColor: map.get('danger_color') || DEFAULT_CONFIG.dangerColor,
-    backgroundColorLight: map.get('background_color_light') || DEFAULT_CONFIG.backgroundColorLight,
-    backgroundColorDark: map.get('background_color_dark') || DEFAULT_CONFIG.backgroundColorDark,
-    surfaceColorLight: map.get('surface_color_light') || DEFAULT_CONFIG.surfaceColorLight,
-    surfaceColorDark: map.get('surface_color_dark') || DEFAULT_CONFIG.surfaceColorDark,
-    textColorLight: map.get('text_color_light') || DEFAULT_CONFIG.textColorLight,
-    textColorDark: map.get('text_color_dark') || DEFAULT_CONFIG.textColorDark,
-    mutedTextColorLight: map.get('muted_text_color_light') || DEFAULT_CONFIG.mutedTextColorLight,
-    mutedTextColorDark: map.get('muted_text_color_dark') || DEFAULT_CONFIG.mutedTextColorDark,
-    borderColorLight: map.get('border_color_light') || DEFAULT_CONFIG.borderColorLight,
-    borderColorDark: map.get('border_color_dark') || DEFAULT_CONFIG.borderColorDark,
-    borderRadiusPx: parseNonNegativeNumber(map.get('border_radius_px'), DEFAULT_CONFIG.borderRadiusPx),
-    managedPages: [],
-    shopLinks: []
-  };
-
-  const fallbackManagedPages = createLegacyManagedPages(baseConfig);
-  baseConfig.managedPages = sanitizeManagedPages(map.get('managed_pages'), fallbackManagedPages);
-  baseConfig.shopLinks = sanitizeShopLinks(map.get('footer_shop_links'), DEFAULT_CONFIG.shopLinks);
-  cachedConfig = baseConfig;
-  cacheUpdatedAt = Date.now();
-  persistConfigToStorage(cachedConfig);
-
-  return cachedConfig;
 };
 
 export const subscribeToPublicSiteConfigSignals = (callback: () => void) => {
@@ -630,6 +674,7 @@ export const subscribeToPublicSiteConfigSignals = (callback: () => void) => {
 export const clearPublicSiteConfigCache = (options?: { broadcast?: boolean }) => {
   cachedConfig = null;
   cacheUpdatedAt = 0;
+  inflightConfigPromise = null;
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.removeItem(SITE_CONFIG_CACHE_KEY);

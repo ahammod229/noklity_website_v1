@@ -22,7 +22,7 @@ const ProductReviews: React.FC = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('product_reviews')
-      .select('*, product:products(title), user:profiles(full_name,email)')
+      .select('*, product:products(title), user:users(display_name,email)')
       .order('created_at', { ascending: false });
 
     if (error) {

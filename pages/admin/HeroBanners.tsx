@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ImagePlus, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { Edit2, Trash2, Plus, X, Image as ImageIcon, Check, GripVertical, Upload, Loader2, Pencil } from 'lucide-react';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
@@ -36,6 +36,7 @@ interface HeroForm {
   highlight_text: string;
   description: string;
   image_url: string;
+  mobile_image_url: string;
   primary_button_text: string;
   secondary_button_text: string;
   target_type: TargetType;
@@ -53,6 +54,7 @@ const EMPTY_FORM: HeroForm = {
   highlight_text: '',
   description: '',
   image_url: '',
+  mobile_image_url: '',
   primary_button_text: 'Shop Now',
   secondary_button_text: 'View Catalog',
   target_type: 'none',
@@ -85,15 +87,10 @@ const parseBannerTargetUrls = (value?: string | null): { primary: string; second
   return { primary: raw, secondary: '' };
 };
 
-const toFriendlyError = (value?: string) => {
-  const message = value || 'Unexpected error';
-  if (message.includes("Could not find the table 'public.hero_banners'")) {
-    return 'Hero banners table is missing. Run the latest supabase/schema.sql in Supabase SQL editor.';
-  }
-  if (message.includes('permission denied') || message.includes('new row violates row-level security')) {
-    return 'Admin permission is required to manage hero banners.';
-  }
-  return message;
+const toFriendlyError = (message?: string) => {
+  const normalized = String(message || '').trim();
+  if (!normalized) return 'An unexpected error occurred.';
+  return `RAW ERROR: ${normalized}`;
 };
 
 const HeroBanners: React.FC = () => {
@@ -173,11 +170,35 @@ const HeroBanners: React.FC = () => {
         fit: 'cover'
       });
       const path = `hero-banners/${optimized.file.name}`;
-      const { error } = await supabase.storage.from('assets').upload(path, optimized.file, { upsert: false });
-      if (error) throw error;
-      const { data } = supabase.storage.from('assets').getPublicUrl(path);
-      setForm((prev) => ({ ...prev, image_url: data.publicUrl }));
+      const { publicUrl } = await uploadFile('assets', path, optimized.file, { upsert: false });
+      setForm((prev) => ({ ...prev, image_url: publicUrl }));
       setMessage({ type: 'success', text: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: toFriendlyError(err.message) });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleUploadMobileImage = async (file?: File | null) => {
+    if (!file) return;
+    setMessage(null);
+    setUploadingImage(true);
+    try {
+      const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.heroBanner);
+      if (validation.shouldBlock) {
+        setMessage({ type: 'error', text: validation.message });
+        return;
+      }
+      const optimized = await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.heroBanner, {
+        fileNamePrefix: 'hero-banner-mobile',
+        fit: 'cover'
+      });
+      const path = `hero-banners-mobile/${optimized.file.name}`;
+      const { publicUrl } = await uploadFile('assets', path, optimized.file, { upsert: false });
+      setForm((prev) => ({ ...prev, mobile_image_url: publicUrl }));
+      setMessage({ type: 'success', text: `${validation.message} Optimized mobile image ${optimized.reducedPercent}% smaller.` });
+
     } catch (error: any) {
       setMessage({ type: 'error', text: toFriendlyError(error?.message || 'Hero image upload failed') });
     } finally {
@@ -191,6 +212,7 @@ const HeroBanners: React.FC = () => {
     highlight_text: form.highlight_text.trim() || null,
     description: form.description.trim() || null,
     image_url: form.image_url.trim(),
+    mobile_image_url: form.mobile_image_url.trim() || null,
     primary_button_text: form.primary_button_text.trim() || 'Shop Now',
     secondary_button_text: form.secondary_button_text.trim() || 'View Catalog',
     target_type: form.target_type,
@@ -261,6 +283,7 @@ const HeroBanners: React.FC = () => {
       highlight_text: banner.highlight_text || '',
       description: banner.description || '',
       image_url: banner.image_url,
+      mobile_image_url: banner.mobile_image_url || '',
       primary_button_text: banner.primary_button_text || 'Shop Now',
       secondary_button_text: banner.secondary_button_text || 'View Catalog',
       target_type: banner.target_type,
@@ -346,16 +369,29 @@ const HeroBanners: React.FC = () => {
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold" placeholder="Title" value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} />
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold" placeholder="Highlight text" value={form.highlight_text} onChange={(e) => setForm((prev) => ({ ...prev, highlight_text: e.target.value }))} />
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold" placeholder="Image URL" value={form.image_url} onChange={(e) => setForm((prev) => ({ ...prev, image_url: e.target.value }))} />
+          <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold" placeholder="Mobile Image URL (Optional)" value={form.mobile_image_url} onChange={(e) => setForm((prev) => ({ ...prev, mobile_image_url: e.target.value }))} />
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold" placeholder="Primary button text" value={form.primary_button_text} onChange={(e) => setForm((prev) => ({ ...prev, primary_button_text: e.target.value }))} />
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold" placeholder="Secondary button text" value={form.secondary_button_text} onChange={(e) => setForm((prev) => ({ ...prev, secondary_button_text: e.target.value }))} />
         </div>
 
-        <label className={`inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 w-fit ${uploadingImage ? 'opacity-70 pointer-events-none' : ''}`}>
-          <Upload className="w-4 h-4" />
-          {uploadingImage ? 'Uploading...' : 'Upload Hero Image'}
-          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleUploadImage(e.target.files?.[0])} />
-        </label>
-        <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.heroBanner)}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className={`inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 w-fit ${uploadingImage ? 'opacity-70 pointer-events-none' : ''}`}>
+              <Upload className="w-4 h-4" />
+              {uploadingImage ? 'Uploading...' : 'Upload Desktop Image'}
+              <input type="file" className="hidden" accept="image/*" onChange={(e) => handleUploadImage(e.target.files?.[0])} />
+            </label>
+            <p className="text-xs text-gray-500 mt-1">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.heroBanner)}</p>
+          </div>
+          <div>
+            <label className={`inline-flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 w-fit ${uploadingImage ? 'opacity-70 pointer-events-none' : ''}`}>
+              <Upload className="w-4 h-4" />
+              {uploadingImage ? 'Uploading...' : 'Upload Mobile Image (Optional)'}
+              <input type="file" className="hidden" accept="image/*" onChange={(e) => handleUploadMobileImage(e.target.files?.[0])} />
+            </label>
+            <p className="text-xs text-gray-500 mt-1">Recommended: 800x1200 or 1:1.5 ratio</p>
+          </div>
+        </div>
 
         <textarea
           rows={3}

@@ -87,7 +87,7 @@ const Notifications: React.FC<NotificationsProps> = ({
         cartItemCount={cartItemCount} 
         title="Notification Preferences"
       >
-        <div className="bg-white p-20 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center">
+        <div className="bg-white p-6 sm:p-20 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
           <p className="text-gray-500 font-bold">Loading your preferences...</p>
         </div>

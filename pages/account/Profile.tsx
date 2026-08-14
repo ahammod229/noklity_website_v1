@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import AccountLayout from '../../components/account/AccountLayout';
 import { User, Mail, Phone, Calendar, Shield, Edit2, Check, X, Loader2, Camera } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { getProfile, updateProfile, updateEmail, uploadProfileAvatar, UserProfile } from '../../services/profileService';
 
 interface ProfileProps {
@@ -12,6 +13,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartClick, onNavigate }) => {
+  const { profile: authProfile, refreshProfile, isLoading: isAuthLoading } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -20,24 +22,57 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
   const [formData, setFormData] = useState({ fullName: '', phone: '', email: '' });
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const syncProfileState = (nextProfile: UserProfile | null) => {
+    setProfile(nextProfile);
+    setFormData({
+      fullName: nextProfile?.fullName || '',
+      phone: nextProfile?.phone || '',
+      email: nextProfile?.email || ''
+    });
+  };
 
-  const fetchProfile = async () => {
+  const mapAuthProfileToPageProfile = (): UserProfile | null => {
+    if (!authProfile) return null;
+
+    const createdAtLabel = authProfile.created_at
+      ? new Date(authProfile.created_at).toLocaleDateString()
+      : 'N/A';
+
+    return {
+      id: authProfile.id,
+      fullName: authProfile.full_name || '',
+      email: authProfile.email || '',
+      phone: authProfile.phone || '',
+      avatarUrl: authProfile.avatar_url || '',
+      lastLogin: 'Just now',
+      memberSince: createdAtLabel
+    };
+  };
+
+  const fetchProfileFallback = async () => {
     try {
       setLoading(true);
       const data = await getProfile();
-      if (data) {
-        setProfile(data);
-        setFormData({ fullName: data.fullName || '', phone: data.phone || '', email: data.email || '' });
-      }
+      syncProfileState(data);
     } catch (error) {
       console.error("Failed to fetch profile", error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const mappedProfile = mapAuthProfileToPageProfile();
+    if (mappedProfile) {
+      syncProfileState(mappedProfile);
+      setLoading(false);
+      return;
+    }
+
+    if (!isAuthLoading) {
+      void fetchProfileFallback();
+    }
+  }, [authProfile, isAuthLoading]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +115,7 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
         setMessage({ type: 'success', text: 'Profile updated successfully.' });
       }
 
-      await fetchProfile();
+      await refreshProfile();
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to update profile", error);
@@ -122,6 +157,7 @@ const Profile: React.FC<ProfileProps> = ({ onLoginClick, cartItemCount, onCartCl
 
     setProfile((prev) => (prev ? { ...prev, avatarUrl: uploadResult.url } : prev));
     setMessage({ type: 'success', text: 'Profile photo updated successfully.' });
+    await refreshProfile();
   };
 
   if (loading) {

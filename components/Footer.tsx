@@ -119,7 +119,7 @@ const Footer: React.FC = () => {
       <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
           <div>
-            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] sm:tracking-[0.28em] font-black text-primary">{siteName} Performance Hub</p>
+            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] sm:tracking-[0.28em] font-black text-red-300">{siteName} Performance Hub</p>
             <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight">Built For Drivers Who Demand More</h3>
           </div>
           <a
@@ -137,7 +137,7 @@ const Footer: React.FC = () => {
           <div className="sm:col-span-2 lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-3xl p-6 md:p-8">
             <div className="flex items-center gap-3 mb-5">
               {footerLogo ? (
-                <img src={footerLogo} alt={`${siteName} footer logo`} className="h-11 w-auto object-contain" />
+                <img src={footerLogo} alt={`${siteName} footer logo`} width={244} height={70} className="h-11 w-auto object-contain" />
               ) : (
                 <>
                   <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
@@ -152,7 +152,7 @@ const Footer: React.FC = () => {
               href={siteUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center mt-3 text-xs font-bold text-primary hover:text-red-300 transition-colors"
+              className="inline-flex items-center mt-3 text-xs font-bold text-red-300 hover:text-red-200 transition-colors"
             >
               {siteUrlName}
               <ArrowUpRight className="w-3 h-3 ml-1" />
@@ -160,15 +160,15 @@ const Footer: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
               <a href={`mailto:${supportEmail}`} className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 hover:border-slate-700 transition-colors">
-                <Mail className="w-4 h-4 mt-0.5 text-primary" />
+                <Mail className="w-4 h-4 mt-0.5 text-red-300" />
                 <span className="text-xs font-bold text-slate-200 break-all">{supportEmail}</span>
               </a>
               <a href={`tel:${supportPhone}`} className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 hover:border-slate-700 transition-colors">
-                <Phone className="w-4 h-4 mt-0.5 text-primary" />
+                <Phone className="w-4 h-4 mt-0.5 text-red-300" />
                 <span className="text-xs font-bold text-slate-200">{supportPhone}</span>
               </a>
               <div className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-                <MapPin className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                <MapPin className="w-4 h-4 mt-0.5 text-red-300 flex-shrink-0" />
                 <span className="text-xs font-bold text-slate-200">{supportAddress}</span>
               </div>
             </div>
@@ -190,7 +190,7 @@ const Footer: React.FC = () => {
                 ) : (
                   <span
                     key={social.label}
-                    aria-label={`${social.label} not configured`}
+                    title={`${social.label} not configured`}
                     className="w-10 h-10 rounded-full bg-slate-900 text-slate-600 border border-slate-800 flex items-center justify-center cursor-not-allowed"
                   >
                     <Icon className="w-4 h-4" />
@@ -205,7 +205,7 @@ const Footer: React.FC = () => {
             <ul className="space-y-3">
               {footerShopLinks.length === 0 ? (
                 <li>
-                  <span className="text-sm font-semibold text-slate-500">No shop links configured</span>
+                  <span className="text-sm font-semibold text-slate-400">No shop links configured</span>
                 </li>
               ) : (
                 footerShopLinks.map((item) => (
@@ -252,8 +252,8 @@ const Footer: React.FC = () => {
         </div>
 
         <div className="mt-10 pt-6 border-t border-slate-800 flex flex-col md:flex-row gap-3 md:items-center md:justify-between text-center md:text-left">
-          <p className="text-xs font-semibold text-slate-500">{footerText}</p>
-          <p className="text-xs font-semibold text-slate-500">Secured checkout • Verified payments • Fast delivery</p>
+          <p className="text-xs font-semibold text-slate-400">{footerText}</p>
+          <p className="text-xs font-semibold text-slate-400">Secured checkout • Verified payments • Fast delivery</p>
         </div>
       </div>
     </footer>

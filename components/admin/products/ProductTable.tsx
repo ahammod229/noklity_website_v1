@@ -58,7 +58,14 @@ export const ProductTable: React.FC<ProductTableProps> = ({
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
-                    <img src={product.image} alt="" className="w-full h-full object-cover mix-blend-multiply" />
+                    <img
+                      src={product.image || 'https://via.placeholder.com/120x120?text=No+Image'}
+                      alt={product.name}
+                      className="w-full h-full object-cover mix-blend-multiply"
+                      onError={(event) => {
+                        event.currentTarget.src = 'https://via.placeholder.com/120x120?text=No+Image';
+                      }}
+                    />
                   </div>
                   <span className="font-medium text-gray-900 max-w-[200px] truncate block" title={product.name}>
                     {product.name}

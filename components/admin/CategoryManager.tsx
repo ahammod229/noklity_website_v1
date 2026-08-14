@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Edit2, Trash2, Save, X, Loader2, Upload } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
@@ -121,10 +121,8 @@ const CategoryManager: React.FC = () => {
         fileNamePrefix: 'category-logo'
       });
       const filePath = `categories/${optimized.file.name}`;
-      const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-      setForm((prev) => ({ ...prev, logo_url: data.publicUrl }));
+      const { publicUrl } = await uploadFile('assets', filePath, optimized.file, { upsert: false });
+      setForm((prev) => ({ ...prev, logo_url: publicUrl }));
       setMessage({ type: 'success', text: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` });
     } catch (error: any) {
       setMessage({ type: 'error', text: toFriendlyError(error?.message || 'Logo upload failed') });

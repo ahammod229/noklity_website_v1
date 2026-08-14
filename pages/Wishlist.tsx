@@ -77,7 +77,7 @@ const Wishlist: React.FC<WishlistProps> = ({
               <WishlistCard
                 key={product.id}
                 image={product.image || ''}
-                title={product.name || 'Unknown Product'}
+                title={product.name || (product as any).title || 'Unknown Product'}
                 category={product.category || 'Uncategorized'}
                 price={product.price || 0}
                 isNew={product.isNew}

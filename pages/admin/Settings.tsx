@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, RefreshCw, Sparkles, Upload, Wand2 } from 'lucide-react';
+import { Loader2, RefreshCw, Sparkles, Upload, Wand2, Image as ImageIcon, Save, HelpCircle } from 'lucide-react';
 import tenantFileConfig from '../../config/tenant.json';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { clearPublicSiteConfigCache } from '../../services/siteConfigService';
 import { clearTenantConfigCache } from '../../services/tenantConfigService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1271,14 +1271,12 @@ const AdminSettings: React.FC = () => {
         ? await optimizeImageByGuide(file, guide, { fileNamePrefix: settingKey })
         : await optimizeImageByGuide(file, ADMIN_IMAGE_GUIDES.linkBar, { fileNamePrefix: settingKey });
       const filePath = `branding/${optimized.file.name}`;
-      const { error: uploadError } = await supabase.storage.from('assets').upload(filePath, optimized.file, {
+      const { publicUrl } = await uploadFile('assets', filePath, optimized.file, {
         upsert: false
       });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-      setFieldValue(settingKey, data.publicUrl);
+      setFieldValue(settingKey, publicUrl);
       if (settingKey === 'header_logo_light' && !values.header_logo_dark) {
-        setFieldValue('header_logo_dark', data.publicUrl);
+        setFieldValue('header_logo_dark', publicUrl);
       }
       setMessage({ type: 'success', text: `${uploadInfoText} Optimized ${optimized.reducedPercent}% smaller.` });
     } catch (error: any) {
@@ -2095,8 +2093,24 @@ const AdminSettings: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
         <aside className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-          <h3 className="text-lg font-black text-gray-900 mb-3">Settings</h3>
-          <div className="space-y-1">
+          <h3 className="text-lg font-black text-gray-900 mb-3 lg:block hidden">Settings</h3>
+          {/* Mobile: horizontal scrollable tabs */}
+          <div className="flex lg:hidden overflow-x-auto gap-2 pb-1 -mx-1 px-1 scrollbar-hide">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap ${
+                  activeTab === tab.id ? 'bg-gray-900 text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* Desktop: vertical list */}
+          <div className="hidden lg:flex lg:flex-col space-y-1">
             {TABS.map((tab) => (
               <button
                 key={tab.id}

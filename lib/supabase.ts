@@ -1,6 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types';
+import { auth } from '../services/firebaseClient';
 
 const getEnvVar = (key: string) => {
   // Check import.meta.env (Vite standard)
@@ -52,22 +53,81 @@ const noOpAuthLock = async <T,>(
   fn: () => Promise<T>
 ): Promise<T> => fn();
 
+let currentFirebaseUid: string | null = null;
+export const setSupabaseFirebaseUid = (uid: string | null) => {
+  currentFirebaseUid = uid;
+};
+
 export const supabase = createClient<Database>(validUrl, validKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    // Avoid Navigator Lock API edge-cases in some browsers (for example Brave)
-    // that can leave auth initialization pending indefinitely.
+    // Firebase handles ALL authentication.
+    // Supabase is used as a pure database client only.
+    persistSession:    false,
+    autoRefreshToken:  false,
+    detectSessionInUrl: false,
     lock: noOpAuthLock
   },
-  fetch: async (input, init) => {
-    if (SUPABASE_CONFIG_ERROR) {
-      throw new Error(SUPABASE_CONFIG_ERROR);
-    }
-    return globalThis.fetch(input, init);
-  },
   global: {
-    headers: { 'x-application-name': 'noklity-ecommerce' }
+    headers: { 'x-application-name': 'noklity-ecommerce' },
+    fetch: async (input, init) => {
+      if (SUPABASE_CONFIG_ERROR) {
+        throw new Error(SUPABASE_CONFIG_ERROR);
+      }
+      
+      // Inject Firebase UID into headers for pseudo-RLS evaluation
+      const activeUid = currentFirebaseUid || auth.currentUser?.uid || null;
+      if (activeUid) {
+        init = init || {};
+        if (init.headers instanceof Headers) {
+          init.headers.set('x-firebase-uid', activeUid);
+        } else if (Array.isArray(init.headers)) {
+          init.headers.push(['x-firebase-uid', activeUid]);
+        } else {
+          init.headers = {
+            ...init.headers,
+            'x-firebase-uid': activeUid
+          };
+        }
+      }
+      
+      return globalThis.fetch(input, init);
+    }
   }
 });
+
+/**
+ * Custom upload wrapper that acquires an upload token to bypass Storage RLS limitations.
+ * Supabase Storage does not have access to custom headers (like x-firebase-uid),
+ * so we use an RPC to generate a token, and prepend it to the file path.
+ */
+export const uploadFile = async (
+  bucket: string,
+  path: string,
+  file: File | Blob,
+  options?: any
+) => {
+  // 1. Acquire upload token
+  const { data: token, error: tokenError } = await supabase.rpc('request_upload_token');
+  if (tokenError || !token) {
+    throw new Error('Unauthorized to upload: ' + (tokenError?.message || 'No token generated'));
+  }
+
+  // 2. Format the path
+  let tokenizedPath = `${token}/${path}`;
+  if (bucket === 'avatars') {
+    // avatars bucket requires the UID as the second folder: token/uid/filename.png
+    const uid = currentFirebaseUid || auth.currentUser?.uid;
+    if (!uid) throw new Error('Not authenticated');
+    // Ensure path doesn't already have uid at the beginning if we're adding it
+    const cleanPath = path.startsWith(`${uid}/`) ? path.slice(uid.length + 1) : path;
+    tokenizedPath = `${token}/${uid}/${cleanPath}`;
+  }
+
+  // 3. Upload file
+  const { data, error } = await supabase.storage.from(bucket).upload(tokenizedPath, file, options);
+  if (error) throw error;
+
+  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+
+  return { path: data.path, publicUrl: urlData.publicUrl };
+};

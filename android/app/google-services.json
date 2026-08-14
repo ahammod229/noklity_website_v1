@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "913803079415",
+    "project_id": "noklity-fd082",
+    "storage_bucket": "noklity-fd082.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:913803079415:android:3181bd55b3b07a12ce2df2",
+        "android_client_info": {
+          "package_name": "com.noklity"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "913803079415-2sagjr0b4iqn4g0g649r45kv8c56q13b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.noklity",
+            "certificate_hash": "3e765f0a846209f98491aec61f7a46ab720adf9d"
+          }
+        },
+        {
+          "client_id": "913803079415-9gcvcvfmskhai1t5u2u7c0ats3eu4ihs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.noklity",
+            "certificate_hash": "8f8f47afabfac85f081d71457d0dedb0c8caa84c"
+          }
+        },
+        {
+          "client_id": "913803079415-h7s0o5j972uvc70l6te0bhe1ndnjsma0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvy9AQmTLv1wUyTzKsTzJNtNvM1UuKKzI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "913803079415-h7s0o5j972uvc70l6te0bhe1ndnjsma0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

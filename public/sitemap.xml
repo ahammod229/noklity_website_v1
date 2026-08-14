@@ -66,4 +66,16 @@
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
+  <url>
+    <loc>https://noklity.com/product/Water%20Oil%20Fuel%20Transfer%20Pump</loc>
+    <lastmod>2026-08-02T21:48:06.82814+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://noklity.com/product/mini-ups-for-wifi-router-4-5-hours-backup</loc>
+    <lastmod>2026-07-29T18:13:00.132318+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>

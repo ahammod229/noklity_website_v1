@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2, Upload, Pencil, Save, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { Plus, Trash2, Loader2, Upload, Pencil, Save, X, Edit2, Check, CreditCard, Image as ImageIcon } from 'lucide-react';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 import { optimizeImageByGuide } from '../../utils/imageOptimization';
 
@@ -111,10 +111,8 @@ const PaymentMethods: React.FC = () => {
       fileNamePrefix: 'payment-logo'
     });
     const filePath = `payments/${optimized.file.name}`;
-    const { error } = await supabase.storage.from('assets').upload(filePath, optimized.file, { upsert: false });
-    if (error) throw error;
-    const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-    return { url: data.publicUrl, infoMessage: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` };
+    const { publicUrl } = await uploadFile('assets', filePath, optimized.file, { upsert: false });
+    return { url: publicUrl, infoMessage: `${validation.message} Optimized ${optimized.reducedPercent}% smaller.` };
   };
 
   const addMethod = async () => {

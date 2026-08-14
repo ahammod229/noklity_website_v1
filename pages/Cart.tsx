@@ -104,7 +104,7 @@ const CartPage: React.FC<CartPageProps> = ({ items, onUpdateQuantity, onRemoveIt
                         type="button"
                         onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
                         disabled={item.quantity <= 1}
-                        className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={`Decrease quantity for ${item.name}`}
                       >
                         <Minus className="h-3.5 w-3.5" />
@@ -114,7 +114,7 @@ const CartPage: React.FC<CartPageProps> = ({ items, onUpdateQuantity, onRemoveIt
                         type="button"
                         onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
                         disabled={typeof item.stock === 'number' ? item.quantity >= item.stock : false}
-                        className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label={`Increase quantity for ${item.name}`}
                       >
                         <Plus className="h-3.5 w-3.5" />

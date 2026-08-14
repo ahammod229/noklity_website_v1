@@ -206,17 +206,17 @@ const ensureAdmin = async (
     throw new HttpError('Admin authorization required. Please login as admin and try again.', 403);
   }
 
-  const { data: profile, error } = await adminClient
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
+  const { data: user, error } = await adminClient
+    .from('users')
+    .select('role, status')
+    .eq('uid', userId)
     .maybeSingle();
 
   if (error) {
     throw new Error(error.message || 'Unable to verify admin role.');
   }
 
-  if (profile?.role !== 'admin') {
+  if (user?.role !== 'admin' || user?.status !== 'active') {
     throw new HttpError('Admin authorization required. Your account is not marked as admin.', 403);
   }
 };
@@ -234,36 +234,9 @@ const resolveRequester = async (req: Request) => {
   const hasUserAuth = Boolean(bearerToken) && !isAnonAuthorization;
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: hasUserAuth
-      ? {
-          headers: {
-            Authorization: `Bearer ${bearerToken}`
-          }
-        }
-      : undefined
-  });
 
-  let userId: string | null = null;
-  if (hasUserAuth) {
-    const {
-      data: { user },
-      error: userError
-    } = await userClient.auth.getUser();
-
-    if (userError || !user?.id) {
-      const message = userError?.message || '';
-      // Some anon JWTs can be passed as bearer token and throw missing `sub`.
-      // Treat those as unauthenticated user requests instead of hard-failing the function.
-      if (message.toLowerCase().includes('missing sub claim')) {
-        userId = null;
-      } else {
-        throw new HttpError(userError?.message || 'Unauthorized request.', 401);
-      }
-    } else {
-      userId = user.id;
-    }
-  }
+  const firebaseUid = (req.headers.get('x-firebase-uid') || '').trim();
+  let userId: string | null = firebaseUid || null;
 
   return { adminClient, userId };
 };
@@ -330,13 +303,13 @@ const canTrackOrder = async (
   guestEmail: string | undefined
 ) => {
   if (requesterUserId) {
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('role')
-      .eq('id', requesterUserId)
+    const { data: user } = await adminClient
+      .from('users')
+      .select('role, status')
+      .eq('uid', requesterUserId)
       .maybeSingle();
 
-    if (profile?.role === 'admin') return true;
+    if (user?.role === 'admin' && user?.status === 'active') return true;
     return order.user_id === requesterUserId;
   }
 

@@ -1,8 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { auth } from '../services/firebaseClient';
+import { logoutUser } from '../services/authService';
+import { Loader2, ShieldOff } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,69 +12,160 @@ interface ProtectedRouteProps {
   adminOnly?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  onNavigate, 
-  adminOnly = false 
+// ─── Admin Access Denied Screen ───────────────────────────────────────────────
+
+const AccessDenied: React.FC<{ onNavigate: (view: any) => void }> = ({ onNavigate }) => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
+    <div className="bg-white rounded-3xl shadow-lg border border-red-100 p-10 max-w-md w-full text-center">
+      <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-5">
+        <ShieldOff className="w-8 h-8 text-red-500" />
+      </div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+      <p className="text-gray-500 text-sm mb-6">
+        You don't have permission to access this page.<br />
+        This area is restricted to administrators only.
+      </p>
+      <button
+        onClick={() => onNavigate('home')}
+        className="w-full bg-primary text-white py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity"
+      >
+        Go to Homepage
+      </button>
+    </div>
+  </div>
+);
+
+// ─── Protected Route ──────────────────────────────────────────────────────────
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  onNavigate,
+  adminOnly = false,
 }) => {
-  const { user, session, isLoading, isAdmin } = useAuth();
-  const hasSessionToken = Boolean(session?.access_token);
-  const [recoveringAdminSession, setRecoveringAdminSession] = useState(false);
+  const { user, isLoading } = useAuth();
+
+  // Double-check admin status directly from Supabase DB (server source of truth)
+  // Never trust client-side isAdmin alone for admin-only routes
+  const [dbAdminVerified, setDbAdminVerified]   = useState(false);
+  const [adminCheckDone, setAdminCheckDone]      = useState(false);
+  const [adminCheckFailed, setAdminCheckFailed]  = useState(false);
+  const abortRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    abortRef.current = false;
 
-    const validateRoute = async () => {
+    const verifyAccess = async () => {
+      // Not an admin-only route — nothing to verify
+      if (!adminOnly) return;
+
+      // Still loading auth — wait
       if (isLoading) return;
 
+      // Not logged in at all
       if (!user) {
         onNavigate('login');
         return;
       }
 
-      if (adminOnly && !isAdmin) {
-        onNavigate('home');
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        onNavigate('login');
         return;
       }
 
-      if (adminOnly && !hasSessionToken) {
-        // Recover session in background without forcing logout loops.
-        setRecoveringAdminSession(true);
-        try {
-          await supabase.auth.refreshSession();
-        } catch {
-          // keep route accessible if user/admin is valid from auth context
-        } finally {
-          if (!cancelled) {
-            setRecoveringAdminSession(false);
-          }
+      try {
+        // ── Server-side admin check ──────────────────────────────────────────
+        // Fetches directly from Supabase users table.
+        // Even if someone manipulates the client-side isAdmin flag,
+        // this re-verifies from the database on every admin page load.
+        const { data, error } = await supabase
+          .from('users')
+          .select('role, status')
+          .eq('uid', uid)
+          .single();
+
+        if (abortRef.current) return;
+
+        if (error || !data) {
+          // DB unreachable — deny access for safety
+          setAdminCheckFailed(true);
+          setAdminCheckDone(true);
+          return;
+        }
+
+        const isAdminInDb = data.role === 'admin' && data.status === 'active';
+
+        if (!isAdminInDb) {
+          setAdminCheckFailed(true);
+          setAdminCheckDone(true);
+
+          // Log unauthorized admin access attempt
+          console.warn(
+            `[Security] Unauthorized admin access attempt by uid=${uid} role=${data.role}`
+          );
+          return;
+        }
+
+        setDbAdminVerified(true);
+        setAdminCheckDone(true);
+      } catch (err) {
+        if (!abortRef.current) {
+          setAdminCheckFailed(true);
+          setAdminCheckDone(true);
         }
       }
     };
 
-    void validateRoute();
+    void verifyAccess();
 
     return () => {
-      cancelled = true;
+      abortRef.current = true;
     };
-  }, [user, isLoading, isAdmin, hasSessionToken, onNavigate, adminOnly]);
+  }, [user, isLoading, adminOnly, onNavigate]);
 
-  if (isLoading || (adminOnly && recoveringAdminSession && !hasSessionToken)) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center p-8 bg-white rounded-3xl shadow-sm border border-gray-100">
-            <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-            <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">Verifying Access...</p>
-        </div>
-      </div>
-    );
+  // ── Non-admin routes: just check if logged in ──────────────────────────────
+
+  if (!adminOnly) {
+    if (isLoading) return <LoadingScreen />;
+    if (!user) {
+      onNavigate('login');
+      return null;
+    }
+    return <>{children}</>;
   }
 
-  if (!user || (adminOnly && !isAdmin)) {
+  // ── Admin-only route ───────────────────────────────────────────────────────
+
+  // Still loading auth or DB check in progress
+  if (isLoading || !adminCheckDone) {
+    return <LoadingScreen message="Verifying admin access..." />;
+  }
+
+  // Not logged in
+  if (!user) {
+    onNavigate('login');
     return null;
+  }
+
+  // DB says not admin
+  if (adminCheckFailed || !dbAdminVerified) {
+    return <AccessDenied onNavigate={onNavigate} />;
   }
 
   return <>{children}</>;
 };
+
+// ─── Loading Screen ───────────────────────────────────────────────────────────
+
+const LoadingScreen: React.FC<{ message?: string }> = ({
+  message = 'Verifying access...',
+}) => (
+  <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50">
+    <div className="flex flex-col items-center p-8 bg-white rounded-3xl shadow-sm border border-gray-100">
+      <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+      <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{message}</p>
+    </div>
+  </div>
+);
 
 export default ProtectedRoute;

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { auth } from './firebaseClient';
 import { canUseFeature } from './tenantConfigService';
 import { getTenantConfigSnapshot } from './tenantConfigService';
 
@@ -62,13 +63,10 @@ export const sendSupportTicket = async (data: SupportTicketData): Promise<{ succ
       };
     }
 
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      console.warn('Support ticket auth check warning:', authError.message);
-    }
+    const currentUser = auth.currentUser;
 
     const payload = {
-      user_id: authData.user?.id || null,
+      user_id: currentUser?.uid || null,
       name,
       email,
       phone: phone || null,
@@ -80,8 +78,7 @@ export const sendSupportTicket = async (data: SupportTicketData): Promise<{ succ
     };
 
     let { error } = await supabase.from('support_tickets').insert(payload);
-    if (error && authData.user?.id && error.code === '23503') {
-      // If profile row is missing for this auth user, fall back to guest ticket so submission still works.
+    if (error && currentUser?.uid && error.code === '23503') {
       const fallback = await supabase.from('support_tickets').insert({ ...payload, user_id: null });
       error = fallback.error || null;
     }

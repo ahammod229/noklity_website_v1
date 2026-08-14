@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { X, MapPin, Phone, User, Globe, Building2, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ChevronLeft, ChevronRight, User, Check } from 'lucide-react';
 import { Address } from '../../services/addressService';
-import { COUNTRY_OPTIONS } from '../../constants/countries';
 
 interface AddressFormProps {
   initialData?: Address;
@@ -10,7 +9,62 @@ interface AddressFormProps {
   isSaving: boolean;
 }
 
+// Mock hierarchical data for Region -> District -> Area based on the screenshots
+const LOCATION_DATA: Record<string, Record<string, string[]>> = {
+  'Barishal': {
+    'Barguna': ['Barguna Sadar', 'Amtali', 'Betagi'],
+    'Barishal - Agailjhara': ['Agailjhara Sadar', 'Gaila', 'Rajihar'],
+    'Barishal - Babuganj': [
+      'Babuganj Sadar',
+      'Barishal Cadet College',
+      'Chandpasha',
+      'Dehergoti',
+      'Guthia',
+      'Madhabpasha',
+      'Nizamuddin College',
+      'Rahamatpur'
+    ],
+    'Barishal - Bakerganj': ['Bakerganj Sadar', 'Dudhal', 'Faridpur'],
+    'Barishal - Gouranadi': ['Gouranadi Sadar', 'Barthi', 'Chandshi'],
+    'Barishal - Hizla': ['Hizla Sadar', 'Dhulkhola', 'Guabaria'],
+    'Barishal - Mehendiganj': ['Mehendiganj Sadar', 'Alimabad', 'Bhasanchar']
+  },
+  'Chattogram': {
+    'Chattogram City': ['Agrabad', 'Halishahar', 'Pahartali'],
+    'Cox\'s Bazar': ['Cox\'s Bazar Sadar', 'Ramu', 'Teknaf']
+  },
+  'Dhaka': {
+    'Dhaka City': ['Gulshan', 'Banani', 'Dhanmondi', 'Mirpur', 'Uttara'],
+    'Gazipur': ['Tongi', 'Gazipur Sadar', 'Kaliakair'],
+    'Narayanganj': ['Narayanganj Sadar', 'Fatullah', 'Siddhirganj']
+  },
+  'Khulna': {
+    'Khulna City': ['Sonadanga', 'Khalishpur', 'Daulatpur'],
+    'Bagerhat': ['Bagerhat Sadar', 'Mongla', 'Fakirhat']
+  },
+  'Mymensingh': {
+    'Mymensingh Sadar': ['Mymensingh City', 'Muktagacha', 'Trishal'],
+    'Jamalpur': ['Jamalpur Sadar', 'Melandaha', 'Islampur']
+  },
+  'Rajshahi': {
+    'Rajshahi City': ['Boalia', 'Rajpara', 'Motihar'],
+    'Bogra': ['Bogra Sadar', 'Sherpur', 'Shibganj']
+  },
+  'Rangpur': {
+    'Rangpur City': ['Kotwali', 'Tajhat', 'Mahiganj'],
+    'Dinajpur': ['Dinajpur Sadar', 'Birganj', 'Kaharole']
+  },
+  'Sylhet': {
+    'Sylhet City': ['Bandar Bazar', 'Zindabazar', 'Ambarkhana'],
+    'Habiganj': ['Habiganj Sadar', 'Nabiganj', 'Chunarughat']
+  }
+};
+
+const REGIONS = Object.keys(LOCATION_DATA);
+
 const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCancel, isSaving }) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  
   const [formData, setFormData] = useState<Omit<Address, 'id'>>({
     label: initialData?.label || 'Home',
     fullName: initialData?.fullName || '',
@@ -18,206 +72,363 @@ const AddressForm: React.FC<AddressFormProps> = ({ initialData, onSubmit, onCanc
     street: initialData?.street || '',
     city: initialData?.city || '',
     state: initialData?.state || '',
-    zip: initialData?.zip || '',
+    zip: initialData?.zip || '0000',
     country: initialData?.country || 'Bangladesh',
     isDefault: initialData?.isDefault || false
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const [landmark, setLandmark] = useState('');
+  
+  // Location Picker State
+  const [isRegionPickerOpen, setIsRegionPickerOpen] = useState(false);
+  const [pickerStep, setPickerStep] = useState<0 | 1 | 2>(0);
+  const [tempRegion, setTempRegion] = useState('');
+  const [tempDistrict, setTempDistrict] = useState('');
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
+  }, []);
+
+  const handleClose = () => {
+    dialogRef.current?.close();
+    onCancel();
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
-    setFormData(prev => ({ ...prev, [name]: val }));
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.city) {
+      alert("Please select a Region/City/District");
+      return;
+    }
+    const finalStreet = landmark ? `${formData.street}, Landmark: ${landmark}` : formData.street;
+    onSubmit({
+      ...formData,
+      street: finalStreet
+    });
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
+    if (e.target === dialogRef.current) {
+      handleClose();
+    }
+  };
+
+  // Location Picker logic
+  const openLocationPicker = () => {
+    setIsRegionPickerOpen(true);
+    setPickerStep(0);
+    setTempRegion('');
+    setTempDistrict('');
+  };
+
+  const selectRegion = (region: string) => {
+    setTempRegion(region);
+    setPickerStep(1);
+    setTempDistrict('');
+  };
+
+  const selectDistrict = (district: string) => {
+    setTempDistrict(district);
+    setPickerStep(2);
+  };
+
+  const selectArea = (area: string) => {
+    const fullLocationString = `${tempRegion}, ${tempDistrict}, ${area}`;
+    setFormData(prev => ({ 
+      ...prev, 
+      city: fullLocationString, // Store full string in city/state
+      state: fullLocationString 
+    }));
+    setIsRegionPickerOpen(false);
+  };
+
+  const renderPickerTabs = () => {
+    return (
+      <div className="flex px-4 border-b border-gray-100 overflow-x-auto custom-scrollbar gap-6 items-center shrink-0">
+        {/* Step 0: Region */}
+        <button 
+          type="button"
+          onClick={() => setPickerStep(0)}
+          className={`py-3 text-[13px] whitespace-nowrap transition-colors ${pickerStep === 0 ? 'text-primary font-bold border-b-2 border-primary' : 'text-gray-600'}`}
+        >
+          {pickerStep > 0 ? tempRegion : 'Select Region'}
+        </button>
+        
+        {/* Step 1: District */}
+        {pickerStep >= 1 && (
+          <button 
+            type="button"
+            onClick={() => setPickerStep(1)}
+            className={`py-3 text-[13px] whitespace-nowrap transition-colors ${pickerStep === 1 ? 'text-primary font-bold border-b-2 border-primary' : 'text-gray-600'}`}
+          >
+            {pickerStep > 1 ? tempDistrict : 'Select district'}
+          </button>
+        )}
+
+        {/* Step 2: Area */}
+        {pickerStep >= 2 && (
+          <button 
+            type="button"
+            className="py-3 text-[13px] whitespace-nowrap transition-colors text-primary font-bold border-b-2 border-primary"
+          >
+            Select area
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderPickerList = () => {
+    let items: string[] = [];
+    let selectedItem = '';
+    
+    if (pickerStep === 0) {
+      items = REGIONS;
+      selectedItem = tempRegion;
+    } else if (pickerStep === 1) {
+      items = Object.keys(LOCATION_DATA[tempRegion] || {});
+      selectedItem = tempDistrict;
+    } else if (pickerStep === 2) {
+      items = LOCATION_DATA[tempRegion]?.[tempDistrict] || [];
+    }
+
+    return (
+      <div className="overflow-y-auto flex-1 custom-scrollbar pb-6 bg-white">
+        {items.map(item => {
+          const isSelected = item === selectedItem;
+          return (
+            <button
+              key={item}
+              type="button"
+              className="w-full text-left px-5 py-4 border-b border-gray-100 flex justify-between items-center hover:bg-gray-50 transition-colors group"
+              onClick={() => {
+                if (pickerStep === 0) selectRegion(item);
+                else if (pickerStep === 1) selectDistrict(item);
+                else selectArea(item);
+              }}
+            >
+              <span className={`text-[14px] ${isSelected ? 'text-primary font-bold' : 'text-gray-800 font-medium'}`}>
+                {item}
+              </span>
+              {isSelected && <Check className="w-5 h-5 text-primary" />}
+              {!isSelected && pickerStep < 2 && <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-400" />}
+            </button>
+          )
+        })}
+      </div>
+    );
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in" onClick={onCancel} />
-      <div className="relative bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+    <dialog
+      ref={dialogRef}
+      onCancel={handleClose}
+      onClick={handleBackdropClick}
+      className="bg-gray-50 md:bg-white w-full h-[100dvh] md:h-auto max-w-xl md:rounded-2xl shadow-2xl flex flex-col md:max-h-[90vh] p-0 m-0 md:m-auto backdrop:bg-gray-900/60 backdrop:backdrop-blur-sm open:animate-in open:slide-in-from-bottom md:open:zoom-in-95 open:duration-300"
+    >
+      <div className="flex flex-col h-full w-full max-h-[inherit] relative bg-white overflow-hidden">
         
-        <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 mb-1">
-              {initialData ? 'Edit Address' : 'Add New Address'}
-            </h2>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Provide your shipping details</p>
-          </div>
-          <button onClick={onCancel} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-white transition-all">
-            <X className="w-6 h-6" />
+        {/* Header */}
+        <div className="p-4 border-b border-gray-100 flex items-center bg-white shrink-0">
+          <button type="button" onClick={handleClose} className="p-2 -ml-2 text-gray-700 hover:text-black transition-all">
+            <ChevronLeft className="w-6 h-6" />
           </button>
+          <h2 className="text-lg font-bold text-gray-900 flex-1 text-center pr-8">
+            {initialData ? 'Edit Shipping Address' : 'Add Shipping Address'}
+          </h2>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 overflow-y-auto custom-scrollbar space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Address Label</label>
-              <div className="flex gap-2">
-                {['Home', 'Office', 'Other'].map(l => (
-                  <button
-                    key={l}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, label: l }))}
-                    className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${
-                      formData.label === l 
-                      ? 'bg-gray-900 text-white border-gray-900' 
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-900'
-                    }`}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Full Name</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="fullName"
-                  required
-                  value={formData.fullName}
-                  onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="e.g. Ahammod Ali"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Phone Number</label>
-              <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="tel"
-                  name="phone"
-                  required
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="+8801712345678"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Street Address</label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="street"
-                  required
-                  value={formData.street}
-                  onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="e.g. Ambarkhana Main Road"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-1">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">City</label>
-              <div className="relative">
-                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="city"
-                  required
-                  value={formData.city}
-                  onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  placeholder="Sylhet"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-1">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">State / Province</label>
+        {/* Form Content */}
+        <form id="addressForm" onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar bg-white p-4 pb-28 space-y-5">
+          
+          {/* Recipient's Name */}
+          <div>
+            <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
+              Recipient's Name <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
               <input
                 type="text"
-                name="state"
                 required
-                value={formData.state}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                placeholder="Sylhet Division"
+                value={formData.fullName}
+                onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                className="w-full px-3 py-3 border border-gray-300 rounded focus:ring-1 focus:ring-primary focus:border-primary outline-none text-sm placeholder-gray-400 pr-10"
+                placeholder="Input the real name"
               />
+              <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             </div>
+          </div>
 
-            <div className="col-span-1">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Zip / Postal Code</label>
-              <input
-                type="text"
-                name="zip"
-                required
-                value={formData.zip}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                placeholder="3100"
-              />
+          {/* Phone Number */}
+          <div>
+            <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              required
+              pattern="^(?:\+88|88)?01[3-9]\d{8}$"
+              title="Please enter a valid Bangladeshi phone number (e.g., 01712345678)"
+              value={formData.phone}
+              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+              className="w-full px-3 py-3 border border-gray-300 rounded focus:ring-1 focus:ring-primary focus:border-primary outline-none text-sm placeholder-gray-400"
+              placeholder="Please input Phone Number"
+            />
+          </div>
+
+          {/* Region/City/District */}
+          <div>
+            <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
+              Region/City/District <span className="text-red-500">*</span>
+            </label>
+            <div 
+              className={`w-full px-3 py-3 border rounded text-sm cursor-pointer flex justify-between items-center transition-colors ${isRegionPickerOpen ? 'border-primary ring-1 ring-primary' : 'border-gray-300 hover:border-gray-400'}`}
+              onClick={openLocationPicker}
+            >
+              <span className={formData.city ? 'text-gray-900' : 'text-gray-400'}>
+                {formData.city || 'Please input Region/City/District'}
+              </span>
             </div>
+          </div>
 
-            <div className="col-span-1">
-              <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Country</label>
-              <div className="relative">
-                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <select
-                  name="country"
-                  required
-                  value={formData.country}
-                  onChange={handleInputChange}
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all appearance-none"
-                >
-                  {COUNTRY_OPTIONS.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          {/* Address */}
+          <div>
+            <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
+              Address <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.street}
+              onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+              className="w-full px-3 py-3 border border-gray-300 rounded focus:ring-1 focus:ring-primary focus:border-primary outline-none text-sm placeholder-gray-400"
+              placeholder="House no./building/street/area"
+            />
+          </div>
 
-            <div className="col-span-2 pt-2">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    name="isDefault"
-                    checked={formData.isDefault}
-                    onChange={handleInputChange}
-                    className="w-6 h-6 border-2 border-gray-200 rounded-lg text-primary focus:ring-primary/20 cursor-pointer transition-all checked:bg-primary checked:border-primary"
-                  />
-                </div>
-                <span className="text-sm font-bold text-gray-600 group-hover:text-gray-900 transition-colors">Set as default shipping address</span>
+          {/* Landmark */}
+          <div>
+            <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
+              Landmark(Optional)
+            </label>
+            <input
+              type="text"
+              value={landmark}
+              onChange={(e) => setLandmark(e.target.value)}
+              className="w-full px-3 py-3 border border-gray-300 rounded focus:ring-1 focus:ring-primary focus:border-primary outline-none text-sm placeholder-gray-400"
+              placeholder="Add Additional Info"
+            />
+          </div>
+
+          {/* Address Category */}
+          <div className="flex items-center justify-between py-2 border-b border-gray-50 mt-2">
+            <span className="text-[13px] text-gray-700">Address Category</span>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="label" 
+                  value="Home"
+                  checked={formData.label === 'Home'}
+                  onChange={() => setFormData(prev => ({ ...prev, label: 'Home' }))}
+                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300"
+                />
+                <span className="text-[13px] text-gray-700">Home</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="label" 
+                  value="Office"
+                  checked={formData.label === 'Office'}
+                  onChange={() => setFormData(prev => ({ ...prev, label: 'Office' }))}
+                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300"
+                />
+                <span className="text-[13px] text-gray-700">Office</span>
               </label>
             </div>
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 px-8 py-4 border border-gray-200 text-gray-700 font-black rounded-2xl hover:bg-gray-50 transition-all uppercase tracking-widest text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 px-8 py-4 bg-primary text-white font-black rounded-2xl hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? 'Save Address' : 'Add Address')}
-            </button>
+          {/* Default Shipping Address */}
+          <div className="flex items-center justify-between py-2 border-b border-gray-50">
+            <span className="text-[13px] text-gray-700">Default Shipping Address</span>
+            <div className="flex items-center gap-2">
+              <span className={`text-[12px] font-medium transition-colors ${!formData.isDefault ? 'text-gray-400' : 'text-gray-800'}`}>Off</span>
+              <label className="relative inline-flex items-center cursor-pointer mx-1">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer"
+                  checked={formData.isDefault}
+                  onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
+                />
+                <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+              <span className={`text-[12px] font-medium transition-colors ${formData.isDefault ? 'text-primary' : 'text-gray-400'}`}>On</span>
+            </div>
           </div>
+
+          {/* Default Billing Address */}
+          <div className="flex items-center justify-between py-2">
+            <span className="text-[13px] text-gray-700">Default Billing Address</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-gray-800 font-medium">Off</span>
+              <label className="relative inline-flex items-center cursor-pointer mx-1">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer"
+                  defaultChecked={true}
+                />
+                <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+              <span className="text-[12px] text-primary font-medium">On</span>
+            </div>
+          </div>
+          
         </form>
+
+        {/* Sticky Save Button */}
+        <div className="absolute bottom-0 left-0 w-full p-4 bg-white pb-6 md:pb-4 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] border-t border-gray-50">
+          <button
+            form="addressForm"
+            type="submit"
+            disabled={isSaving}
+            className="w-full py-3.5 bg-primary text-white font-medium rounded text-[15px] hover:opacity-90 transition-opacity flex items-center justify-center"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+        
+        {/* Region Picker Bottom Sheet */}
+        {isRegionPickerOpen && (
+          <div className="absolute inset-0 z-[60] flex flex-col justify-end">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" onClick={() => setIsRegionPickerOpen(false)} />
+            
+            {/* Sheet */}
+            <div className="relative bg-white rounded-t-[1.5rem] flex flex-col max-h-[85vh] h-[80vh] animate-in slide-in-from-bottom duration-300 shadow-xl overflow-hidden">
+              {/* Sheet Header */}
+              <div className="flex justify-between items-center p-4 shrink-0">
+                <div className="w-8" /> {/* Spacer */}
+                <h3 className="text-[16px] font-bold text-gray-900">Select address</h3>
+                <button type="button" onClick={() => setIsRegionPickerOpen(false)} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              
+              {/* Dynamic Tabs */}
+              {renderPickerTabs()}
+              
+              {/* List */}
+              {renderPickerList()}
+            </div>
+          </div>
+        )}
+
       </div>
-    </div>
+    </dialog>
   );
 };
 

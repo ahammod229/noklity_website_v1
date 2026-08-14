@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildResponsivePictureSources,
   DEFAULT_RESPONSIVE_IMAGE_WIDTHS
@@ -19,34 +19,6 @@ const DEFAULT_PLACEHOLDER_SRC = `data:image/svg+xml;charset=UTF-8,${encodeURICom
     <rect x="160" y="160" width="480" height="480" rx="48" fill="#e5e7eb"/>
   </svg>
 `)}`;
-
-const preloadedImages = new Map<string, true | Promise<void>>();
-
-const preloadImage = (src: string) => {
-  if (!src || src.startsWith('data:') || typeof window === 'undefined') {
-    return;
-  }
-
-  const existing = preloadedImages.get(src);
-  if (existing === true) return;
-  if (existing) throw existing;
-
-  const promise = new Promise<void>((resolve) => {
-    const image = new Image();
-    image.onload = () => {
-      preloadedImages.set(src, true);
-      resolve();
-    };
-    image.onerror = () => {
-      preloadedImages.delete(src);
-      resolve();
-    };
-    image.src = src;
-  });
-
-  preloadedImages.set(src, promise);
-  throw promise;
-};
 
 type RenderStage = 'full' | 'no-avif' | 'no-webp' | 'fallback';
 
@@ -163,15 +135,6 @@ const OptimizedImageRenderer: React.FC<OptimizedImageRendererProps> = ({
   );
 };
 
-interface SuspenseImageProps extends OptimizedImageRendererProps {
-  suspenseSrc: string;
-}
-
-const SuspenseImage: React.FC<SuspenseImageProps> = ({ suspenseSrc, ...props }) => {
-  preloadImage(suspenseSrc);
-  return <OptimizedImageRenderer {...props} />;
-};
-
 const OptimizedImage: React.FC<OptimizedImageProps> = (props) => {
   const { src, loading = 'lazy', ...rest } = props;
   const [renderStage, setRenderStage] = useState<RenderStage>('full');
@@ -186,9 +149,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = (props) => {
     () => buildResponsivePictureSources(src || '', { widths: props.responsiveWidths }),
     [props.responsiveWidths, src]
   );
-
-  const suspenseSrc = responsiveSources.placeholderSrc || responsiveSources.fallbackSrc || src;
-  const shouldUseSuspense = loading !== 'lazy' && Boolean(suspenseSrc);
 
   const handleLoad: React.ReactEventHandler<HTMLImageElement> = (event) => {
     setIsLoaded(true);
@@ -224,26 +184,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = (props) => {
     onError: handleError
   };
 
-  if (!shouldUseSuspense) {
-    return <OptimizedImageRenderer {...rendererProps} />;
-  }
-
-  return (
-    <Suspense
-      fallback={
-        <OptimizedImageRenderer
-          {...rendererProps}
-          placeholderOnly
-          renderStage="fallback"
-        />
-      }
-    >
-      <SuspenseImage
-        {...rendererProps}
-        suspenseSrc={suspenseSrc}
-      />
-    </Suspense>
-  );
+  return <OptimizedImageRenderer {...rendererProps} />;
 };
 
 export default OptimizedImage;

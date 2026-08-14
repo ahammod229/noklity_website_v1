@@ -11,9 +11,17 @@ const TENANT_CONFIG_CACHE_KEY = 'noklity_tenant_config_v1';
 const TENANT_CACHE_TTL_MS = 60_000;
 const LICENSE_BYPASS_ENV = 'VITE_TENANT_LICENSE_BYPASS';
 const LICENSE_PATTERN = /^NXL-(BASIC|PRO|ENTERPRISE)-[A-Z0-9]{8,}-[A-Z0-9]{4,}$/i;
+const mergeAllowedHosts = (primary: unknown, fallback: unknown) => {
+  const merged = [
+    ...parseAllowedHosts(primary, []),
+    ...parseAllowedHosts(fallback, [])
+  ];
+  return Array.from(new Set(merged));
+};
 
 let tenantCache: TenantRuntimeConfig | null = null;
 let tenantCacheUpdatedAt = 0;
+let inflightTenantConfigPromise: Promise<TenantRuntimeConfig> | null = null;
 
 const getEnv = (key: string) => {
   if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
@@ -87,7 +95,9 @@ const normalizeConfigShape = (input: Partial<TenantConfig>): TenantConfig => {
     companyAddress: String(input.companyAddress || fallback.companyAddress || ''),
     companyPhone: String(input.companyPhone || fallback.companyPhone || ''),
     domain: normalizeHost(String(input.domain || fallback.domain || 'localhost')),
-    allowedHosts: parseAllowedHosts(input.allowedHosts, parseAllowedHosts(fallback.allowedHosts, ['localhost', '127.0.0.1'])),
+    allowedHosts: mergeAllowedHosts(input.allowedHosts, fallback.allowedHosts).length
+      ? mergeAllowedHosts(input.allowedHosts, fallback.allowedHosts)
+      : ['localhost', '127.0.0.1'],
     timezone: String(input.timezone || fallback.timezone || 'UTC'),
     currency: String(input.currency || fallback.currency || 'USD').toUpperCase(),
     planName: normalizePlanName(String(input.planName || fallback.planName || 'Basic')),
@@ -203,7 +213,7 @@ export const getTenantConfigSnapshot = (): TenantRuntimeConfig => {
   const stored = loadFromStorage();
   if (stored) {
     tenantCache = stored;
-    tenantCacheUpdatedAt = 0;
+    tenantCacheUpdatedAt = Date.now();
     return stored;
   }
   tenantCache = asRuntimeConfig(getDefaultConfig());
@@ -220,32 +230,45 @@ export const getTenantConfig = async (): Promise<TenantRuntimeConfig> => {
     const stored = loadFromStorage();
     if (stored) {
       tenantCache = stored;
-      tenantCacheUpdatedAt = 0;
+      tenantCacheUpdatedAt = Date.now();
     }
   }
 
-  const defaults = getDefaultConfig();
-  const dbConfig = await getDbConfig();
-  const envConfig = getEnvConfig();
-  const merged = normalizeConfigShape({
-    ...defaults,
-    ...dbConfig,
-    ...envConfig,
-    featureFlags: {
-      ...normalizeFeatureFlagOverrides(defaults.featureFlags),
-      ...normalizeFeatureFlagOverrides(dbConfig.featureFlags),
-      ...normalizeFeatureFlagOverrides(envConfig.featureFlags)
-    }
-  });
-  tenantCache = asRuntimeConfig(merged);
-  tenantCacheUpdatedAt = Date.now();
-  saveToStorage(tenantCache);
-  return tenantCache;
+  if (inflightTenantConfigPromise) {
+    return inflightTenantConfigPromise;
+  }
+
+  inflightTenantConfigPromise = (async () => {
+    const defaults = getDefaultConfig();
+    const dbConfig = await getDbConfig();
+    const envConfig = getEnvConfig();
+    const merged = normalizeConfigShape({
+      ...defaults,
+      ...dbConfig,
+      ...envConfig,
+      featureFlags: {
+        ...normalizeFeatureFlagOverrides(defaults.featureFlags),
+        ...normalizeFeatureFlagOverrides(dbConfig.featureFlags),
+        ...normalizeFeatureFlagOverrides(envConfig.featureFlags)
+      }
+    });
+    tenantCache = asRuntimeConfig(merged);
+    tenantCacheUpdatedAt = Date.now();
+    saveToStorage(tenantCache);
+    return tenantCache;
+  })();
+
+  try {
+    return await inflightTenantConfigPromise;
+  } finally {
+    inflightTenantConfigPromise = null;
+  }
 };
 
 export const clearTenantConfigCache = () => {
   tenantCache = null;
   tenantCacheUpdatedAt = 0;
+  inflightTenantConfigPromise = null;
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.removeItem(TENANT_CONFIG_CACHE_KEY);

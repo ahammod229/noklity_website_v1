@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import OptimizedImage from './ui/OptimizedImage';
 
+const PRODUCT_GALLERY_SAFE_WIDTHS = [400, 800];
+
 interface ProductImageGalleryProps {
   mainImage: string;
   images?: string[];
@@ -39,7 +41,7 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({ mainImage, im
           alt={productName}
           width={960}
           height={960}
-          responsiveWidths={[400, 800, 1200, 1600]}
+          responsiveWidths={PRODUCT_GALLERY_SAFE_WIDTHS}
           sizes="(max-width: 1024px) 100vw, 40vw"
           loading="eager"
           className={`w-full h-full object-contain transition-transform duration-200 ${

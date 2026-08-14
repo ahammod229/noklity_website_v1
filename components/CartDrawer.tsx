@@ -81,9 +81,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                       <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug">{item.name}</h3>
                       <button 
                         onClick={() => onRemoveItem(item.id)}
-                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                        className="text-gray-300 hover:text-red-500 transition-colors p-2 rounded-md hover:bg-red-50"
+                        aria-label="Remove item"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">{item.category}</p>
@@ -98,18 +99,20 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                     <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-2 py-1">
                       <button 
                         onClick={() => onUpdateQuantity(item.id, -1)}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-900"
+                        className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-md transition-colors"
                         disabled={item.quantity <= 1}
+                        aria-label="Decrease quantity"
                       >
-                        <Minus className="w-3 h-3" />
+                        <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-xs font-bold w-3 text-center">{item.quantity}</span>
+                      <span className="text-xs font-bold w-5 text-center">{item.quantity}</span>
                       <button 
                         onClick={() => onUpdateQuantity(item.id, 1)}
                         disabled={typeof item.stock === 'number' ? item.quantity >= item.stock : false}
-                        className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        aria-label="Increase quantity"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>

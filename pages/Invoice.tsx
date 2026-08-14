@@ -152,11 +152,11 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b-2 border-gray-900 bg-gray-50">
-                  <th className="py-4 px-4 text-[10px] font-black text-gray-900 uppercase tracking-widest">Item Description</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-gray-900 uppercase tracking-widest">SKU</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Qty</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-gray-900 uppercase tracking-widest text-right">Price</th>
-                  <th className="py-4 px-4 text-[10px] font-black text-gray-900 uppercase tracking-widest text-right">Total</th>
+                  <th className="py-4 px-4 text-xs font-black text-gray-900 uppercase tracking-widest">Item Description</th>
+                  <th className="py-4 px-4 text-xs font-black text-gray-900 uppercase tracking-widest">SKU</th>
+                  <th className="py-4 px-4 text-xs font-black text-gray-900 uppercase tracking-widest text-center">Qty</th>
+                  <th className="py-4 px-4 text-xs font-black text-gray-900 uppercase tracking-widest text-right">Price</th>
+                  <th className="py-4 px-4 text-xs font-black text-gray-900 uppercase tracking-widest text-right">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { X, Loader2, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
 import { Product } from '../../types';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 import {
   buildResponsiveProductUploadBundle,
@@ -81,23 +81,24 @@ const uploadProductImageBundle = async (file: File, fileNamePrefix: string) => {
   });
 
   const filesToUpload = [bundle.master.file, ...bundle.assets.map((asset) => asset.file)];
+  let masterPublicUrl = '';
+  
   await Promise.all(
     filesToUpload.map(async (assetFile) => {
       const filePath = `products/${assetFile.name}`;
-      const { error } = await supabase.storage.from('assets').upload(filePath, assetFile, {
+      const result = await uploadFile('assets', filePath, assetFile, {
         upsert: false,
         contentType: assetFile.type || undefined
       });
-      if (error) throw error;
+      if (assetFile === bundle.master.file) {
+        masterPublicUrl = result.publicUrl;
+      }
     })
   );
 
-  const filePath = `products/${bundle.master.file.name}`;
-  const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
-
   return {
     bundle,
-    publicUrl: data.publicUrl
+    publicUrl: masterPublicUrl
   };
 };
 

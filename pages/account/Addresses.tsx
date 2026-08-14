@@ -82,7 +82,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
   if (loading) {
     return (
       <AccountLayout activeTab="addresses" onNavigate={onNavigate} onCartClick={onCartClick} onLoginClick={onLoginClick} cartItemCount={cartItemCount} title="Shipping Addresses">
-        <div className="bg-white p-20 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center">
+        <div className="bg-white p-6 sm:p-20 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
           <p className="text-gray-500 font-bold">Fetching your addresses...</p>
         </div>
@@ -102,7 +102,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
       <div className="space-y-6 animate-in fade-in duration-500">
         
         {/* Header Action */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <p className="text-gray-500 font-bold">Manage your shipping destinations for faster checkout.</p>
           <button 
             onClick={() => { setEditingAddress(undefined); setIsFormOpen(true); }}
@@ -181,7 +181,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-[3rem] p-16 border border-dashed border-gray-200 flex flex-col items-center text-center">
+          <div className="bg-white rounded-[3rem] p-6 sm:p-16 border border-dashed border-gray-200 flex flex-col items-center text-center">
             <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
               <MapPin className="w-10 h-10 text-gray-200" strokeWidth={1} />
             </div>

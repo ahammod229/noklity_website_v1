@@ -1,33 +1,8 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import MobileBottomNav from './components/MobileBottomNav';
-import Home from './pages/Home';
-import AdminDashboard from './pages/AdminDashboard';
-import Help from './pages/Help';
-import Checkout from './pages/Checkout';
-import OrderSuccess from './pages/OrderSuccess';
-import Orders from './pages/Orders'; // Keep for generic route if needed, but overridden below
-import AccountOrders from './pages/account/Orders'; // Updated import path
-import OrderDetails from './pages/OrderDetails';
-import Wishlist from './pages/Wishlist';
-import Search from './pages/Search';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
-import PaymentSuccess from './pages/PaymentSuccess';
-import PaymentFailed from './pages/PaymentFailed';
-import Invoice from './pages/Invoice';
-import CartPage from './pages/Cart';
-import Profile from './pages/account/Profile';
-import Addresses from './pages/account/Addresses';
-import Notifications from './pages/account/Notifications';
-import Security from './pages/account/Security';
-import ProductDetailsPage from './pages/ProductDetails';
-import ContentPage from './pages/ContentPage';
-import AuthModal from './components/AuthModal';
-import CartDrawer from './components/CartDrawer';
 import Toast, { ToastType } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Product } from './types';
@@ -47,6 +22,81 @@ import { clearTenantConfigCache, isHostAllowed } from './services/tenantConfigSe
 import { applyAppearanceSettings } from './services/appearanceService';
 import RouteSeo from './components/RouteSeo';
 import { supabase } from './lib/supabase';
+import { BREAKPOINTS, getViewportBand } from './constants/breakpoints';
+
+const Home = lazy(() => import('./pages/Home'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const Help = lazy(() => import('./pages/Help'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess'));
+const Orders = lazy(() => import('./pages/Orders'));
+const AccountOrders = lazy(() => import('./pages/account/Orders'));
+const OrderDetails = lazy(() => import('./pages/OrderDetails'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const Search = lazy(() => import('./pages/Search'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
+const PaymentFailed = lazy(() => import('./pages/PaymentFailed'));
+const Invoice = lazy(() => import('./pages/Invoice'));
+const CartPage = lazy(() => import('./pages/Cart'));
+const Profile = lazy(() => import('./pages/account/Profile'));
+const Addresses = lazy(() => import('./pages/account/Addresses'));
+const Notifications = lazy(() => import('./pages/account/Notifications'));
+const Security = lazy(() => import('./pages/account/Security'));
+const ProductDetailsPage = lazy(() => import('./pages/ProductDetails'));
+const ContentPage = lazy(() => import('./pages/ContentPage'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+const CartDrawer = lazy(() => import('./components/CartDrawer'));
+
+const DEFAULT_FAVICON_PATH = '/favicon.svg';
+
+const inferFaviconType = (href: string) => {
+  const normalized = String(href || '').toLowerCase().split('?')[0].split('#')[0];
+  if (normalized.endsWith('.svg')) return 'image/svg+xml';
+  if (normalized.endsWith('.png')) return 'image/png';
+  if (normalized.endsWith('.ico')) return 'image/x-icon';
+  if (normalized.endsWith('.webp')) return 'image/webp';
+  if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg';
+  return '';
+};
+
+const upsertHeadLink = (rel: string, href: string, type?: string) => {
+  if (typeof document === 'undefined') return;
+
+  let link = document.head.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = rel;
+    document.head.appendChild(link);
+  }
+
+  link.href = href;
+  if (type) {
+    link.type = type;
+  } else {
+    link.removeAttribute('type');
+  }
+};
+
+const applyDocumentFavicon = (faviconUrl?: string) => {
+  const nextHref = (faviconUrl || '').trim() || DEFAULT_FAVICON_PATH;
+  const nextType = inferFaviconType(nextHref);
+
+  upsertHeadLink('icon', nextHref, nextType);
+  upsertHeadLink('shortcut icon', nextHref, nextType);
+  upsertHeadLink('apple-touch-icon', nextHref);
+};
+
+const RouteLoadingFallback: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
+  <div className={`${compact ? 'min-h-[160px]' : 'min-h-[60vh]'} flex items-center justify-center bg-white`}>
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="w-9 h-9 text-gray-300 animate-spin" />
+      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-400">Loading</p>
+    </div>
+  </div>
+);
 
 // Inner App component to use Auth, Cart, and Wishlist Context
 const AppContent: React.FC = () => {
@@ -71,7 +121,7 @@ const AppContent: React.FC = () => {
   const getInitialView = (): AppView => {
     const path = window.location.pathname;
     if (path === '/help') return 'help';
-    if (path === '/admin') return 'admin';
+    if (path === '/noklity-panel-secure-8x9') return 'admin';
     if (path === '/cart') return 'cart';
     if (path === '/checkout') return 'checkout';
     if (path.startsWith('/order-success')) return 'order-success';
@@ -125,7 +175,7 @@ const AppContent: React.FC = () => {
 
   const [currentView, setCurrentView] = useState<AppView>(getInitialView);
   const [currentParam, setCurrentParam] = useState<string | undefined>(getParams());
-  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 768);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < BREAKPOINTS.md);
   const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
   const isAllowedHost = useMemo(() => isHostAllowed(currentHost, tenantConfig), [currentHost, tenantConfig]);
 
@@ -141,13 +191,16 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768;
+      const width = window.innerWidth;
+      const mobile = width < BREAKPOINTS.md;
+      document.documentElement.dataset.viewport = getViewportBand(width);
       setIsMobileViewport(mobile);
       if (mobile && isCartOpen) {
         setIsCartOpen(false);
       }
     };
 
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isCartOpen, setIsCartOpen]);
@@ -178,15 +231,7 @@ const AppContent: React.FC = () => {
           borderColorDark: config.borderColorDark,
           borderRadiusPx: config.borderRadiusPx
         });
-        if (config.faviconUrl) {
-          let favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
-          if (!favicon) {
-            favicon = document.createElement('link');
-            favicon.rel = 'icon';
-            document.head.appendChild(favicon);
-          }
-          favicon.href = config.faviconUrl;
-        }
+        applyDocumentFavicon(config.faviconUrl);
       } catch {
         // Keep default browser title/icon on config failure.
       }
@@ -209,6 +254,9 @@ const AppContent: React.FC = () => {
     let isActive = true;
     let lastKnownRevision = '';
     let isCheckingRevision = false;
+    let pollInterval: number | null = null;
+    let startTimer: number | null = null;
+    let unsubscribeSignals = () => {};
 
     const refreshSharedConfig = () => {
       if (!isActive) return;
@@ -229,7 +277,8 @@ const AppContent: React.FC = () => {
 
         if (!isActive || error) return;
 
-        const nextRevision = String(data?.[0]?.updated_at || '');
+        const latestSettingsRow = (Array.isArray(data) ? data[0] : null) as { updated_at?: unknown } | null;
+        const nextRevision = String(latestSettingsRow?.updated_at || '');
         if (forceRefresh) {
           if (nextRevision) {
             lastKnownRevision = nextRevision;
@@ -252,42 +301,39 @@ const AppContent: React.FC = () => {
       }
     };
 
-    const unsubscribeSignals = subscribeToPublicSiteConfigSignals(() => {
-      void syncLatestConfigRevision(true);
-    });
-
-    const realtimeChannel = supabase
-      .channel(`site-settings-sync-${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'site_settings' },
-        () => {
-          void syncLatestConfigRevision(true);
-        }
-      )
-      .subscribe();
-
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         void syncLatestConfigRevision();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    const pollInterval = window.setInterval(() => {
-      if (!document.hidden) {
-        void syncLatestConfigRevision();
-      }
-    }, 15000);
+    startTimer = window.setTimeout(() => {
+      if (!isActive) return;
 
-    void syncLatestConfigRevision();
+      unsubscribeSignals = subscribeToPublicSiteConfigSignals(() => {
+        void syncLatestConfigRevision(true);
+      });
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      pollInterval = window.setInterval(() => {
+        if (!document.hidden) {
+          void syncLatestConfigRevision();
+        }
+      }, 15000);
+
+      void syncLatestConfigRevision();
+    }, 1200);
 
     return () => {
       isActive = false;
       unsubscribeSignals();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.clearInterval(pollInterval);
-      void supabase.removeChannel(realtimeChannel);
+      if (startTimer !== null) {
+        window.clearTimeout(startTimer);
+      }
+      if (pollInterval !== null) {
+        window.clearInterval(pollInterval);
+      }
     };
   }, []);
 
@@ -295,6 +341,9 @@ const AppContent: React.FC = () => {
     let path = '/';
     if (view !== 'home') {
         path = `/${view}`;
+        if (view === 'admin') {
+            path = '/noklity-panel-secure-8x9';
+        }
         if (view === 'help' && param) {
             path = `/help#${param}`;
         }
@@ -344,10 +393,10 @@ const AppContent: React.FC = () => {
   };
 
   // Wrapper for adding to cart with toast
-  const addToCart = async (product: Product) => {
+  const addToCart = async (product: Product, quantity?: number) => {
     try {
-      await contextAddToCart(product);
-      const shortName = (product.name || 'Product').trim();
+      await contextAddToCart(product, quantity);
+      const shortName = (product.name || (product as any).title || 'Product').trim();
       const compact = shortName.length > 26 ? `${shortName.slice(0, 25)}...` : shortName;
       showToast(`${compact} added to cart`);
     } catch (error: any) {
@@ -432,15 +481,6 @@ const AppContent: React.FC = () => {
       );
     }
 
-    // Show global loader while auth is initializing to prevent "flashing" or premature redirects
-    if (isAuthLoading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-white">
-          <Loader2 className="w-10 h-10 text-gray-300 animate-spin" />
-        </div>
-      );
-    }
-
     if (currentView === 'admin') {
       return (
         <ProtectedRoute onNavigate={navigate} adminOnly>
@@ -448,6 +488,8 @@ const AppContent: React.FC = () => {
         </ProtectedRoute>
       );
     }
+
+
 
     if (currentView === 'login') {
       return <Login onNavigate={navigate} onLoginSuccess={() => showToast('Successfully logged in!')} />;
@@ -648,7 +690,9 @@ const AppContent: React.FC = () => {
       )}
       
       <div className={isMobileBottomNavVisible ? 'pb-[84px] md:pb-0' : ''}>
-        {renderContent()}
+        <Suspense fallback={<RouteLoadingFallback />}>
+          {renderContent()}
+        </Suspense>
       </div>
       
       {!isFooterHidden && <Footer />}
@@ -666,19 +710,23 @@ const AppContent: React.FC = () => {
         </div>
       )}
       
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-      />
+      <Suspense fallback={null}>
+        <AuthModal 
+          isOpen={isAuthModalOpen} 
+          onClose={() => setIsAuthModalOpen(false)} 
+        />
+      </Suspense>
 
-      <CartDrawer 
-        isOpen={isCartOpen && !isMobileViewport} 
-        onClose={() => setIsCartOpen(false)}
-        items={cart}
-        onUpdateQuantity={handleUpdateQuantityByDelta}
-        onRemoveItem={removeFromCart}
-        onCheckout={() => navigate('checkout')}
-      />
+      <Suspense fallback={<RouteLoadingFallback compact />}>
+        <CartDrawer 
+          isOpen={isCartOpen && !isMobileViewport} 
+          onClose={() => setIsCartOpen(false)}
+          items={cart}
+          onUpdateQuantity={handleUpdateQuantityByDelta}
+          onRemoveItem={removeFromCart}
+          onCheckout={() => navigate('checkout')}
+        />
+      </Suspense>
 
       <Toast 
         message={toast.message}

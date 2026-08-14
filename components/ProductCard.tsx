@@ -72,7 +72,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
       {/* Wishlist Button */}
       <button 
         onClick={handleWishlistClick}
-        className={`absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-20 p-1.5 sm:p-2.5 rounded-full transition-all duration-300 shadow-sm ${
+      className={`absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-20 p-2 sm:p-2.5 rounded-full transition-all duration-300 shadow-sm ${
           isWishlisted 
             ? 'bg-red-50 text-red-500 hover:bg-red-100' 
             : 'bg-white/80 backdrop-blur text-gray-400 hover:text-red-500 hover:bg-white'
@@ -149,14 +149,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
                 e.stopPropagation();
                 onClick?.(product);
               }}
-              className="flex-1 h-9 sm:h-10 rounded-lg border border-gray-200 text-gray-700 font-bold text-[11px] sm:text-sm hover:border-primary hover:text-primary"
+              className="flex-1 h-11 sm:h-10 rounded-lg border border-gray-200 text-gray-700 font-bold text-[11px] sm:text-sm hover:border-primary hover:text-primary"
             >
               View
             </button>
             <button 
               onClick={handleCartClick}
               disabled={isOutOfStock}
-              className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-primary hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-gray-100 disabled:hover:text-gray-700"
+              className="h-11 sm:h-10 px-3 sm:px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-primary hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-gray-100 disabled:hover:text-gray-700"
               title={isOutOfStock ? 'Out of stock' : 'Add to cart'}
             >
               <ShoppingCart className="w-4 h-4" />

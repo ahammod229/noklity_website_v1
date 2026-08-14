@@ -16,6 +16,11 @@ const isLiveCatalogProduct = (product: Product) => {
   return normalizedStatus !== 'inactive' && product.isActive !== false;
 };
 
+const normalizeImageUrls = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+
 const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -65,44 +70,44 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
     }
 
     if (data) {
-      const mappedProducts: Product[] = data.map((row: any) => ({
-        id: row.id,
-        name: row.title,
-        slug: row.slug || '',
-        brand: row.brand || '',
-        modelNumber: row.model_number || '',
-        sku: row.sku || '',
-        category: row.category || 'Uncategorized',
-        price: row.price,
-        originalPrice: row.discount_price ? row.price : undefined, // Logic adjustment: if discount_price exists, display price is discount_price? Usually price is MSRP.
-        specifications: row.specifications || {},
-        compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
-        weight: Number(row.weight || 0),
-        deliveryCharge: Number(row.delivery_charge || 0),
-        warranty: row.warranty || '',
-        countryOfOrigin: row.country_of_origin || '',
-        status: row.status || 'active',
-        defaultDeliveryFee: Number(row.default_delivery_fee || 0),
-        // Let's align with schema: price is selling price. If discount_price is set in DB, that's likely the sale price.
-        // However, standard e-comm schema usually has `price` (regular) and `sale_price` (discounted).
-        // Let's assume row.price is REGULAR and row.discount_price is SALE.
-        // So for the Product type: price = row.discount_price || row.price. originalPrice = row.discount_price ? row.price : undefined.
-        // This matches the previous logic.
-        image: row.image_url || '',
-        images: Array.isArray(row.image_urls) ? row.image_urls : [],
-        deliveryCharges: row.delivery_charges || {},
-        warrantyMonths: Number(row.warranty_months || 0),
-        warrantyPolicy: row.warranty_policy || '',
-        shippingInfo: row.shipping_info || '',
-        returnPolicy: row.return_policy || '',
-        faqText: row.faq_text || '',
-        relatedProductIds: Array.isArray(row.related_product_ids) ? row.related_product_ids : [],
-        isActive: row.status !== 'inactive' && row.is_active !== false,
-        stock: row.stock,
-        rating: row.rating,
-        isFlashSale: row.is_flash_sale,
-        description: row.description,
-      }));
+      const mappedProducts: Product[] = data.map((row: any) => {
+        const images = normalizeImageUrls(row.image_urls);
+        const primaryImage = String(row.image_url || '').trim() || images[0] || 'https://via.placeholder.com/400x400?text=No+Image';
+
+        return {
+          id: row.id,
+          name: row.title,
+          slug: row.slug || '',
+          brand: row.brand || '',
+          modelNumber: row.model_number || '',
+          sku: row.sku || '',
+          category: row.category || 'Uncategorized',
+          price: row.discount_price || row.price,
+          originalPrice: row.discount_price ? row.price : undefined,
+          specifications: row.specifications || {},
+          compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
+          weight: Number(row.weight || 0),
+          deliveryCharge: Number(row.delivery_charge || 0),
+          warranty: row.warranty || '',
+          countryOfOrigin: row.country_of_origin || '',
+          status: row.status || 'active',
+          defaultDeliveryFee: Number(row.default_delivery_fee || 0),
+          image: primaryImage,
+          images,
+          deliveryCharges: row.delivery_charges || {},
+          warrantyMonths: Number(row.warranty_months || 0),
+          warrantyPolicy: row.warranty_policy || '',
+          shippingInfo: row.shipping_info || '',
+          returnPolicy: row.return_policy || '',
+          faqText: row.faq_text || '',
+          relatedProductIds: Array.isArray(row.related_product_ids) ? row.related_product_ids : [],
+          isActive: row.status !== 'inactive' && row.is_active !== false,
+          stock: row.stock,
+          rating: row.rating,
+          isFlashSale: row.is_flash_sale,
+          description: row.description,
+        };
+      });
       const visibleProducts = mappedProducts.filter(isLiveCatalogProduct);
       setCatalogRecoveryNeeded(mappedProducts.length > 0 && visibleProducts.length === 0);
       setProducts(visibleProducts.length > 0 ? visibleProducts : mappedProducts);

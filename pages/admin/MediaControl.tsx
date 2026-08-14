@@ -11,7 +11,7 @@ import {
   Trash2,
   Upload
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 import { optimizeImageByGuide, optimizeImageForUpload } from '../../utils/imageOptimization';
 
@@ -275,8 +275,7 @@ const MediaControl: React.FC = () => {
 
         const finalName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeFileName(fileToUpload.name)}`;
         const path = normalizedFolder ? `${normalizedFolder}/${finalName}` : finalName;
-        const { error } = await supabase.storage.from(bucket).upload(path, fileToUpload, { upsert: false });
-        if (error) throw error;
+        await uploadFile(bucket, path, fileToUpload, { upsert: false });
         uploadedCount += 1;
       } catch (error: any) {
         failed.push(`${file.name}: ${toFriendlyError(error?.message || 'Upload failed')}`);

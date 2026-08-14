@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">noklity</string>
+    <string name="title_activity_main">noklity</string>
+    <string name="package_name">com.noklity</string>
+    <string name="custom_url_scheme">com.noklity</string>
+    <string name="default_web_client_id">913803079415-h7s0o5j972uvc70l6te0bhe1ndnjsma0.apps.googleusercontent.com</string>
+</resources>

@@ -30,6 +30,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
               : 'Search Noklity products to find imported electronics, tools, tyres and parts across Bangladesh.'
           }
           path={currentPath}
+          robots="noindex, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
           keywords="Noklity search, electronics Bangladesh, tools Bangladesh, tyres Bangladesh, parts Bangladesh"
         />
       );
@@ -47,7 +48,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Shopping Cart | Noklity"
           description="Review items in your Noklity cart before checkout."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'checkout':
@@ -56,7 +57,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Checkout | Noklity"
           description="Complete your Noklity order securely."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'login':
@@ -65,7 +66,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Login | Noklity"
           description="Sign in to your Noklity account."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'signup':
@@ -74,7 +75,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Create Account | Noklity"
           description="Create your Noklity account to manage orders, wishlist, and addresses."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'forgot-password':
@@ -83,7 +84,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Reset Password | Noklity"
           description="Reset your Noklity account password."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'admin':
@@ -92,7 +93,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Admin Dashboard | Noklity"
           description="Manage Noklity store operations."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'account-orders':
@@ -112,7 +113,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Account | Noklity"
           description="Manage your Noklity account and orders."
           path={currentPath}
-          robots="noindex, nofollow"
+          robots="noindex, nofollow, max-image-preview:large"
         />
       );
     case 'product-details':
@@ -121,6 +122,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Product Details | Noklity"
           description="View product details, price, and availability on Noklity."
           path={param ? `/product/${param}` : currentPath}
+          robots="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
         />
       );
     case 'content-page':
@@ -129,6 +131,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Information | Noklity"
           description="Read company, contact, shipping, and policy information from Noklity."
           path={param ? `/page/${param}` : currentPath}
+          robots="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
         />
       );
     case 'home':
@@ -138,6 +141,7 @@ const RouteSeo: React.FC<RouteSeoProps> = ({ view, param }) => {
           title="Noklity | Electronics, Tools, Tyres & Parts – Bangladesh"
           description={DEFAULT_DESCRIPTION}
           path="/"
+          robots="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
           keywords="Noklity, electronics Bangladesh, tools Bangladesh, tyres Bangladesh, auto parts Bangladesh, imported electronics, imported tools, imported parts"
         />
       );

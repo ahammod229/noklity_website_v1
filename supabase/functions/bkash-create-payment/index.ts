@@ -69,17 +69,6 @@ serve(async (req) => {
     const anonKey = getEnv('SUPABASE_ANON_KEY');
     const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
     const authHeader = (req.headers.get('Authorization') || '').trim();
-    const isAnonAuthorization = authHeader === `Bearer ${anonKey}`;
-    const shouldTryUserAuth = Boolean(authHeader) && !isAnonAuthorization;
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: shouldTryUserAuth
-        ? {
-            headers: {
-              Authorization: authHeader
-            }
-          }
-        : undefined
-    });
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const bkashEnabled = await isBkashFeatureEnabled(adminClient);
@@ -87,18 +76,8 @@ serve(async (req) => {
       return jsonResponse({ success: false, error: 'bKash payment is disabled for this plan.' }, 403);
     }
 
-    let requesterUserId: string | null = null;
-    if (shouldTryUserAuth) {
-      const {
-        data: { user },
-        error: userError
-      } = await userClient.auth.getUser();
-      if (!userError && user?.id) {
-        requesterUserId = user.id;
-      } else {
-        return jsonResponse({ success: false, error: userError?.message || 'Unauthorized' }, 401);
-      }
-    }
+    const firebaseUid = (req.headers.get('x-firebase-uid') || '').trim();
+    let requesterUserId: string | null = firebaseUid || null;
 
     const { data: order, error: orderError } = await adminClient
       .from('orders')

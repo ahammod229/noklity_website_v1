@@ -6,7 +6,7 @@ import { CartItem, Product } from '../types';
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Product) => Promise<void>;
+  addToCart: (product: Product, quantity?: number) => Promise<void>;
   removeFromCart: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -101,7 +101,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data, error } = await supabase
             .from('cart_items')
             .select('*')
-            .eq('user_id', user.id);
+            .eq('user_id', user.uid);
 
           if (error) throw error;
 
@@ -127,7 +127,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await supabase
                   .from('cart_items')
                   .delete()
-                  .eq('user_id', user.id)
+                  .eq('user_id', user.uid)
                   .in('product_id', normalized.removedIds);
               }
 
@@ -137,7 +137,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     supabase
                       .from('cart_items')
                       .update({ quantity: entry.quantity })
-                      .match({ user_id: user.id, product_id: entry.productId })
+                      .match({ user_id: user.uid, product_id: entry.productId })
                   )
                 );
               }
@@ -189,10 +189,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const addToCart = async (product: Product) => {
+  const addToCart = async (product: Product, quantity: number = 1) => {
     const inventoryMap = await fetchInventorySnapshots([product.id]);
     const snapshot = inventoryMap.get(product.id);
-    const productName = product.name || snapshot?.title || 'This product';
+    const productName = product.name || (product as any).title || snapshot?.title || 'This product';
 
     if (isUnavailable(snapshot)) {
       throw new Error(`${productName} is out of stock.`);
@@ -205,13 +205,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const existingIndex = newCart.findIndex(item => item.id === product.id);
 
     if (existingIndex >= 0) {
-      if (newCart[existingIndex].quantity >= availableStock) {
-        throw new Error(`Only ${availableStock} item(s) available for ${productName}.`);
+      const targetQty = newCart[existingIndex].quantity + quantity;
+      if (targetQty > availableStock) {
+        throw new Error(`Only ${availableStock} item(s) available for ${productName}. You already have ${newCart[existingIndex].quantity} in cart.`);
       }
-      newCart[existingIndex].quantity += 1;
+      newCart[existingIndex].quantity = targetQty;
       newCart[existingIndex].stock = availableStock;
     } else {
-      newCart.push({ ...product, stock: availableStock, quantity: 1 });
+      if (quantity > availableStock) {
+        throw new Error(`Only ${availableStock} item(s) available for ${productName}.`);
+      }
+      newCart.push({ ...product, stock: availableStock, quantity });
     }
 
     setCart(newCart);
@@ -223,9 +227,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const item = newCart.find(i => i.id === product.id);
         if (item) {
           await supabase.from('cart_items').upsert({
-            user_id: user.id,
+            user_id: user.uid,
             product_id: product.id,
-            title: product.name,
+            title: product.name || (product as any).title || 'Product',
             price: product.price,
             image: product.image,
             quantity: item.quantity
@@ -244,7 +248,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (user) {
       try {
-        await supabase.from('cart_items').delete().match({ user_id: user.id, product_id: productId });
+        await supabase.from('cart_items').delete().match({ user_id: user.uid, product_id: productId });
       } catch (err) {
         console.error('Error syncing cart remove:', err);
       }
@@ -266,7 +270,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (user) {
         try {
-          await supabase.from('cart_items').delete().match({ user_id: user.id, product_id: productId });
+          await supabase.from('cart_items').delete().match({ user_id: user.uid, product_id: productId });
         } catch (err) {
           console.error('Error syncing cart remove for out-of-stock item:', err);
         }
@@ -288,7 +292,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const item = newCart.find(i => i.id === productId);
         if (item) {
-          await supabase.from('cart_items').update({ quantity: safeQuantity }).match({ user_id: user.id, product_id: productId });
+          await supabase.from('cart_items').update({ quantity: safeQuantity }).match({ user_id: user.uid, product_id: productId });
         }
       } catch (err) {
         console.error('Error syncing cart update:', err);
@@ -306,7 +310,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (user) {
       try {
-        await supabase.from('cart_items').delete().eq('user_id', user.id);
+        await supabase.from('cart_items').delete().eq('user_id', user.uid);
       } catch (err) {
         console.error('Error clearing cart:', err);
       }

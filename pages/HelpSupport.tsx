@@ -74,7 +74,7 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 mb-2">Email Us</h3>
                     <p className="text-gray-500 mb-6">Get support via email</p>
-                    <a href={`mailto:${supportEmail}`} className="inline-flex items-center text-primary font-bold hover:underline">
+                    <a href={`mailto:${supportEmail}`} className="inline-flex flex-wrap items-center text-primary font-bold hover:underline break-all">
                         {supportEmail} <ArrowRight className="w-4 h-4 ml-2" />
                     </a>
                     <div className="mt-6 pt-6 border-t border-gray-50">

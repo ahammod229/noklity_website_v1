@@ -11,6 +11,11 @@ interface ProductManagerProps {
   showToast: (message: string, type?: ToastType) => void;
 }
 
+const normalizeImageUrls = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+
 const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,18 +42,22 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
     }
 
     if (data) {
-      const mappedProducts: Product[] = data.map((row: any) => ({
-        id: row.id,
-        name: row.title,
-        category: row.category || 'Uncategorized',
-        price: row.discount_price || row.price,
-        originalPrice: row.discount_price ? row.price : undefined,
-        image: row.image_url || '',
-        stock: row.stock,
-        rating: row.rating,
-        isFlashSale: row.is_flash_sale,
-        description: row.description,
-      }));
+      const mappedProducts: Product[] = data.map((row: any) => {
+        const images = normalizeImageUrls(row.image_urls);
+        return {
+          id: row.id,
+          name: row.title,
+          category: row.category || 'Uncategorized',
+          price: row.discount_price || row.price,
+          originalPrice: row.discount_price ? row.price : undefined,
+          image: String(row.image_url || '').trim() || images[0] || 'https://via.placeholder.com/400x400?text=No+Image',
+          images,
+          stock: row.stock,
+          rating: row.rating,
+          isFlashSale: row.is_flash_sale,
+          description: row.description,
+        };
+      });
       setProducts(mappedProducts);
     }
     setLoading(false);

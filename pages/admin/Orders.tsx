@@ -20,6 +20,7 @@ import {
   Truck
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getSteadfastDeliveryStatus } from '../../services/steadfastDeliveryService';
 import OrderTable from '../../components/admin/OrderTable';
 import { Order } from '../../types';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -168,7 +169,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
         .from('orders')
         .select(`
           *,
-          user:profiles(email),
+          user:users(email, display_name),
           payment_submissions(
             transaction_reference,
             document_type,
@@ -638,7 +639,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                 <h2 className="text-2xl font-black text-gray-900 mb-1">Order {formatShortOrderId(selectedOrder.id)}</h2>
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Placed on {selectedOrder.date}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {onNavigate && (
                   <button 
                     onClick={() => onNavigate('invoice', selectedOrder.id)}

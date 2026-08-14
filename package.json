@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server:dev": "tsx watch server/index.ts",
+    "server:start": "tsx server/index.ts",
+    "dev:mern": "concurrently -k \"npm run server:dev\" \"npm run dev\"",
     "generate:og-image": "python3 scripts/generate-og-image.py",
     "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "vite build",
@@ -17,16 +20,35 @@
     "test": "npm run test:productization && npm run test:smoke && npm run check:prepublish"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.90.1",
+    "@capacitor-firebase/authentication": "^8.3.0",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "@supabase/supabase-js": "^2.111.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "firebase": "^12.16.0",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.562.0",
+    "mongoose": "^8.19.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^6.30.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.5.0",
+    "concurrently": "^9.2.1",
+    "postcss": "^8.5.12",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.20.6",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

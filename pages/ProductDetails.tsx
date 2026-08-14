@@ -6,10 +6,11 @@ import { getProductById } from '../services/productService';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
 import { getPublicSiteConfigSnapshot } from '../services/siteConfigService';
+import { normalizeProductFaqItems } from '../utils/productFaq';
 
 interface ProductDetailsPageProps {
   productId?: string;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product, quantity?: number) => void;
   onNavigate: (view: any) => void;
   onHomeClick?: () => void;
   onCategoryClick?: (category: string) => void;
@@ -38,6 +39,7 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
 
   const productCanonicalPath = productId ? `/product/${productId}` : '/product';
   const siteConfig = getPublicSiteConfigSnapshot();
+  const productFaqItems = normalizeProductFaqItems(product?.faqText || '');
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -128,6 +130,14 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
           name: product.brand
         }
       : undefined,
+    aggregateRating:
+      Number(product.rating || 0) > 0
+        ? {
+            '@type': 'AggregateRating',
+            ratingValue: Number(product.rating || 0).toFixed(1),
+            reviewCount: 1
+          }
+        : undefined,
     offers: {
       '@type': 'Offer',
       url: `${(siteConfig.siteUrl || 'https://noklity.com').replace(/\/+$/, '')}${productCanonicalPath}`,
@@ -140,6 +150,22 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
       itemCondition: 'https://schema.org/NewCondition'
     }
   };
+
+  const faqStructuredData =
+    productFaqItems.length > 0
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: productFaqItems.map((item) => ({
+            '@type': 'Question',
+            name: item.question,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: item.answer
+            }
+          }))
+        }
+      : null;
 
   const breadcrumbStructuredData = {
     '@context': 'https://schema.org',
@@ -175,7 +201,7 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
         image={product.image}
         imageAlt={product.name}
         type="product"
-        structuredData={[breadcrumbStructuredData, productStructuredData]}
+        structuredData={[breadcrumbStructuredData, productStructuredData, faqStructuredData].filter(Boolean)}
       />
       <ProductDetailsComponent 
         product={product} 

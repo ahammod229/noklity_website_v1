@@ -184,7 +184,7 @@ const AccountOrders: React.FC<AccountOrdersProps> = ({
             })}
           </div>
         ) : (
-          <div className="bg-white rounded-[3rem] p-16 border border-dashed border-gray-200 flex flex-col items-center text-center">
+          <div className="bg-white rounded-[3rem] p-6 sm:p-16 border border-dashed border-gray-200 flex flex-col items-center text-center">
             <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
               <ShoppingBag className="w-10 h-10 text-gray-200" strokeWidth={1} />
             </div>

@@ -1,5 +1,10 @@
-
-import { supabase } from '../lib/supabase';
+import { supabase, uploadFile } from '../lib/supabase';
+import { auth } from './firebaseClient';
+import {
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential
+} from 'firebase/auth';
 
 export interface UserProfile {
   id: string;
@@ -42,40 +47,39 @@ const toFriendlyAvatarUploadError = (message?: string) => {
 };
 
 /**
- * Retrieves the current user's profile details.
+ * Retrieves the current user's profile from the `users` table (Firebase UID based).
  */
 export const getProfile = async (): Promise<UserProfile | null> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
 
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
-      .eq('id', user.id)
+      .eq('uid', firebaseUser.uid)
       .single();
 
-    if (error) {
-      console.error('Error fetching profile:', JSON.stringify(error, null, 2));
-      // Fallback to basic auth data if profile row missing
+    if (error || !data) {
+      // Fallback to Firebase user data
       return {
-        id: user.id,
-        fullName: user.user_metadata?.full_name || '',
-        email: user.email || '',
+        id: firebaseUser.uid,
+        fullName: firebaseUser.displayName || '',
+        email: firebaseUser.email || '',
         phone: '',
-        avatarUrl: user.user_metadata?.avatar_url || '',
-        lastLogin: new Date().toLocaleDateString(),
-        memberSince: new Date(user.created_at).toLocaleDateString()
+        avatarUrl: firebaseUser.photoURL || '',
+        lastLogin: 'Just now',
+        memberSince: new Date().toLocaleDateString()
       };
     }
 
     return {
-      id: data.id,
-      fullName: data.full_name || user.user_metadata?.full_name || '',
-      email: user.email || data.email || '',
+      id: data.uid,
+      fullName: data.display_name || firebaseUser.displayName || '',
+      email: firebaseUser.email || data.email || '',
       phone: data.phone || '',
-      avatarUrl: data.avatar_url || user.user_metadata?.avatar_url || '',
-      lastLogin: 'Just now', // Placeholder as auth logs aren't exposed directly
+      avatarUrl: data.photo_url || firebaseUser.photoURL || '',
+      lastLogin: 'Just now',
       memberSince: new Date(data.created_at).toLocaleDateString()
     };
   } catch (err) {
@@ -85,76 +89,26 @@ export const getProfile = async (): Promise<UserProfile | null> => {
 };
 
 /**
- * Updates the user's profile information.
+ * Updates the user's profile information in the `users` table.
  */
 export const updateProfile = async (updates: Partial<UserProfile>): Promise<boolean> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return false;
 
     const dbUpdates: any = {};
-    if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
+    if (updates.fullName !== undefined) dbUpdates.display_name = updates.fullName;
     if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-    if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
+    if (updates.avatarUrl !== undefined) dbUpdates.photo_url = updates.avatarUrl;
 
-    const basePayload = {
-      id: user.id,
-      email: user.email || updates.email || ''
-    };
-
-    let { error } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          ...basePayload,
-          ...dbUpdates
-        },
-        { onConflict: 'id' }
-      );
+    const { error } = await supabase
+      .from('users')
+      .update(dbUpdates)
+      .eq('uid', firebaseUser.uid);
 
     if (error) {
-      const missingAvatarColumn =
-        String(error.message || '').includes('avatar_url') ||
-        String(error.details || '').includes('avatar_url') ||
-        error.code === '42703';
-
-      if (missingAvatarColumn && dbUpdates.avatar_url !== undefined) {
-        delete dbUpdates.avatar_url;
-        const retry = await supabase
-          .from('profiles')
-          .upsert(
-            {
-              ...basePayload,
-              ...dbUpdates
-            },
-            { onConflict: 'id' }
-          );
-        error = retry.error;
-      }
-
-      if (error) {
-        console.error('Error updating profile:', JSON.stringify(error, null, 2));
-        return false;
-      }
-    }
-
-    if (updates.fullName !== undefined) {
-      const { error: authUpdateError } = await supabase.auth.updateUser({
-        data: {
-          full_name: updates.fullName,
-          ...(updates.avatarUrl !== undefined ? { avatar_url: updates.avatarUrl } : {})
-        }
-      });
-      if (authUpdateError) {
-        console.warn('Auth metadata update warning:', authUpdateError.message);
-      }
-    } else if (updates.avatarUrl !== undefined) {
-      const { error: authUpdateError } = await supabase.auth.updateUser({
-        data: { avatar_url: updates.avatarUrl }
-      });
-      if (authUpdateError) {
-        console.warn('Avatar metadata update warning:', authUpdateError.message);
-      }
+      console.error('Error updating profile:', JSON.stringify(error, null, 2));
+      return false;
     }
 
     return true;
@@ -164,28 +118,27 @@ export const updateProfile = async (updates: Partial<UserProfile>): Promise<bool
   }
 };
 
+/**
+ * Changes the Firebase user's password.
+ */
 export const changePassword = async (currentPassword: string, newPassword: string): Promise<ServiceResult> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !user.email) {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || !firebaseUser.email) {
       return { success: false, error: 'You must be logged in to change password.' };
     }
 
+    // Re-authenticate with current password first
     if (currentPassword.trim()) {
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword
-      });
-      if (reauthError) {
+      try {
+        const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+        await reauthenticateWithCredential(firebaseUser, credential);
+      } catch {
         return { success: false, error: 'Current password is incorrect.' };
       }
     }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      return { success: false, error: error.message || 'Failed to update password.' };
-    }
-
+    await updatePassword(firebaseUser, newPassword);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to change password.' };
@@ -194,13 +147,10 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 
 export const logoutAllSessions = async (): Promise<ServiceResult> => {
   try {
-    const { error } = await supabase.auth.signOut({ scope: 'global' });
-    if (error) {
-      return { success: false, error: error.message || 'Failed to log out all sessions.' };
-    }
+    await auth.signOut();
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err?.message || 'Failed to log out all sessions.' };
+    return { success: false, error: err?.message || 'Failed to log out.' };
   }
 };
 
@@ -211,36 +161,27 @@ export const updateEmail = async (nextEmail: string): Promise<EmailUpdateResult>
       return { success: false, error: 'Email is required.' };
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !user.email) {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser || !firebaseUser.email) {
       return { success: false, error: 'You must be logged in to update email.' };
     }
 
-    if (user.email.toLowerCase() === targetEmail) {
+    if (firebaseUser.email.toLowerCase() === targetEmail) {
       return { success: true, requiresConfirmation: false };
     }
 
-    const { data, error } = await supabase.auth.updateUser({ email: targetEmail });
+    // Update email in the users table
+    const { error } = await supabase
+      .from('users')
+      .update({ email: targetEmail })
+      .eq('uid', firebaseUser.uid);
+
     if (error) {
       return { success: false, error: error.message || 'Failed to update email.' };
     }
 
-    const currentEmail = (data.user?.email || user.email || '').toLowerCase();
-    const requiresConfirmation = currentEmail !== targetEmail;
-
-    if (!requiresConfirmation) {
-      await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: user.id,
-            email: targetEmail
-          },
-          { onConflict: 'id' }
-        );
-    }
-
-    return { success: true, requiresConfirmation };
+    // Note: changing email in Firebase requires verification — inform user
+    return { success: true, requiresConfirmation: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to update email.' };
   }
@@ -248,37 +189,45 @@ export const updateEmail = async (nextEmail: string): Promise<EmailUpdateResult>
 
 export const uploadProfileAvatar = async (file: File): Promise<{ success: boolean; url?: string; error?: string }> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
       return { success: false, error: 'You must be logged in to upload avatar.' };
     }
 
     const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const path = `${firebaseUser.uid}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     let lastErrorMessage = '';
+    let successBucket = '';
+    let successPublicUrl = '';
+    
     for (const bucketName of AVATAR_BUCKET_CANDIDATES) {
-      const { error: uploadError } = await supabase.storage.from(bucketName).upload(path, file, { upsert: false });
-      if (uploadError) {
-        const message = String(uploadError.message || '');
+      try {
+        const { publicUrl } = await uploadFile(bucketName, path, file, { upsert: false });
+        successBucket = bucketName;
+        successPublicUrl = publicUrl;
+        break;
+      } catch (err: any) {
+        const message = String(err.message || '');
         lastErrorMessage = message || lastErrorMessage;
         if (isBucketNotFoundError(message)) {
           continue;
         }
         return { success: false, error: toFriendlyAvatarUploadError(message) };
       }
-
-      const { data } = supabase.storage.from(bucketName).getPublicUrl(path);
-      if (!data?.publicUrl) {
-        return { success: false, error: 'Avatar uploaded, but failed to build public URL.' };
-      }
-
-      return { success: true, url: data.publicUrl };
     }
 
-    return {
-      success: false,
-      error: toFriendlyAvatarUploadError(lastErrorMessage || 'Bucket not found')
-    };
+    if (!successBucket) {
+      return { success: false, error: `Failed to upload avatar: ${lastErrorMessage || 'Bucket not found'}` };
+    }
+
+    // Save the new avatar URL in the users table
+    await supabase
+      .from('users')
+      .update({ photo_url: successPublicUrl })
+      .eq('uid', firebaseUser.uid);
+
+    return { success: true, url: successPublicUrl };
+
   } catch (err: any) {
     return { success: false, error: toFriendlyAvatarUploadError(err?.message) };
   }

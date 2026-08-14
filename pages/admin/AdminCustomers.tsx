@@ -151,7 +151,7 @@ const AdminCustomers: React.FC = () => {
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Customer Database</h2>
           <p className="text-gray-500 font-medium">Oversee registered accounts and analyze purchasing behavior.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
            <button
              onClick={handleExportCsv}
              disabled={exporting}

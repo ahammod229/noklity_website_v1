@@ -1,5 +1,6 @@
 
 import { supabase } from '../lib/supabase';
+import { auth } from './firebaseClient';
 
 /**
  * Customer Service
@@ -38,19 +39,17 @@ const isAllowlistedAdminEmail = (email?: string | null) => {
 };
 
 const assertAdmin = async () => {
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError || !authData.user) {
-    throw new Error('Unauthorized');
-  }
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Unauthorized');
 
-  if (isAllowlistedAdminEmail(authData.user.email)) {
+  if (isAllowlistedAdminEmail(currentUser.email)) {
     return;
   }
 
   const { data: me, error: meError } = await supabase
-    .from('profiles')
+    .from('users')
     .select('role')
-    .eq('id', authData.user.id)
+    .eq('uid', currentUser.uid)
     .single();
 
   if (meError || me?.role !== 'admin') {
@@ -65,16 +64,15 @@ export const getCustomers = async (): Promise<Customer[]> => {
   try {
     await assertAdmin();
 
-    // 1. Fetch profiles
+    // 1. Fetch users from the `users` table (Firebase-synced)
     const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
-      .neq('role', 'admin'); // Optional: Exclude admins from customer list if desired
+      .neq('role', 'admin'); // Exclude admins from customer list
 
     if (profileError) throw profileError;
 
-    // 2. Fetch orders (simplified fetch for client-side aggregation)
-    // In production with thousands of orders, this should be an RPC or Edge Function
+    // 2. Fetch orders for aggregation
     const { data: orders, error: orderError } = await supabase
       .from('orders')
       .select('id, user_id, total_amount, created_at, shipping_address, status');
@@ -82,8 +80,9 @@ export const getCustomers = async (): Promise<Customer[]> => {
     if (orderError) throw orderError;
 
     // 3. Merge data
-    const customers: Customer[] = profiles.map(profile => {
-      const userOrders = orders?.filter(o => o.user_id === profile.id) || [];
+    const customers: Customer[] = (profiles || []).map(profile => {
+      // orders.user_id matches Firebase UID (uid)
+      const userOrders = orders?.filter(o => o.user_id === profile.uid) || [];
       
       // Sort orders descending
       userOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -98,7 +97,6 @@ export const getCustomers = async (): Promise<Customer[]> => {
           month: 'short', day: 'numeric', year: 'numeric' 
         });
         
-        // Extract address from last order if available
         const shipping = userOrders[0].shipping_address as any;
         if (shipping) {
           address = `${shipping.address || ''}, ${shipping.city || ''}, ${shipping.country || ''}`.replace(/^, |^, /, '').trim();
@@ -106,7 +104,6 @@ export const getCustomers = async (): Promise<Customer[]> => {
         }
       }
 
-      // Map recent orders for details view (limit 5)
       const recentOrders = userOrders.slice(0, 5).map(o => ({
         id: o.id,
         date: new Date(o.created_at).toLocaleDateString(),
@@ -115,8 +112,8 @@ export const getCustomers = async (): Promise<Customer[]> => {
       }));
 
       return {
-        id: profile.id,
-        name: profile.full_name || 'Guest User',
+        id: profile.uid,  // use uid as the customer id
+        name: profile.display_name || 'Guest User',
         email: profile.email || '',
         phone: profile.phone || 'N/A',
         ordersCount: userOrders.length,
@@ -147,9 +144,9 @@ export const updateCustomerStatus = async (id: string, status: 'Active' | 'Block
 
     const dbStatus = status === 'Blocked' ? 'blocked' : 'active';
     const { error } = await supabase
-      .from('profiles')
+      .from('users')
       .update({ status: dbStatus })
-      .eq('id', id);
+      .eq('uid', id);  // id is the Firebase UID
 
     if (error) throw error;
     return true;

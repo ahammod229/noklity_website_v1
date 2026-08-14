@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Loader2, Upload, X, Globe, MessageCircle, Mail, Image as ImageIcon } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, uploadFile } from '../../lib/supabase';
 import { clearPublicSiteConfigCache } from '../../services/siteConfigService';
 import { ADMIN_IMAGE_GUIDES } from '../../utils/adminImageGuides';
 import { optimizeImageByGuide } from '../../utils/imageOptimization';
@@ -128,15 +128,9 @@ const SiteSettings: React.FC = () => {
       const fileName = fileToUpload.name || `${key}-${Date.now()}.webp`;
       const filePath = `branding/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('assets')
-        .upload(filePath, fileToUpload, { upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('assets').getPublicUrl(filePath);
+      const { publicUrl } = await uploadFile('assets', filePath, fileToUpload, { upsert: false });
       
-      setConfig(prev => ({ ...prev, [key]: data.publicUrl }));
+      setConfig(prev => ({ ...prev, [key]: publicUrl }));
     } catch (err) {
       console.error('Upload failed:', err);
       alert('Failed to upload image. Ensure you are logged in as admin and have storage permissions.');

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://noklity.com/sitemap.xml
+Sitemap: https://www.noklity.com/sitemap.xml

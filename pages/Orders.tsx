@@ -122,7 +122,7 @@ const Orders: React.FC<OrdersProps> = ({
                         <div className="p-6">
                             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                                 {/* Product Image */}
-                                <div className="w-full sm:w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 flex-shrink-0 overflow-hidden relative group-hover:border-gray-200 transition-colors">
+                                <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden relative group-hover:border-gray-200 transition-colors">
                                     {order.previewImage && (
                                         <OptimizedImage
                                           src={order.previewImage}

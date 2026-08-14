@@ -15,11 +15,15 @@ import {
   AlertCircle,
   RefreshCcw,
   XCircle,
-  ExternalLink
+  ExternalLink,
+  Star,
+  MessageSquare,
+  X
 } from 'lucide-react';
 import { getOrderById, OrderDetail } from '../services/orderService';
 import { downloadInvoicePDF } from '../services/invoiceService';
 import { supabase } from '../lib/supabase';
+import { auth } from '../services/firebaseClient';
 import { useCurrency } from '../hooks/useCurrency';
 import { formatShortOrderId } from '../utils/orderId';
 import {
@@ -34,6 +38,23 @@ interface OrderDetailsProps {
   onCartClick: () => void;
   onNavigate: (view: any, param?: any) => void;
   orderId?: string;
+}
+
+interface ReviewDraft {
+  productId: string;
+  productName: string;
+  rating: number;
+  title: string;
+  comment: string;
+}
+
+interface ProductReviewStatus {
+  id: string;
+  productId: string;
+  rating: number;
+  title: string;
+  comment: string;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 const mapDeliveryToOrderStatus = (
@@ -71,6 +92,9 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submittingReviewFor, setSubmittingReviewFor] = useState<string | null>(null);
+  const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null);
+  const [reviewFormError, setReviewFormError] = useState<string | null>(null);
+  const [productReviews, setProductReviews] = useState<Record<string, ProductReviewStatus>>({});
   const [trackingSyncing, setTrackingSyncing] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
 
@@ -99,6 +123,42 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
     };
 
     fetchOrder();
+  }, [orderId]);
+
+  useEffect(() => {
+    const loadExistingReviews = async () => {
+      if (!orderId) return;
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      const { data, error: reviewLoadError } = await supabase
+        .from('product_reviews')
+        .select('id, product_id, rating, title, comment, status')
+        .eq('order_id', orderId)
+        .eq('user_id', currentUser.uid);
+
+      if (reviewLoadError) {
+        console.error('Failed to load existing reviews:', reviewLoadError);
+        return;
+      }
+
+      const nextReviewMap = (data || []).reduce<Record<string, ProductReviewStatus>>((accumulator, review: any) => {
+        accumulator[String(review.product_id)] = {
+          id: review.id,
+          productId: String(review.product_id),
+          rating: Number(review.rating) || 0,
+          title: review.title || '',
+          comment: review.comment || '',
+          status: review.status || 'pending'
+        };
+        return accumulator;
+      }, {});
+
+      setProductReviews(nextReviewMap);
+    };
+
+    void loadExistingReviews();
   }, [orderId]);
 
   const canTrackParcel = Boolean(order?.deliveryProvider === 'steadfast' || order?.deliveryConsignmentId);
@@ -160,50 +220,107 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
     );
   }
 
-  const handleWriteReview = async (productId: string, productName: string) => {
+  const openReviewModal = (productId: string, productName: string) => {
     if (!order || order.status !== 'Delivered') {
       alert('You can only review after delivery.');
       return;
     }
 
-    const ratingInput = window.prompt(`Rate "${productName}" (1-5)`);
-    if (!ratingInput) return;
-    const rating = Math.max(1, Math.min(5, Number(ratingInput)));
-    if (Number.isNaN(rating)) {
-      alert('Please enter a valid rating number.');
+    const existingReview = productReviews[productId];
+    setReviewFormError(null);
+    setReviewDraft({
+      productId,
+      productName,
+      rating: existingReview?.rating || 0,
+      title: existingReview?.title || '',
+      comment: existingReview?.comment || ''
+    });
+  };
+
+  const closeReviewModal = () => {
+    if (submittingReviewFor) return;
+    setReviewDraft(null);
+    setReviewFormError(null);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewDraft || !order) return;
+
+    if (!reviewDraft.rating || reviewDraft.rating < 1 || reviewDraft.rating > 5) {
+      setReviewFormError('Please select a rating between 1 and 5 stars.');
       return;
     }
 
-    const comment = window.prompt('Write your review comment') || '';
-    const title = window.prompt('Review title (optional)') || null;
-
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) {
-      alert('Please login again.');
+    if (!reviewDraft.comment.trim()) {
+      setReviewFormError('Please write a short review before submitting.');
       return;
     }
 
-    setSubmittingReviewFor(productId);
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setReviewFormError('Please login again and then submit your review.');
+      return;
+    }
+
+    setSubmittingReviewFor(reviewDraft.productId);
+    setReviewFormError(null);
     const { error: reviewError } = await supabase
       .from('product_reviews')
       .upsert({
-        product_id: productId,
+        product_id: reviewDraft.productId,
         order_id: order.id,
-        user_id: authData.user.id,
-        rating,
-        title,
-        comment,
-        status: 'pending'
+        user_id: currentUser.uid,
+        rating: reviewDraft.rating,
+        title: reviewDraft.title.trim() || null,
+        comment: reviewDraft.comment.trim(),
+        status: 'approved'
       }, { onConflict: 'order_id,user_id,product_id' });
     setSubmittingReviewFor(null);
 
     if (reviewError) {
       console.error('Failed to submit review:', reviewError);
-      alert(reviewError.message || 'Failed to submit review');
+      setReviewFormError(reviewError.message || 'Failed to submit review');
       return;
     }
 
-    alert('Review submitted and waiting for admin approval.');
+    setProductReviews((prev) => ({
+      ...prev,
+      [reviewDraft.productId]: {
+        id: prev[reviewDraft.productId]?.id || `${reviewDraft.productId}-${order.id}`,
+        productId: reviewDraft.productId,
+        rating: reviewDraft.rating,
+        title: reviewDraft.title.trim(),
+        comment: reviewDraft.comment.trim(),
+        status: 'approved'
+      }
+    }));
+    setReviewDraft(null);
+    setReviewFormError(null);
+    alert('Review submitted successfully. It is now visible on the product page.');
+  };
+
+  const reviewStatusMeta = (status?: ProductReviewStatus['status']) => {
+    switch (status) {
+      case 'approved':
+        return {
+          label: 'Review Approved',
+          badgeClass: 'bg-green-50 text-green-700 border-green-100',
+          buttonLabel: 'Update Review'
+        };
+      case 'rejected':
+        return {
+          label: 'Needs Update',
+          badgeClass: 'bg-red-50 text-red-700 border-red-100',
+          buttonLabel: 'Update Review'
+        };
+      case 'pending':
+      default:
+        return {
+          label: 'Pending Approval',
+          badgeClass: 'bg-amber-50 text-amber-700 border-amber-100',
+          buttonLabel: 'Edit Review'
+        };
+    }
   };
 
   // Timeline Logic
@@ -233,7 +350,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                 <ChevronLeft className="w-4 h-4 mr-1 group-hover:-translate-x-1 transition-transform" />
                 Back to Orders
             </button>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={() => {
                     try {
@@ -391,13 +508,29 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
                                             Qty: {item.quantity}
                                         </div>
                                         {order.status === 'Delivered' && (
-                                            <button
-                                                onClick={() => handleWriteReview(item.id, item.name)}
-                                                disabled={submittingReviewFor === item.id}
-                                                className="text-primary text-sm font-bold hover:underline disabled:opacity-60"
-                                            >
-                                                {submittingReviewFor === item.id ? 'Submitting...' : 'Write a Review'}
-                                            </button>
+                                            <div className="flex flex-col items-end gap-2">
+                                                {productReviews[item.id] && (
+                                                  <span
+                                                    className={`px-3 py-1 rounded-full border text-[11px] font-black uppercase tracking-[0.16em] ${
+                                                      reviewStatusMeta(productReviews[item.id].status).badgeClass
+                                                    }`}
+                                                  >
+                                                    {reviewStatusMeta(productReviews[item.id].status).label}
+                                                  </span>
+                                                )}
+                                                <button
+                                                    onClick={() => openReviewModal(item.id, item.name)}
+                                                    disabled={submittingReviewFor === item.id}
+                                                    className="inline-flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-4 py-2 text-sm font-black text-primary hover:bg-primary hover:text-white transition-all disabled:opacity-60"
+                                                >
+                                                    <MessageSquare className="w-4 h-4" />
+                                                    {submittingReviewFor === item.id
+                                                      ? 'Submitting...'
+                                                      : productReviews[item.id]
+                                                        ? reviewStatusMeta(productReviews[item.id].status).buttonLabel
+                                                        : 'Write a Review'}
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -563,6 +696,119 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
             </div>
         </div>
       </main>
+
+      {reviewDraft && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/65 backdrop-blur-sm" onClick={closeReviewModal} />
+          <div className="relative w-full max-w-2xl rounded-[2rem] border border-gray-100 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 sm:px-8">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Share Your Feedback</p>
+                <h2 className="mt-1 text-2xl font-black text-gray-900">Review {reviewDraft.productName}</h2>
+                <p className="mt-2 text-sm font-medium text-gray-500">
+                  Your review will appear on this product page after submission. Admin can still moderate it later if needed.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeReviewModal}
+                disabled={Boolean(submittingReviewFor)}
+                className="rounded-full border border-gray-200 p-2 text-gray-400 hover:text-gray-900 hover:border-gray-300 disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-6 px-6 py-6 sm:px-8">
+              <div>
+                <label className="mb-3 block text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
+                  Rating
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() =>
+                        setReviewDraft((prev) => (prev ? { ...prev, rating: star } : prev))
+                      }
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
+                        star <= reviewDraft.rating
+                          ? 'border-amber-200 bg-amber-50 text-amber-500'
+                          : 'border-gray-200 bg-white text-gray-300 hover:border-gray-300 hover:text-gray-500'
+                      }`}
+                    >
+                      <Star className={`w-5 h-5 ${star <= reviewDraft.rating ? 'fill-current' : ''}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
+                  Review Title
+                </label>
+                <input
+                  type="text"
+                  value={reviewDraft.title}
+                  onChange={(event) =>
+                    setReviewDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))
+                  }
+                  placeholder="Example: Excellent quality and backup performance"
+                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-base font-medium text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
+                  Detailed Review
+                </label>
+                <textarea
+                  rows={5}
+                  value={reviewDraft.comment}
+                  onChange={(event) =>
+                    setReviewDraft((prev) => (prev ? { ...prev, comment: event.target.value } : prev))
+                  }
+                  placeholder="Write about product quality, packaging, delivery experience, and whether it matched your expectations."
+                  className="w-full resize-none rounded-2xl border border-gray-200 px-4 py-3 text-base font-medium text-gray-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                />
+              </div>
+
+              {reviewFormError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  {reviewFormError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-gray-100 px-6 py-5 sm:flex-row sm:justify-end sm:px-8">
+              <button
+                type="button"
+                onClick={closeReviewModal}
+                disabled={Boolean(submittingReviewFor)}
+                className="h-11 rounded-2xl border border-gray-200 px-5 text-sm font-black text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitReview}
+                disabled={Boolean(submittingReviewFor)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {submittingReviewFor ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Review'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

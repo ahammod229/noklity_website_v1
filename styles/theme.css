@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --color-primary-rgb: 225 29 72;
   --color-primary-hover-rgb: 190 24 93;
@@ -25,6 +29,7 @@
   --border-current-rgb: var(--border-light-rgb);
   --noklity-bg: rgb(var(--background-current-rgb));
   --noklity-text: rgb(var(--text-current-rgb));
+  --viewport-band: xs;
 }
 
 html,
@@ -38,6 +43,68 @@ body {
   color: var(--noklity-text);
   transition: background-color 200ms ease, color 200ms ease;
   overflow-x: hidden;
+}
+
+html[data-viewport='xs'] {
+  --viewport-band: xs;
+}
+
+html[data-viewport='sm'] {
+  --viewport-band: sm;
+}
+
+html[data-viewport='md'] {
+  --viewport-band: md;
+}
+
+html[data-viewport='lg'] {
+  --viewport-band: lg;
+}
+
+html[data-viewport='xl'] {
+  --viewport-band: xl;
+}
+
+html[data-viewport='xxl'] {
+  --viewport-band: xxl;
+}
+
+/* Bootstrap-style breakpoint map used across the app */
+/* No media query for xs since this is the default range */
+@media only screen and (max-width: 575px) {
+  .hero-chips {
+    justify-content: flex-start;
+  }
+}
+
+@media only screen and (min-width: 576px) and (max-width: 767px) {
+  .hero-chips {
+    justify-content: flex-start;
+  }
+}
+
+@media only screen and (min-width: 768px) and (max-width: 991px) {
+  .hero-chips {
+    justify-content: center;
+  }
+}
+
+@media only screen and (min-width: 992px) and (max-width: 1199px) {
+  .hero-chips {
+    justify-content: flex-start;
+  }
+}
+
+@media only screen and (min-width: 1200px) and (max-width: 1399px) {
+  .hero-chips {
+    justify-content: flex-start;
+  }
+}
+
+@media only screen and (min-width: 1400px) and (max-width: 1600px) {
+  .hero-chips {
+    justify-content: flex-start;
+  }
 }
 
 html.dark {

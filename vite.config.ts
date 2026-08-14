@@ -7,6 +7,12 @@ export default defineConfig(() => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/api': {
+            target: 'http://localhost:5000',
+            changeOrigin: true
+          }
+        }
       },
       plugins: [react()],
       build: {
@@ -25,14 +31,6 @@ export default defineConfig(() => {
                   return 'ui-vendor';
                 }
                 return 'vendor';
-              }
-
-              if (id.includes('/pages/admin/') || id.includes('/components/admin/')) {
-                return 'admin-pages';
-              }
-
-              if (id.includes('/pages/customer/') || id.includes('/components/customer/')) {
-                return 'customer-pages';
               }
 
               return undefined;

@@ -246,7 +246,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                 </div>
 
                 {/* Price + Image Editor */}
-                <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-6 w-full md:w-auto justify-between md:justify-end bg-gray-50 p-3 rounded-xl border border-gray-100">
                   <div className="max-w-[220px]">
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Image URL</p>
                     <div className="flex gap-2">

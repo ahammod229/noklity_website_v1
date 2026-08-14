@@ -35,7 +35,7 @@ export const getAllAdminOrders = async (): Promise<AdminOrderDetail[]> => {
       .from('orders')
       .select(`
         *,
-        user:profiles(email),
+        user:users(email, display_name),
         order_items(
           quantity,
           price,

@@ -131,7 +131,7 @@ const Security: React.FC<SecurityProps> = ({ onLoginClick, cartItemCount, onCart
               />
             </div>
 
-            <div className="md:col-span-2 flex items-center justify-between gap-4 pt-2">
+            <div className="md:col-span-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
               <button
                 type="submit"
                 disabled={isSaving}

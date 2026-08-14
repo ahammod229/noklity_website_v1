@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAddresses, addAddress, Address } from '../services/addressService';
 import { createOrder } from '../services/orderService';
 import { markPaymentFailed, startBkashPaymentSession, verifyPaymentStatus } from '../services/paymentService';
-import { supabase } from '../lib/supabase';
+import { supabase, uploadFile } from '../lib/supabase';
 import AddressForm from '../components/account/AddressForm';
 import { useCurrency } from '../hooks/useCurrency';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
@@ -24,7 +23,10 @@ import {
   Loader2, 
   ShieldCheck, 
   ShoppingBag,
-  AlertCircle
+  AlertCircle,
+  Edit2,
+  ChevronRight,
+  X
 } from 'lucide-react';
 
 interface CheckoutProps {
@@ -51,6 +53,8 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   
   const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
+  const [isAddressSelectionOpen, setIsAddressSelectionOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   
@@ -183,20 +187,41 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const handleAddAddress = async (data: Omit<Address, 'id'>) => {
     setIsSavingAddress(true);
     try {
-      let newAddr: Address;
-      if (user) {
-        newAddr = await addAddress(data);
-      } else {
-        newAddr = {
-          id: `guest-${Date.now()}`,
-          ...data
-        };
+      if (editingAddress) {
+        if (user) {
+          // @ts-ignore - Assuming updateAddress is imported or we can just call addAddress which handles default internally, wait, we need updateAddress. I'll import it above.
+          // Wait, updateAddress is not imported in Checkout.tsx.
+          // Let's import it in the next chunk, or I can just inline it if I forget.
+          // Let's use the local state update for guest, and for logged-in user we need `updateAddress`.
+        }
       }
-      setAddresses(prev => [...prev, newAddr]);
-      setSelectedAddressId(newAddr.id);
+      
+      if (editingAddress) {
+        if (user) {
+          // Import is needed. I'll handle that.
+          const { updateAddress } = await import('../services/addressService');
+          await updateAddress(editingAddress.id, data);
+          await fetchAddresses();
+        } else {
+          setAddresses(prev => prev.map(a => a.id === editingAddress.id ? { ...a, ...data } : a));
+        }
+      } else {
+        let newAddr: Address;
+        if (user) {
+          newAddr = await addAddress(data);
+        } else {
+          newAddr = {
+            id: `guest-${Date.now()}`,
+            ...data
+          };
+        }
+        setAddresses(prev => [...prev, newAddr]);
+        setSelectedAddressId(newAddr.id);
+      }
       setIsAddressFormOpen(false);
+      setEditingAddress(null);
     } catch (error) {
-      console.error("Failed to add address", error);
+      console.error("Failed to add/update address", error);
     } finally {
       setIsSavingAddress(false);
     }
@@ -293,10 +318,10 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
         }
 
         if (paymentMethod === 'bank_transfer') {
-          const { data: currentSession } = await supabase.auth.getSession();
-          const currentUserId = currentSession.session?.user?.id;
+          const currentUserId = user?.uid || null;
           let documentPath: string | null = null;
-          if (proofFile && currentUserId) {
+          if (proofFile) {
+            const folderName = currentUserId || 'guest';
             const isImage = proofFile.type.startsWith('image/');
             const uploadFile = isImage
               ? (
@@ -310,27 +335,25 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                 ).file
               : proofFile;
             const ext = uploadFile.name.split('.').pop() || (isImage ? 'webp' : 'bin');
-            const filePath = `${currentUserId}/${result.orderId}-${Date.now()}.${ext}`;
-            const { error: uploadError } = await supabase.storage
-              .from('payment-proofs')
-              .upload(filePath, uploadFile, { upsert: false });
-            if (!uploadError) {
-              documentPath = filePath;
+            const filePath = `${folderName}/${result.orderId}-${Date.now()}.${ext}`;
+            try {
+              const { path: newPath } = await uploadFile('payment-proofs', filePath, uploadFile, { upsert: false });
+              documentPath = newPath;
+            } catch (uploadError) {
+              console.error('Failed to upload payment proof:', uploadError);
             }
           }
 
-          if (currentUserId) {
-            await supabase.from('payment_submissions').insert({
-              order_id: result.orderId,
-              user_id: currentUserId,
-              payment_method: 'bank_transfer',
-              bank_code: selectedBankCode || null,
-              document_type: documentType || null,
-              transaction_reference: transactionReference.trim() || null,
-              document_path: documentPath,
-              status: 'pending'
-            });
-          }
+          await supabase.from('payment_submissions').insert({
+            order_id: result.orderId,
+            user_id: currentUserId,
+            payment_method: 'bank_transfer',
+            bank_code: selectedBankCode || null,
+            document_type: documentType || null,
+            transaction_reference: transactionReference.trim() || null,
+            document_path: documentPath,
+            status: 'pending'
+          });
 
           await supabase
             .from('orders')
@@ -407,70 +430,52 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
           <div className="flex-1 space-y-8">
             
             {/* 1. Shipping Address */}
-            <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
-                            <MapPin className="w-5 h-5" />
-                        </div>
-                    <h2 className="text-xl font-bold text-gray-900">Shipping Address</h2>
-                    {isGuestCheckout && (
-                      <span className="ml-2 text-[11px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-1 rounded">
-                        Guest Checkout
-                      </span>
-                    )}
-                    </div>
-                    <button 
-                        onClick={() => setIsAddressFormOpen(true)}
-                        className="flex items-center gap-2 text-primary font-bold text-sm hover:underline"
-                    >
-                        <Plus className="w-4 h-4" /> Add New
-                    </button>
-                </div>
-
+            <section className="bg-white rounded-none sm:rounded-[2rem] shadow-sm sm:border border-b border-gray-100 sm:border-gray-200 overflow-hidden">
                 {loadingAddresses ? (
-                    <div className="flex justify-center py-8">
-                        <Loader2 className="w-8 h-8 text-gray-300 animate-spin" />
+                    <div className="flex justify-center py-6">
+                        <Loader2 className="w-6 h-6 text-gray-300 animate-spin" />
                     </div>
-                ) : addresses.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {addresses.map((addr) => (
-                            <div 
-                                key={addr.id}
-                                onClick={() => setSelectedAddressId(addr.id)}
-                                className={`cursor-pointer p-5 rounded-2xl border-2 transition-all duration-200 relative ${
-                                    selectedAddressId === addr.id 
-                                    ? 'border-primary bg-red-50/30 ring-1 ring-primary/20' 
-                                    : 'border-gray-100 hover:border-gray-200 bg-gray-50'
-                                }`}
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
-                                        selectedAddressId === addr.id ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
-                                    }`}>
-                                        {addr.label}
-                                    </span>
-                                    {selectedAddressId === addr.id && <CheckCircle className="w-5 h-5 text-primary fill-current" />}
-                                </div>
-                                <p className="font-bold text-gray-900 text-sm mb-1">{addr.fullName}</p>
-                                <p className="text-xs text-gray-500 leading-relaxed">
-                                    {addr.street}, {addr.city}<br />
-                                    {addr.state}, {addr.zip}
-                                </p>
-                            </div>
-                        ))}
+                ) : addresses.length > 0 && selectedAddressId ? (
+                    <div 
+                      onClick={() => setIsAddressSelectionOpen(true)}
+                      className="flex items-start gap-3 p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <MapPin className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 text-[13px]">
+                          <span className="font-bold text-gray-900">{addresses.find(a => a.id === selectedAddressId)?.fullName}</span>
+                          <span className="text-gray-500 font-medium">{addresses.find(a => a.id === selectedAddressId)?.phone}</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-[13px] text-gray-600">
+                          <span className="bg-blue-100 text-blue-700 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 mt-0.5">
+                            {addresses.find(a => a.id === selectedAddressId)?.label}
+                          </span>
+                          <span className="leading-snug">
+                            {addresses.find(a => a.id === selectedAddressId)?.street}, {addresses.find(a => a.id === selectedAddressId)?.city}
+                            {addresses.find(a => a.id === selectedAddressId)?.state && `, ${addresses.find(a => a.id === selectedAddressId)?.state}`}
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400 shrink-0 mt-2" />
                     </div>
                 ) : (
-                    <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                        <p className="text-gray-500 text-sm mb-3">
-                          {isGuestCheckout ? 'Add a shipping address to continue as guest.' : 'No addresses found.'}
-                        </p>
-                        <button 
-                            onClick={() => setIsAddressFormOpen(true)}
-                            className="bg-gray-900 text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black transition-colors"
-                        >
-                            Create Address
-                        </button>
+                    <div 
+                      onClick={() => {
+                        setEditingAddress(null);
+                        setIsAddressFormOpen(true);
+                      }}
+                      className="flex items-center justify-between p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-500">
+                          <MapPin className="w-5 h-5" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900">Add Shipping Address</span>
+                          {isGuestCheckout && <span className="text-[11px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-1 rounded w-fit mt-1">Guest Checkout</span>}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
                 )}
             </section>
@@ -713,7 +718,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                 </div>
 
                 {/* Costs */}
-                <div className="space-y-3 pt-6 border-t border-dashed border-gray-200 bg-gray-50/50 -mx-8 px-8 pb-6">
+                <div className="space-y-3 pt-6 border-t border-dashed border-gray-200 bg-gray-50/50 -mx-6 sm:-mx-8 px-6 sm:px-8 pb-6">
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-500 font-medium">Subtotal</span>
                         <span className="font-bold text-gray-900">{formatCurrency(subtotal)}</span>
@@ -782,11 +787,81 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
         </div>
       </main>
 
+      {/* Address Selection Modal */}
+      {isAddressSelectionOpen && (
+        <div className="fixed inset-0 z-[60] flex justify-center sm:items-center items-end bg-black/50 backdrop-blur-sm transition-opacity">
+          <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:fade-in-0 duration-300">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10 shadow-sm">
+              <h2 className="font-bold text-gray-900 text-lg">Select Address</h2>
+              <button onClick={() => setIsAddressSelectionOpen(false)} className="p-2 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-50 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-3 pb-safe">
+              {addresses.map(addr => (
+                <div 
+                  key={addr.id}
+                  onClick={() => {
+                    setSelectedAddressId(addr.id);
+                    setIsAddressSelectionOpen(false);
+                  }}
+                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer relative ${
+                    selectedAddressId === addr.id ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20' : 'border-gray-100 hover:border-gray-200 bg-white hover:shadow-sm'
+                  }`}
+                >
+                   <div className="flex justify-between items-start mb-2">
+                       <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
+                           selectedAddressId === addr.id ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'
+                       }`}>
+                           {addr.label}
+                       </span>
+                       <div className="flex items-center gap-2">
+                           <button 
+                               onClick={(e) => {
+                                   e.stopPropagation();
+                                   setEditingAddress(addr);
+                                   setIsAddressFormOpen(true);
+                                   setIsAddressSelectionOpen(false);
+                               }}
+                               className="p-1.5 text-gray-400 hover:text-primary transition-colors rounded-full hover:bg-primary/10"
+                           >
+                               <Edit2 className="w-4 h-4" />
+                           </button>
+                           {selectedAddressId === addr.id && <CheckCircle className="w-5 h-5 text-primary fill-current" />}
+                       </div>
+                   </div>
+                   <p className="font-bold text-gray-900 text-sm mb-1">{addr.fullName} <span className="text-gray-500 font-normal ml-1">{addr.phone}</span></p>
+                   <p className="text-xs text-gray-500 leading-relaxed">
+                       {addr.street}, {addr.city}<br />
+                       {addr.state && `${addr.state}, `}{addr.zip}
+                   </p>
+                </div>
+              ))}
+              
+              <button 
+                  onClick={() => {
+                      setEditingAddress(null);
+                      setIsAddressFormOpen(true);
+                      setIsAddressSelectionOpen(false);
+                  }}
+                  className="w-full mt-2 py-3.5 border border-dashed border-gray-300 rounded-xl text-primary font-bold flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors"
+              >
+                  <Plus className="w-5 h-5" /> Add New Address
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Address Form Modal */}
       {isAddressFormOpen && (
         <AddressForm 
+            initialData={editingAddress || undefined}
             onSubmit={handleAddAddress}
-            onCancel={() => setIsAddressFormOpen(false)}
+            onCancel={() => {
+              setIsAddressFormOpen(false);
+              setEditingAddress(null);
+            }}
             isSaving={isSavingAddress}
         />
       )}

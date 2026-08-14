@@ -535,6 +535,7 @@ export interface Database {
           highlight_text: string | null;
           description: string | null;
           image_url: string;
+          mobile_image_url: string | null;
           primary_button_text: string;
           secondary_button_text: string;
           target_type: 'none' | 'product' | 'category' | 'url';
@@ -553,6 +554,7 @@ export interface Database {
           highlight_text?: string | null;
           description?: string | null;
           image_url: string;
+          mobile_image_url?: string | null;
           primary_button_text?: string;
           secondary_button_text?: string;
           target_type?: 'none' | 'product' | 'category' | 'url';
@@ -571,6 +573,7 @@ export interface Database {
           highlight_text?: string | null;
           description?: string | null;
           image_url?: string;
+          mobile_image_url?: string | null;
           primary_button_text?: string;
           secondary_button_text?: string;
           target_type?: 'none' | 'product' | 'category' | 'url';

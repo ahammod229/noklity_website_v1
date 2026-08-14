@@ -84,7 +84,7 @@ const AdminDashboardPage: React.FC = () => {
       // 3. Fetch Recent Orders
       const recentOrdersPromise = supabase
         .from('orders')
-        .select('id, created_at, total_amount, status, user:profiles(full_name)')
+        .select('id, created_at, total_amount, status, user:users(display_name)')
         .order('created_at', { ascending: false })
         .limit(5);
 

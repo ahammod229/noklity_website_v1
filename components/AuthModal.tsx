@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { loginUser, registerUser } from '../services/authService';
 import { X, Mail, Lock, Loader2 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -23,17 +23,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        const { error: authError } = await loginUser(email, password);
+        if (authError) throw new Error(authError);
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
+        const { error: authError } = await registerUser('', email, password);
+        if (authError) throw new Error(authError);
       }
       onClose();
     } catch (err: any) {
@@ -61,56 +55,52 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               {error}
             </div>
           )}
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Email</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="email"
-                required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                placeholder="name@example.com"
+                onChange={e => setEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                placeholder="your@email.com"
+                required
               />
             </div>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Password</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="password"
-                required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                onChange={e => setPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 placeholder="••••••••"
+                required
               />
             </div>
           </div>
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLogin ? 'Sign In' : 'Create Account')}
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isLogin ? 'Sign In' : 'Create Account'}
           </button>
-
-          <div className="text-center text-sm text-gray-500 mt-4">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary font-bold hover:underline"
-            >
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
-          </div>
         </form>
+
+        <div className="px-6 pb-6 text-center">
+          <button
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-sm text-primary hover:underline"
+          >
+            {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -175,7 +175,7 @@ const Search: React.FC<SearchPageProps> = ({
                             Showing {results.length} of {totalCount} products
                         </span>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <button 
                                 onClick={() => setIsMobileFiltersOpen(true)}
                                 className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-black uppercase tracking-widest text-gray-700 hover:bg-gray-50"
@@ -254,7 +254,7 @@ const Search: React.FC<SearchPageProps> = ({
                             <p className="text-gray-500 mb-8 max-w-sm font-medium leading-relaxed">
                                 We couldn't find any matches for your current filters. Try checking for typos or using different keywords.
                             </p>
-                            <div className="flex gap-4">
+                            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                 <button 
                                     onClick={handleClearFilters}
                                     className="bg-white text-gray-900 border border-gray-200 font-bold py-3 px-8 rounded-2xl hover:bg-gray-50 transition-all text-sm"

@@ -1,6 +1,6 @@
 # NOKLITY Storefront (White-Label Productized)
 
-React + Vite + Supabase ecommerce storefront and admin panel, productized for reusable white-label deployments.
+React + Vite ecommerce storefront and admin panel with Supabase today and an in-progress Express + MongoDB migration path.
 
 ## What was added
 - Unified tenant configuration (`file + DB + env`) with runtime cache.
@@ -18,10 +18,26 @@ React + Vite + Supabase ecommerce storefront and admin panel, productized for re
 4. Start:
    - `npm run dev`
 
+## MERN development
+1. Add backend env values in `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/.env.local`
+   - `MONGO_URI`
+   - `PORT`
+   - `CLIENT_ORIGIN`
+   - optional: `VITE_API_BASE_URL`
+2. Start frontend + backend together:
+   - `npm run dev:mern`
+3. Health check:
+   - `http://localhost:5000/api/health`
+
+The product catalog now attempts the Express + Mongo API first and falls back to Supabase automatically if the API is unavailable.
+
 ## Useful commands
 - `npm run dev`
 - `npm run build`
 - `npm run preview`
+- `npm run server:dev`
+- `npm run server:start`
+- `npm run dev:mern`
 - `npm run check:prepublish`
 - `npm run test:productization`
 - `npm run test:smoke`
@@ -42,6 +58,8 @@ React + Vite + Supabase ecommerce storefront and admin panel, productized for re
   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/WHITE_LABEL_CUSTOMIZATION.md`
 - Upgrade guide:
   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/UPGRADE_GUIDE.md`
+- MERN migration plan:
+  - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/MERN_MIGRATION_PLAN.md`
 - HostSeba cPanel deployment:
   - `/Users/ahammodali/Desktop/NOKLITY/noklity_ecomerce_final-version/docs/HOSTSEBA_CPANEL_DEPLOYMENT.md`
 

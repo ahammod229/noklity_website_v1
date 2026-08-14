@@ -1,5 +1,6 @@
 
 import { supabase } from '../lib/supabase';
+import { auth } from './firebaseClient';
 import { CartItem, Order } from '../types';
 import { getTenantConfig } from './tenantConfigService';
 import { getShortOrderId } from '../utils/orderId';
@@ -82,9 +83,8 @@ export const createOrder = async (orderData: OrderData): Promise<{ success: bool
       throw new Error('Bank transfer is disabled for this plan.');
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUser = sessionData.session?.user;
-    const isGuestCheckout = !currentUser?.id;
+    const currentFirebaseUser = auth.currentUser;
+    const isGuestCheckout = !currentFirebaseUser;
     if (isGuestCheckout && !featureMap.checkout_guest) {
       throw new Error('Guest checkout is disabled. Please sign in to place an order.');
     }
@@ -148,22 +148,7 @@ export const createOrder = async (orderData: OrderData): Promise<{ success: bool
       throw new Error(stockIssues.slice(0, 3).join(' '));
     }
 
-    // Ensure profile row exists for authenticated users before order insert.
-    if (currentUser?.id) {
-      const { error: profileError } = await supabase.from('profiles').upsert(
-        {
-          id: currentUser.id,
-          email: currentUser.email || `${currentUser.id}@customer.local`,
-          full_name: (currentUser.user_metadata?.full_name as string) || null,
-          role: 'user',
-          status: 'active'
-        },
-        { onConflict: 'id' }
-      );
-      if (profileError) {
-        throw new Error(`Unable to prepare customer profile: ${profileError.message}`);
-      }
-    }
+    // User profile is already synced to the users table by AuthContext on login.
 
     const formattedItems = orderData.items.map(item => ({
       product_id: item.id,
@@ -196,7 +181,7 @@ export const createOrder = async (orderData: OrderData): Promise<{ success: bool
 export const getOrders = async (): Promise<any[]> => {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session?.user) return [];
+    if (!sessionData.session?.user && !auth.currentUser) return [];
 
     const { data, error } = await supabase
       .from('orders')

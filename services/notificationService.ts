@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { auth } from './firebaseClient';
 
 export interface NotificationPreferences {
   orderConfirmations: boolean;
@@ -68,15 +69,13 @@ const sanitizePreferences = (raw: unknown): NotificationPreferences => {
  */
 export const getNotificationPreferences = async (): Promise<NotificationPreferences> => {
   try {
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return { ...DEFAULT_PREFERENCES };
 
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('notification_settings')
-      .eq('id', user.id)
+      .eq('uid', user.uid)
       .single();
 
     if (error) {
@@ -100,22 +99,14 @@ export const getNotificationPreferences = async (): Promise<NotificationPreferen
  */
 export const updateNotificationPreferences = async (preferences: NotificationPreferences): Promise<boolean> => {
   try {
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return false;
 
     const payload = sanitizePreferences(preferences);
     const { error } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id: user.id,
-          email: user.email || '',
-          notification_settings: payload
-        },
-        { onConflict: 'id' }
-      );
+      .from('users')
+      .update({ notification_settings: payload })
+      .eq('uid', user.uid);
 
     if (error) {
       if (isNotificationColumnMissing(error)) {

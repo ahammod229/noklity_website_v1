@@ -34,7 +34,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const { data, error } = await supabase
           .from('wishlist_items')
           .select('product_id, products(*)')
-          .eq('user_id', user.id)
+          .eq('user_id', user.uid)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -88,7 +88,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const { error } = await supabase
         .from('wishlist_items')
-        .insert({ user_id: user.id, product_id: product.id });
+        .insert({ user_id: user.uid, product_id: product.id });
 
       if (error) throw error;
     } catch (err) {
@@ -109,7 +109,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const { error } = await supabase
         .from('wishlist_items')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', user.uid)
         .eq('product_id', productId);
 
       if (error) throw error;

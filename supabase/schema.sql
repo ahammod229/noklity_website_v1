@@ -26,8 +26,13 @@ as $$
     from public.profiles p
     where p.id = auth.uid()
       and p.role = 'admin'
+      and coalesce(p.status, 'active') = 'active'
   );
 $$;
+
+grant execute on function public.is_admin() to anon;
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.is_admin() to service_role;
 
 -- Profiles ------------------------------------------------------------------
 create table if not exists public.profiles (
@@ -65,11 +70,15 @@ with check (auth.uid() = id);
 
 create policy "Users can update own profile"
 on public.profiles for update
-using (auth.uid() = id);
+using (auth.uid() = id)
+with check (auth.uid() = id);
 
 create policy "Admins can update all profiles"
 on public.profiles for update
 using (
+  public.is_admin()
+)
+with check (
   public.is_admin()
 );
 
@@ -495,7 +504,9 @@ begin
 end;
 $$;
 
-grant execute on function public.create_order(jsonb, numeric, jsonb, text) to anon, authenticated;
+grant execute on function public.create_order(jsonb, numeric, jsonb, text) to anon;
+grant execute on function public.create_order(jsonb, numeric, jsonb, text) to authenticated;
+grant execute on function public.create_order(jsonb, numeric, jsonb, text) to service_role;
 
 -- Cart ----------------------------------------------------------------------
 create table if not exists public.cart_items (
@@ -801,8 +812,8 @@ values (
   'assets',
   'assets',
   true,
-  5242880,
-  array['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+  10485760,
+  array['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/gif', 'image/avif', 'application/pdf']
 )
 on conflict (id) do update
 set
@@ -829,6 +840,10 @@ with check (
 create policy "Admins can update assets"
 on storage.objects for update
 using (
+  bucket_id = 'assets'
+  and public.is_admin()
+)
+with check (
   bucket_id = 'assets'
   and public.is_admin()
 );
