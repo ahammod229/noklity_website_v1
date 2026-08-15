@@ -426,7 +426,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans pb-[10.5rem] md:pb-8">
+    <div className="min-h-screen bg-gray-100 font-sans pb-[12rem] md:pb-8">
       {shareFeedback && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 shadow-md">
           {shareFeedback}
@@ -720,32 +720,25 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
           }
           .nk-prod-bottom-bar {
             position: fixed;
-            bottom: 72px;
+            /* MobileBottomNav = h-16(64px) + mb-2(8px) = 72px, plus 8px gap + safe-area */
+            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
             left: 50%;
             transform: translateX(-50%);
-            width: calc(100% - 16px);
-            max-width: 500px;
+            width: calc(100% - 24px);
+            max-width: 480px;
             background-color: #ffffff;
-            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
-            border: 1px solid #eaeaea;
-            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            border: 1px solid #e8e8e8;
+            border-radius: 20px;
             padding: 10px 12px;
-            z-index: 60;
+            z-index: 63;
             display: flex;
-            gap: 12px;
+            gap: 10px;
             box-sizing: border-box;
           }
           @media (min-width: 768px) {
             .nk-prod-bottom-bar {
-              bottom: 0;
-              border-radius: 0;
-              border-left: none;
-              border-right: none;
-              border-bottom: none;
-              width: 100%;
-              max-width: 450px;
-              padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-              z-index: 9999;
+              display: none;
             }
           }
           .nk-prod-btn {
