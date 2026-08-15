@@ -426,7 +426,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans">
+    <div className="min-h-screen bg-gray-100 font-sans md:pb-8">
       {shareFeedback && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 shadow-md">
           {shareFeedback}
@@ -444,7 +444,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
           .nk-prod-container {
             background-color: #ffffff;
             padding: 12px;
-            padding-bottom: 100px; /* Ensures content stays above mobile bottom nav */
+            /* bottom padding = fixed bar (~68px) + MobileBottomNav (~72px) + gap (16px) = 156px */
+            padding-bottom: 160px;
             display: flex;
             flex-direction: column;
             gap: 16px;
@@ -718,42 +719,95 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             line-height: 1.5;
             margin-top: 6px;
           }
-          .nk-prod-action-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-          }
-          .nk-prod-action-row .nk-prod-btn {
+          /* ── Fixed sticky bottom action bar ── */
+          .nk-prod-action-bar {
+            position: fixed;
+            /* Sit above MobileBottomNav: h-16(64px) + mb-2(8px) = 72px total */
+            bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+            left: 0;
+            right: 0;
             width: 100%;
+            background-color: #ffffff;
+            border-top: 1px solid #e8e8e8;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.09);
+            padding: 10px 12px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+            z-index: 50;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            box-sizing: border-box;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+          }
+          .nk-prod-action-bar.hidden-bar {
+            transform: translateY(calc(100% + 8px));
+            opacity: 0;
+            pointer-events: none;
+          }
+          .nk-prod-action-bar-total {
+            display: flex;
+            flex-direction: column;
+            min-width: 80px;
+            flex-shrink: 0;
+          }
+          .nk-prod-action-bar-total-label {
+            font-size: 10px;
+            color: #888888;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+          .nk-prod-action-bar-total-price {
+            font-size: 16px;
+            font-weight: 800;
+            color: #e61c43;
+            line-height: 1.1;
+          }
+          .nk-prod-action-bar-btns {
+            display: flex;
+            flex: 1;
+            gap: 8px;
           }
           .nk-prod-btn {
             flex: 1;
-            height: 48px;
-            border-radius: 25px;
+            height: 46px;
+            border-radius: 23px;
             border: none;
-            font-size: 15px;
-            font-weight: 700;
+            font-size: 14px;
+            font-weight: 800;
             color: #ffffff;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.2s ease, transform 0.1s ease;
+            transition: opacity 0.15s ease, transform 0.1s ease;
+            white-space: nowrap;
           }
           .nk-prod-btn:active {
-            transform: scale(0.98);
-            opacity: 0.95;
+            transform: scale(0.97);
+            opacity: 0.88;
+          }
+          .nk-prod-btn:disabled {
+            background-color: #d1d5db !important;
+            color: #9ca3af !important;
+            cursor: not-allowed;
           }
           .nk-prod-btn-buy {
             background-color: #2ca5e0;
           }
+          .nk-prod-btn-buy:hover:not(:disabled) {
+            background-color: #1d95cc;
+          }
           .nk-prod-btn-cart {
             background-color: #e61c43;
           }
+          .nk-prod-btn-cart:hover:not(:disabled) {
+            background-color: #c8102e;
+          }
         ` }} />
 
-        {/* Back navigation header */}
-        <header className="bg-white border-b border-gray-200 nk-prod-header">
+        {/* Sticky top navigation header */}
+        <header className="sticky top-0 z-40 bg-white border-b border-gray-200 nk-prod-header">
           <div className="px-3 pt-3 pb-2 flex items-start gap-2.5">
             <button
               onClick={onClose}
@@ -889,26 +943,6 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                 +
               </button>
             </div>
-          </div>
-
-          {/* Inline Action Buttons — right after quantity, before specs */}
-          <div className="nk-prod-action-row">
-            <button
-              onClick={handleBuyNow}
-              disabled={isProcessing || isOutOfStock}
-              className="nk-prod-btn nk-prod-btn-buy"
-              style={{ opacity: isProcessing || isOutOfStock ? 0.5 : 1, cursor: isProcessing || isOutOfStock ? 'not-allowed' : 'pointer' }}
-            >
-              {isProcessing ? 'Please wait...' : 'Buy Now'}
-            </button>
-            <button
-              onClick={handleAddToCart}
-              disabled={isProcessing || isOutOfStock}
-              className="nk-prod-btn nk-prod-btn-cart"
-              style={{ opacity: isProcessing || isOutOfStock ? 0.5 : 1, cursor: isProcessing || isOutOfStock ? 'not-allowed' : 'pointer' }}
-            >
-              {isProcessing ? '...' : 'Add to Cart'}
-            </button>
           </div>
 
           {/* Dynamic Specifications Block */}
@@ -1292,8 +1326,40 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
         </div>
       )}
 
-      {/* Mobile bottom padding spacer — ensures last content is visible above MobileBottomNav (h-16 + mb-2 = 72px) */}
-      <div className="md:hidden" style={{ height: '80px' }} aria-hidden="true" />
+      {/* ── Mobile Fixed Bottom Action Bar ── */}
+      {/* Hidden on md+. Sits above MobileBottomNav (z-65). Smooth show/hide on scroll. */}
+      <div
+        className={`md:hidden nk-prod-action-bar${!isMobileActionBarVisible ? ' hidden-bar' : ''}${
+          isImageViewerOpen ? ' hidden-bar' : ''
+        }`}
+        aria-hidden={isImageViewerOpen}
+      >
+        {/* Total price preview */}
+        <div className="nk-prod-action-bar-total">
+          <span className="nk-prod-action-bar-total-label">Total</span>
+          <span className="nk-prod-action-bar-total-price">{formatCurrency(mobileActionTotal)}</span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="nk-prod-action-bar-btns">
+          <button
+            onClick={handleBuyNow}
+            disabled={isProcessing || isOutOfStock}
+            className="nk-prod-btn nk-prod-btn-buy"
+            aria-label="Buy Now"
+          >
+            {isProcessing ? '...' : 'Buy Now'}
+          </button>
+          <button
+            onClick={handleAddToCart}
+            disabled={isProcessing || isOutOfStock}
+            className="nk-prod-btn nk-prod-btn-cart"
+            aria-label="Add to Cart"
+          >
+            {isProcessing ? '...' : 'Add to Cart'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
