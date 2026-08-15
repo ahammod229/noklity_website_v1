@@ -426,7 +426,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans pb-[12rem] md:pb-8">
+    <div className="min-h-screen bg-gray-100 font-sans">
       {shareFeedback && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[120] rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 shadow-md">
           {shareFeedback}
@@ -444,11 +444,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
           .nk-prod-container {
             background-color: #ffffff;
             padding: 12px;
+            padding-bottom: 100px; /* Ensures content stays above mobile bottom nav */
             display: flex;
             flex-direction: column;
             gap: 16px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin-bottom: 80px; /* Safe padding for bottom bar */
             max-width: 450px;
             margin-left: auto;
             margin-right: auto;
@@ -718,28 +718,13 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             line-height: 1.5;
             margin-top: 6px;
           }
-          .nk-prod-bottom-bar {
-            position: fixed;
-            /* MobileBottomNav = h-16(64px) + mb-2(8px) = 72px, plus 8px gap + safe-area */
-            bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-            left: 50%;
-            transform: translateX(-50%);
-            width: calc(100% - 24px);
-            max-width: 480px;
-            background-color: #ffffff;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
-            border: 1px solid #e8e8e8;
-            border-radius: 20px;
-            padding: 10px 12px;
-            z-index: 63;
-            display: flex;
+          .nk-prod-action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
-            box-sizing: border-box;
           }
-          @media (min-width: 768px) {
-            .nk-prod-bottom-bar {
-              display: none;
-            }
+          .nk-prod-action-row .nk-prod-btn {
+            width: 100%;
           }
           .nk-prod-btn {
             flex: 1;
@@ -904,6 +889,26 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                 +
               </button>
             </div>
+          </div>
+
+          {/* Inline Action Buttons — right after quantity, before specs */}
+          <div className="nk-prod-action-row">
+            <button
+              onClick={handleBuyNow}
+              disabled={isProcessing || isOutOfStock}
+              className="nk-prod-btn nk-prod-btn-buy"
+              style={{ opacity: isProcessing || isOutOfStock ? 0.5 : 1, cursor: isProcessing || isOutOfStock ? 'not-allowed' : 'pointer' }}
+            >
+              {isProcessing ? 'Please wait...' : 'Buy Now'}
+            </button>
+            <button
+              onClick={handleAddToCart}
+              disabled={isProcessing || isOutOfStock}
+              className="nk-prod-btn nk-prod-btn-cart"
+              style={{ opacity: isProcessing || isOutOfStock ? 0.5 : 1, cursor: isProcessing || isOutOfStock ? 'not-allowed' : 'pointer' }}
+            >
+              {isProcessing ? '...' : 'Add to Cart'}
+            </button>
           </div>
 
           {/* Dynamic Specifications Block */}
@@ -1287,28 +1292,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
         </div>
       )}
 
-      <div
-        className={`md:hidden ${
-          isImageViewerOpen ? 'hidden' : ''
-        }`}
-      >
-        <div className="nk-prod-bottom-bar">
-          <button
-            onClick={handleBuyNow}
-            disabled={isProcessing || isOutOfStock}
-            className="nk-prod-btn nk-prod-btn-buy"
-          >
-            Buy Now
-          </button>
-          <button
-            onClick={handleAddToCart}
-            disabled={isProcessing || isOutOfStock}
-            className="nk-prod-btn nk-prod-btn-cart"
-          >
-            Add to Cart
-          </button>
-        </div>
-      </div>
+      {/* Mobile bottom padding spacer — ensures last content is visible above MobileBottomNav (h-16 + mb-2 = 72px) */}
+      <div className="md:hidden" style={{ height: '80px' }} aria-hidden="true" />
     </div>
   );
 };
