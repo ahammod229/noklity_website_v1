@@ -131,11 +131,11 @@ const Search: React.FC<SearchPageProps> = ({
       />
       <main className="flex-grow">
         {/* Search Header */}
-        <div className="bg-gray-50 border-b border-gray-200 py-8">
+        <div className="bg-gray-50 border-b border-gray-200 py-4 sm:py-6 md:py-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <button 
                     onClick={() => onNavigate('home')}
-                    className="flex items-center text-xs font-black text-gray-400 hover:text-gray-900 mb-6 group uppercase tracking-widest transition-colors"
+                    className="flex items-center text-xs font-black text-gray-400 hover:text-gray-900 mb-3 md:mb-5 group uppercase tracking-widest transition-colors"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                     Back to Home
@@ -152,11 +152,11 @@ const Search: React.FC<SearchPageProps> = ({
             </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-            <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-6">
+            <div className="flex flex-col lg:flex-row gap-0 lg:gap-6">
                 
                 {/* Left Sidebar - Filters */}
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 lg:w-72">
                     <SearchFilters 
                         mobileOpen={isMobileFiltersOpen}
                         onCloseMobile={() => setIsMobileFiltersOpen(false)}
@@ -170,7 +170,7 @@ const Search: React.FC<SearchPageProps> = ({
                 <div className="flex-1 min-w-0">
                     
                     {/* Toolbar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 md:mb-8 md:pb-6 border-b border-gray-100">
                         <span className="font-bold text-gray-700 text-sm">
                             Showing {results.length} of {totalCount} products
                         </span>
@@ -204,13 +204,13 @@ const Search: React.FC<SearchPageProps> = ({
 
                     {/* Results Grid */}
                     {initialLoading ? (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
                             {[1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="bg-gray-100 rounded-[2rem] h-[420px] animate-pulse"></div>
                             ))}
                         </div>
                     ) : error ? (
-                        <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
+                        <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                             <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
                                 <PackageX className="w-10 h-10 text-gray-300" strokeWidth={1.5} />
                             </div>
@@ -232,7 +232,7 @@ const Search: React.FC<SearchPageProps> = ({
                               </div>
                             </div>
                           )}
-                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-8">
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
                             {results.map(product => (
                                 <ProductCard 
                                     key={product.id}
@@ -246,7 +246,7 @@ const Search: React.FC<SearchPageProps> = ({
                         </div>
                     ) : (
                         /* Empty State */
-                        <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-gray-50 rounded-[3rem] border border-dashed border-gray-200">
+                        <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                             <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
                                 <PackageX className="w-10 h-10 text-gray-300" strokeWidth={1.5} />
                             </div>

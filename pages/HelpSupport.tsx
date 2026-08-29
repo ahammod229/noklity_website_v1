@@ -50,7 +50,7 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
       
       <main className="flex-grow">
         {/* Hero / Title Section */}
-        <section className="bg-gray-50 border-b border-gray-100 py-16 md:py-20">
+        <section className="bg-gray-50 border-b border-gray-100 py-8 md:py-10">
           <div className="max-w-4xl mx-auto px-4 text-center">
             <div className="inline-flex items-center justify-center p-3 bg-white rounded-full shadow-sm mb-6">
                 <HelpCircle className="w-6 h-6 text-primary" />
@@ -68,7 +68,7 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
             {/* Contact Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-20">
                 {/* Email Card */}
-                <div className="bg-white rounded-2xl p-8 shadow-lg shadow-gray-200/50 border border-gray-100 hover:border-primary/20 hover:shadow-xl transition-all duration-300 group">
+                <div className="bg-white rounded-2xl p-5 shadow-lg shadow-gray-200/50 border border-gray-100 hover:border-primary/20 hover:shadow-xl transition-all duration-300 group">
                     <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <Mail className="w-6 h-6 text-primary" />
                     </div>
@@ -85,7 +85,7 @@ const HelpSupport: React.FC<HelpSupportProps> = ({
                 </div>
 
                 {/* WhatsApp Card */}
-                <div className="bg-white rounded-2xl p-8 shadow-lg shadow-gray-200/50 border border-gray-100 hover:border-green-500/20 hover:shadow-xl transition-all duration-300 group">
+                <div className="bg-white rounded-2xl p-5 shadow-lg shadow-gray-200/50 border border-gray-100 hover:border-green-500/20 hover:shadow-xl transition-all duration-300 group">
                     <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <MessageCircle className="w-6 h-6 text-green-600" />
                     </div>

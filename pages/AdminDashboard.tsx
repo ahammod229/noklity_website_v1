@@ -36,6 +36,7 @@ import AdminDashboardPage from './admin/Dashboard';
 import ProductsPage from './admin/Products';
 import AdminOrders from './admin/Orders';
 import CategoryManager from '../components/admin/CategoryManager';
+import BrandManager from '../components/admin/BrandManager';
 import SupportManager from '../components/admin/SupportManager';
 import AdminSettings from './admin/Settings';
 import AdminLanguage from './admin/AdminLanguage';
@@ -418,6 +419,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
       case 'finance': return <Finance />;
       case 'orders': return <AdminOrders onNavigate={onNavigate} />;
       case 'categories': return <CategoryManager />;
+      case 'brands': return <BrandManager />;
       case 'hero': return <HeroBanners />;
       case 'media': return <MediaControl />;
       case 'support': return <SupportManager />;
@@ -599,7 +601,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, showToast, on
       </aside>
 
       {/* Main Content */}
-      <main className="min-h-screen p-4 sm:p-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:p-8 overflow-x-hidden">
+      <main className="min-h-screen p-4 sm:p-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:p-5 overflow-x-clip">
         {/* Top Bar */}
         <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-8 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between shadow-sm">
           <div className="flex items-start gap-3">

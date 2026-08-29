@@ -251,11 +251,11 @@ const AdminDashboardPage: React.FC = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         
         {/* Recent Orders */}
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
             <h3 className="text-lg font-black text-gray-900 tracking-tight">Recent Orders</h3>
             <button className="text-xs font-bold text-primary hover:underline uppercase tracking-widest">View All</button>
           </div>
@@ -288,7 +288,7 @@ const AdminDashboardPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12">
+              <div className="text-center py-6">
                 <ShoppingBag className="w-12 h-12 text-gray-200 mx-auto mb-3" />
                 <p className="text-gray-400 font-medium">No orders found.</p>
               </div>
@@ -298,7 +298,7 @@ const AdminDashboardPage: React.FC = () => {
 
         {/* Graph Insights */}
         <div className="space-y-6">
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <LineChart className="w-5 h-5 text-primary" />
@@ -355,7 +355,7 @@ const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-primary" />

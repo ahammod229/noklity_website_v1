@@ -198,11 +198,11 @@ const SupportManager: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="p-16 flex justify-center">
+          <div className="p-5 flex justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : tickets.length === 0 ? (
-          <div className="p-12 text-center text-gray-500 font-medium">No tickets found</div>
+          <div className="p-6 text-center text-gray-500 font-medium">No tickets found</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">

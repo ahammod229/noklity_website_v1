@@ -69,13 +69,13 @@ const ContentPage: React.FC<ContentPageProps> = ({ slug, onNavigate }) => {
         path={`/page/${safeSlug}`}
         robots={notFound ? 'noindex, nofollow' : 'index, follow'}
       />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-8">
           <p className="text-xs font-black uppercase tracking-widest text-primary">Company & Legal</p>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight mt-2">{title || 'Page'}</h1>
         </div>
 
-        <article className="bg-white border border-gray-200 rounded-3xl shadow-sm p-6 md:p-10 space-y-5">
+        <article className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 md:p-6 space-y-5">
           {paragraphs.map((paragraph, idx) => (
             <p key={`${safeSlug}-${idx}`} className="text-base md:text-lg leading-8 text-gray-700 font-medium">
               {paragraph}

@@ -19,7 +19,7 @@ const CartPage: React.FC<CartPageProps> = ({ items, onUpdateQuantity, onRemoveIt
   if (items.length === 0) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-5 text-center shadow-sm">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-50">
             <ShoppingBag className="h-7 w-7 text-gray-400" />
           </div>
@@ -97,7 +97,7 @@ const CartPage: React.FC<CartPageProps> = ({ items, onUpdateQuantity, onRemoveIt
                     </p>
                   )}
 
-                  <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+                  <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-3">
                     <span className="text-sm font-black text-gray-900 sm:text-base">{formatCurrency(item.price)}</span>
                     <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1">
                       <button
@@ -134,9 +134,9 @@ const CartPage: React.FC<CartPageProps> = ({ items, onUpdateQuantity, onRemoveIt
               <span className="font-semibold text-gray-500">Subtotal</span>
               <span className="font-black text-gray-900">{formatCurrency(subtotal)}</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-gray-500">Shipping</span>
-              <span className="font-black text-gray-900">Calculated at checkout</span>
+            <div className="flex items-center justify-between text-sm gap-2">
+              <span className="font-semibold text-gray-500 whitespace-nowrap">Shipping</span>
+              <span className="font-black text-gray-900 text-right">Calculated at checkout</span>
             </div>
           </div>
           <button

@@ -89,7 +89,7 @@ const Orders: React.FC<OrdersProps> = ({
   if (loading) {
     return (
       <AccountLayout activeTab="account-orders" onNavigate={onNavigate} onCartClick={onCartClick} onLoginClick={onLoginClick} cartItemCount={cartItemCount} title="My Orders">
-        <div className="bg-white p-20 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center">
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col items-center justify-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
           <p className="text-gray-500 font-bold">Loading your order history...</p>
         </div>
@@ -109,7 +109,7 @@ const Orders: React.FC<OrdersProps> = ({
       <div className="space-y-6 animate-in fade-in duration-500">
         
         {/* Orders Header/Search */}
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-gray-900 font-bold">
             {filteredOrders.length > 0 
               ? `Showing ${paginatedOrders.length} of ${filteredOrders.length} orders`
@@ -137,7 +137,7 @@ const Orders: React.FC<OrdersProps> = ({
                 return (
                   <div 
                     key={order.id} 
-                    className="group bg-white rounded-3xl border border-gray-100 overflow-hidden hover:shadow-xl hover:shadow-gray-200/40 transition-all duration-300"
+                    className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl hover:shadow-gray-200/40 transition-all duration-300"
                   >
                     <div className="p-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -166,7 +166,7 @@ const Orders: React.FC<OrdersProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 md:gap-8">
+                        <div className="flex flex-wrap items-center gap-3 md:gap-5">
                           <div className="text-right hidden sm:block">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
                             <p className="text-lg font-black text-gray-900 tracking-tight">{formatCurrency(order.total)}</p>
@@ -226,7 +226,7 @@ const Orders: React.FC<OrdersProps> = ({
             )}
           </>
         ) : (
-          <div className="bg-white rounded-[3rem] p-6 sm:p-16 border border-dashed border-gray-200 flex flex-col items-center text-center">
+          <div className="bg-white rounded-2xl p-6 sm:p-5 border border-dashed border-gray-200 flex flex-col items-center text-center">
             <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
               <ShoppingBag className="w-10 h-10 text-gray-200" strokeWidth={1} />
             </div>

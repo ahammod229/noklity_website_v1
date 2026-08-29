@@ -91,9 +91,9 @@ const ProductTabs: React.FC<ProductTabsProps> = ({ productId, description, specs
   };
 
   return (
-    <div className="mt-8 bg-gray-50 rounded-2xl p-6 md:p-8">
+    <div className="mt-8 bg-gray-50 rounded-2xl p-4 md:p-6">
       {/* Tab Header */}
-      <div className="flex gap-8 border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-5 border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
         <button 
           onClick={() => setActiveTab('desc')}
           className={`pb-3 text-sm font-bold uppercase tracking-widest transition-colors whitespace-nowrap ${
@@ -235,7 +235,7 @@ const ProductTabs: React.FC<ProductTabsProps> = ({ productId, description, specs
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="grid gap-4 rounded-3xl border border-gray-200 bg-white p-5 md:grid-cols-[220px,1fr] md:p-6">
+                <div className="grid gap-4 rounded-xl border border-gray-200 bg-white p-5 md:grid-cols-[220px,1fr] md:p-6">
                   <div className="rounded-2xl bg-gray-50 px-5 py-6 text-center">
                     <p className="text-4xl font-black text-gray-900">{averageRating.toFixed(1)}</p>
                     <div className="mt-3 flex items-center justify-center gap-1">

@@ -231,7 +231,7 @@ const CategoryManager: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="bg-white p-12 rounded-2xl border border-gray-200 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-2xl border border-gray-200 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : (

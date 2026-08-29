@@ -4,7 +4,7 @@ import { Product } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { Plus, Search, Loader2 } from 'lucide-react';
 import { ProductTable } from '../../components/admin/products/ProductTable';
-import ProductForm, { ProductFormData } from '../../components/admin/ProductForm';
+import { ProductForm, ProductFormData } from '../../components/admin/products/ProductForm';
 import { ToastType } from '../../components/Toast';
 
 interface ProductsPageProps {
@@ -60,7 +60,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*, product_variants(*)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -77,6 +77,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
         return {
           id: row.id,
           name: row.title,
+          videoUrl: row.video_url,
+          videoProvider: row.video_provider,
+          variants: row.product_variants,
           slug: row.slug || '',
           brand: row.brand || '',
           modelNumber: row.model_number || '',
@@ -86,6 +89,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
           originalPrice: row.discount_price ? row.price : undefined,
           specifications: row.specifications || {},
           compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
+          keywords: row.keywords || "",
+          keyFeatures: Array.isArray(row.key_features) ? row.key_features : [],
           weight: Number(row.weight || 0),
           deliveryCharge: Number(row.delivery_charge || 0),
           warranty: row.warranty || '',
@@ -258,11 +263,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
   const handleSubmit = async (formData: ProductFormData) => {
     setIsSaving(true);
 
-    // Map form data to DB schema
-    // Logic: If salePrice is valid and < regularPrice, we store regularPrice as 'price' and salePrice as 'discount_price' (or vice versa depending on schema interp).
-    // Let's stick to: 'price' column is the base price. 'discount_price' is the lower price.
-    // If formData.salePrice is present, use it.
-    
     const payload = {
       title: formData.name,
       slug: formData.slug || null,
@@ -270,8 +270,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
       model_number: formData.modelNumber || null,
       sku: formData.sku || null,
       category: formData.category,
-      price: formData.regularPrice, // Base price
-      discount_price: (formData.salePrice && formData.salePrice < formData.regularPrice) ? formData.salePrice : null,
+      price: formData.regularPrice,
+      discount_price:
+        formData.salePrice !== null &&
+        formData.salePrice !== undefined &&
+        formData.salePrice > 0 &&
+        formData.salePrice < formData.regularPrice
+          ? formData.salePrice
+          : null,
       specifications: formData.specifications || {},
       compatibility: formData.compatibility || [],
       weight: formData.weight || null,
@@ -280,45 +286,87 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
       country_of_origin: formData.countryOfOrigin || null,
       status: formData.status,
       stock: formData.stock,
-      image_url: formData.image,
+      image_url: formData.image || formData.images[0] || null,
       image_urls: formData.images,
-      delivery_charges: formData.deliveryCharges,
-      warranty_months: formData.warrantyMonths,
+      delivery_charges: formData.deliveryCharges || {},
+      warranty_months: formData.warrantyMonths || 0,
       warranty_policy: formData.warrantyPolicy || null,
       tax_percent: 0,
-      default_delivery_fee: formData.defaultDeliveryFee,
+      default_delivery_fee: formData.defaultDeliveryFee || 0,
       shipping_info: formData.shippingInfo || null,
       return_policy: formData.returnPolicy || null,
       faq_text: formData.faqText || null,
       related_product_ids: formData.relatedProductIds || [],
       is_active: formData.status === 'active',
-      is_flash_sale: formData.isFlashSale,
+      is_flash_sale: formData.isFlashSale || false,
+      video_url: formData.videoUrl || null,
+      video_provider: formData.videoProvider || null,
       description: formData.description || null,
-      // rating: handled by default or ignored on update
+      keywords: formData.keywords || null,
+      key_features: formData.keyFeatures || null,
+      is_preorder: formData.isPreorder || false,
+      preorder_expected_date: formData.preorderExpectedDate || null,
     };
 
-    let error;
+    let productId: string | null = editingProduct?.id ?? null;
+    let error: any = null;
 
     if (editingProduct) {
       const { error: updateError } = await supabase
         .from('products')
-        .update(payload)
+        .update(payload as any)
         .eq('id', editingProduct.id);
       error = updateError;
     } else {
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('products')
-        .insert([{ ...payload, rating: 5.0 }]); // Default rating for new items
+        .insert([{ ...payload, rating: 5.0 }])
+        .select('id')
+        .single();
       error = insertError;
+      if (!insertError && inserted) productId = inserted.id;
     }
 
     if (error) {
       notify(error.message, 'error');
-    } else {
-      notify(editingProduct ? 'Product updated successfully' : 'Product created successfully');
-      handleCloseModal();
-      fetchProducts();
+      setIsSaving(false);
+      return;
     }
+
+    // ── Save variants ──
+    const db = supabase as any;
+    if (productId && formData.variants && formData.variants.length > 0) {
+      // Delete old variants for this product first
+      await db.from('product_variants').delete().eq('product_id', productId);
+
+      const variantRows = formData.variants
+        .filter((v: any) => v.name.trim())
+        .map((v: any) => ({
+          product_id: productId,
+          name: v.name.trim(),
+          price: v.price || formData.regularPrice,
+          stock: v.stock || 0,
+          sku: v.sku || null,
+          image_url: v.image_url || null,
+        }));
+
+      if (variantRows.length > 0) {
+        const { error: variantError } = await db
+          .from('product_variants')
+          .insert(variantRows);
+        if (variantError) {
+          console.warn('Variant save warning:', variantError.message);
+          notify('Product saved, but some variants could not be saved: ' + variantError.message, 'error');
+        }
+      }
+    } else if (productId && editingProduct) {
+      // If editing and no variants, remove existing ones
+      await db.from('product_variants').delete().eq('product_id', productId);
+    }
+
+    notify(editingProduct ? 'Product updated successfully!' : 'Product published successfully!');
+    handleCloseModal();
+    fetchProducts();
     setIsSaving(false);
   };
 
@@ -326,6 +374,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (isModalOpen) {
+    return (
+      <div className="-mx-4 sm:-mx-6 lg:-mx-5 -mt-4 sm:-mt-6 lg:-mt-5 -mb-4 sm:-mb-6 lg:-mb-5">
+        <ProductForm 
+          initialData={editingProduct}
+          onSubmit={handleSubmit}
+          onCancel={handleCloseModal}
+          isSaving={isSaving}
+          categories={categories}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -389,16 +451,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ showToast }) => {
         />
       </div>
 
-      {/* Modal Form Component */}
-      {isModalOpen && (
-        <ProductForm 
-          initialData={editingProduct}
-          onSubmit={handleSubmit}
-          onCancel={handleCloseModal}
-          isSaving={isSaving}
-          categories={categories}
-        />
-      )}
+
     </div>
   );
 };

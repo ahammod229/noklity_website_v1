@@ -132,9 +132,9 @@ const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8">
-          <div className="sm:col-span-2 lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-3xl p-6 md:p-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5">
+          <div className="sm:col-span-2 lg:col-span-5 bg-slate-900/70 border border-slate-800 rounded-xl p-4 md:p-6">
             <div className="flex items-center gap-3 mb-5">
               {footerLogo ? (
                 <img src={footerLogo} alt={`${siteName} footer logo`} width={244} height={70} className="h-11 w-auto object-contain" />

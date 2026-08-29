@@ -1,12 +1,22 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { X, Loader2, Plus, Trash2, Upload, Image as ImageIcon } from 'lucide-react';
+import { HelpCircle, X, Plus, Loader2, ChevronRight, Check, Image as ImageIcon, Trash2 } from 'lucide-react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { Product } from '../../types';
 import { supabase, uploadFile } from '../../lib/supabase';
-import { ADMIN_IMAGE_GUIDES, formatImageGuideHint, validateImageAgainstGuide } from '../../utils/adminImageGuides';
 import {
-  buildResponsiveProductUploadBundle,
-  getResponsiveUploadTargetWidths
+  buildResponsiveProductUploadBundle
 } from '../../utils/imageOptimization';
+
+// @ts-ignore
+export interface ProductVariantData {
+  id?: string;
+  name: string;
+  price: number;
+  stock: number;
+  sku: string;
+  image_url: string;
+}
 
 export interface ProductFormData {
   name: string;
@@ -24,7 +34,7 @@ export interface ProductFormData {
   images: string[];
   description: string;
   specifications: Record<string, string>;
-  compatibility: string[];
+  compatibility: any;
   weight: number;
   deliveryCharge: number;
   warranty: string;
@@ -37,7 +47,19 @@ export interface ProductFormData {
   faqText: string;
   relatedProductIds: string[];
   countryOfOrigin: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'archived';
+  isPreorder: boolean;
+  preorderExpectedDate: string;
+  keywords: string;
+  keyFeatures: string[];
+  // Daraz specific fields mapped to DB
+  length: number;
+  width: number;
+  height: number;
+  dangerousGoods: string;
+  warrantyType: string;
+  highlights: string;
+  whatsInBox: string;
 }
 
 interface ProductFormProps {
@@ -48,72 +70,23 @@ interface ProductFormProps {
   categories?: string[];
 }
 
-type ProductTab = 'general' | 'details' | 'shipping';
-
 const DEFAULT_CATEGORIES = [
-  'Engine', 'Brakes', 'Suspension', 'Exhaust',
-  'Interior', 'Wheels', 'Fluids', 'Maintenance', 'Electronics', 'Exterior'
+  'Engine', 'Brakes', 'Suspension', 'Exhaust', 
+  'Interior', 'Wheels', 'Fluids', 'Maintenance', 'Electronics'
 ];
 
-const DEFAULT_CITY_CHARGES: Record<string, number> = {
-  Dhaka: 80,
-  Chittagong: 120,
-  Khulna: 140,
-  Rajshahi: 130,
-  Sylhet: 150
-};
-
-const tabButtonClass = (active: boolean) =>
-  `px-5 py-3 text-sm font-extrabold border-b-2 transition-colors ${active ? 'text-[#ff6b6b] border-[#ff6b6b]' : 'text-slate-400 border-transparent hover:text-slate-200'}`;
-
-const slugify = (value: string) =>
-  value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '');
-
-const uploadProductImageBundle = async (file: File, fileNamePrefix: string) => {
-  const bundle = await buildResponsiveProductUploadBundle(file, {
-    fileNamePrefix,
-    widths: getResponsiveUploadTargetWidths(),
-    fit: 'contain'
-  });
-
-  const filesToUpload = [bundle.master.file, ...bundle.assets.map((asset) => asset.file)];
-  let masterPublicUrl = '';
-  
-  await Promise.all(
-    filesToUpload.map(async (assetFile) => {
-      const filePath = `products/${assetFile.name}`;
-      const result = await uploadFile('assets', filePath, assetFile, {
-        upsert: false,
-        contentType: assetFile.type || undefined
-      });
-      if (assetFile === bundle.master.file) {
-        masterPublicUrl = result.publicUrl;
-      }
-    })
-  );
-
-  return {
-    bundle,
-    publicUrl: masterPublicUrl
-  };
-};
-
-const ProductForm: React.FC<ProductFormProps> = ({
+const DarazProductForm: React.FC<ProductFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
   isSaving,
   categories
 }) => {
-  const [activeTab, setActiveTab] = useState<ProductTab>('general');
+  const [showMoreWarranty, setShowMoreWarranty] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     slug: '',
-    brand: '',
+    brand: 'No Brand',
     modelNumber: '',
     sku: '',
     category: categories?.[0] || 'Engine',
@@ -127,27 +100,37 @@ const ProductForm: React.FC<ProductFormProps> = ({
     description: '',
     specifications: {},
     compatibility: [],
-    weight: 0,
+    weight: 0.5,
     deliveryCharge: 0,
-    warranty: '',
+    
     isFlashSale: false,
-    warrantyMonths: 0,
-    warrantyPolicy: '',
-    deliveryCharges: DEFAULT_CITY_CHARGES,
+    
+    
+    deliveryCharges: {},
     shippingInfo: '',
-    returnPolicy: '',
+    
     faqText: '',
     relatedProductIds: [],
     countryOfOrigin: '',
-    status: 'active'
+    status: 'active',
+    isPreorder: false,
+    preorderExpectedDate: '',
+    keywords: '',
+    keyFeatures: [],
+    length: 10,
+    width: 10,
+    height: 10,
+    dangerousGoods: 'none',
+    warranty: initialData?.warranty || 'No Warranty',
+                highlights: '',
+    variants: initialData?.variants || [],
+    videoUrl: initialData?.videoUrl || '',
+    videoProvider: initialData?.videoProvider || 'youtube',
+    whatsInBox: ''
   });
-  const [specificationRows, setSpecificationRows] = useState<Array<{ key: string; value: string }>>([{ key: '', value: '' }]);
-  const [compatibilityInput, setCompatibilityInput] = useState('');
-  const [relatedIdsInput, setRelatedIdsInput] = useState('');
-  const [newImageUrl, setNewImageUrl] = useState('');
+
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadingGallery, setUploadingGallery] = useState(false);
-  const [replaceGalleryOnUpload, setReplaceGalleryOnUpload] = useState(false);
   const [formMessage, setFormMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
   const categoryList = useMemo(
@@ -157,11 +140,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   useEffect(() => {
     if (initialData) {
-      const related = initialData.relatedProductIds || [];
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         name: initialData.name,
         slug: initialData.slug || '',
-        brand: initialData.brand || '',
+        brand: initialData.brand || 'No Brand',
         modelNumber: initialData.modelNumber || '',
         sku: initialData.sku || '',
         category: initialData.category,
@@ -171,478 +154,737 @@ const ProductForm: React.FC<ProductFormProps> = ({
         defaultDeliveryFee: Number(initialData.defaultDeliveryFee || 0),
         isActive: initialData.isActive !== false,
         image: initialData.image,
-        images: initialData.images || [],
+        images: initialData.images || [initialData.image].filter(Boolean),
         description: initialData.description || '',
         specifications: initialData.specifications || {},
         compatibility: initialData.compatibility || [],
-        weight: Number(initialData.weight || 0),
+        weight: Number(initialData.weight || 0.5),
         deliveryCharge: Number(initialData.deliveryCharge || 0),
         warranty: initialData.warranty || '',
         isFlashSale: initialData.isFlashSale || false,
         warrantyMonths: initialData.warrantyMonths || 0,
         warrantyPolicy: initialData.warrantyPolicy || '',
-        deliveryCharges: initialData.deliveryCharges || DEFAULT_CITY_CHARGES,
+        deliveryCharges: initialData.deliveryCharges || {},
         shippingInfo: initialData.shippingInfo || '',
         returnPolicy: initialData.returnPolicy || '',
         faqText: initialData.faqText || '',
-        relatedProductIds: related,
         countryOfOrigin: initialData.countryOfOrigin || '',
-        status: initialData.status || (initialData.isActive === false ? 'inactive' : 'active')
-      });
-      setRelatedIdsInput(related.join(', '));
-      const specs = Object.entries(initialData.specifications || {}).map(([key, value]) => ({
-        key,
-        value: String(value)
+        status: initialData.status || (initialData.isActive === false ? 'inactive' : 'active'),
+        isPreorder: initialData.isPreorder || false,
+        preorderExpectedDate: initialData.preorderExpectedDate || '',
+        keywords: (initialData as any).keywords || '',
+        keyFeatures: (initialData as any).keyFeatures || [],
+        highlights: (initialData.specifications?.highlights) || '',
+        whatsInBox: (initialData.specifications?.whatsInBox) || ''
       }));
-      setSpecificationRows(specs.length > 0 ? specs : [{ key: '', value: '' }]);
-      setCompatibilityInput((initialData.compatibility || []).join(', '));
     }
   }, [initialData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormMessage(null);
+    if (!formData.name) return setFormMessage({ type: 'error', text: 'Product Title is required.' });
+    if (!formData.category) return setFormMessage({ type: 'error', text: 'Category is required.' });
+    if (formData.regularPrice <= 0) return setFormMessage({ type: 'error', text: 'Price must be greater than 0.' });
+    if (!formData.image && formData.images.length === 0) return setFormMessage({ type: 'error', text: 'At least 1 product image is required.' });
 
-    if (!formData.name.trim()) {
-      setFormMessage({ type: 'error', text: 'Product title is required.' });
-      setActiveTab('general');
-      return;
-    }
-    if (!formData.image.trim()) {
-      setFormMessage({ type: 'error', text: 'Primary image is required.' });
-      setActiveTab('details');
-      return;
-    }
-    if (formData.salePrice !== null && formData.salePrice >= formData.regularPrice) {
-      setFormMessage({ type: 'error', text: 'Discount price must be lower than regular price.' });
-      setActiveTab('general');
-      return;
+    // Map Daraz specific fields back to specifications if needed
+    const finalData = { ...formData };
+    finalData.specifications = {
+      ...finalData.specifications,
+      highlights: finalData.highlights,
+      whatsInBox: finalData.whatsInBox,
+      dimensions: `${finalData.length}x${finalData.width}x${finalData.height} cm`,
+      warrantyType: finalData.warrantyType,
+      dangerousGoods: finalData.dangerousGoods
+    };
+
+    if (finalData.images.length > 0 && !finalData.image) {
+      finalData.image = finalData.images[0];
     }
 
-    const relatedProductIds = relatedIdsInput
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
-    const compatibility = compatibilityInput
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
-    const specifications = specificationRows.reduce<Record<string, string>>((acc, row) => {
-      if (!row.key.trim()) return acc;
-      acc[row.key.trim()] = row.value.trim();
-      return acc;
-    }, {});
-
-    await onSubmit({
-      ...formData,
-      slug: formData.slug.trim() || slugify(formData.name),
-      relatedProductIds,
-      compatibility,
-      specifications
-    });
+    onSubmit(finalData);
   };
 
-  const handleChargeChange = (city: string, value: string) => {
-    const amount = Number(value || 0);
-    setFormData((prev) => ({
-      ...prev,
-      deliveryCharges: {
-        ...prev.deliveryCharges,
-        [city]: amount
-      }
-    }));
-  };
-
-  const handleUploadPrimaryImage = async (file?: File | null) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingImage(true);
-    setFormMessage(null);
 
     try {
-      const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.productPrimary);
-      if (validation.shouldBlock) {
-        setFormMessage({ type: 'error', text: validation.message });
-        return;
-      }
-      const { bundle, publicUrl } = await uploadProductImageBundle(file, 'product-primary');
-      setFormData((prev) => ({ ...prev, image: publicUrl }));
-      setFormMessage({
-        type: 'success',
-        text: `${validation.message} Optimized ${bundle.master.reducedPercent}% smaller (${Math.round(
-          bundle.master.optimizedBytes / 1024
-        )}KB) with ${bundle.supportsAvif ? 'AVIF/WebP' : 'WebP'} responsive variants.`
+      setUploadingImage(true);
+      setFormMessage(null);
+
+      const path = `products/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const bundle = await buildResponsiveProductUploadBundle(file, path);
+      
+      const { data, error } = await supabase.storage.from('products').upload(bundle.master.path, bundle.master.file, {
+        cacheControl: '31536000',
+        upsert: false
       });
-    } catch (error) {
-      console.error('Primary image upload failed:', error);
-      setFormMessage({ type: 'error', text: 'Primary image upload failed. Check admin storage permissions.' });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(data.path);
+
+      setFormData(prev => {
+        const newImages = [...prev.images, publicUrl];
+        return {
+          ...prev,
+          images: newImages,
+          image: prev.image || publicUrl
+        };
+      });
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      setFormMessage({ type: 'error', text: error.message || 'Failed to upload image' });
     } finally {
       setUploadingImage(false);
+      if (e.target) e.target.value = '';
     }
   };
 
-  const handleUploadGalleryImages = async (files?: FileList | null) => {
-    if (!files || files.length === 0) return;
-
-    setUploadingGallery(true);
-    setFormMessage(null);
-
-    try {
-      const filesArray = Array.from(files);
-      let nonPerfectCount = 0;
-      for (const file of filesArray) {
-        const validation = await validateImageAgainstGuide(file, ADMIN_IMAGE_GUIDES.productGallery);
-        if (validation.shouldBlock) {
-          setFormMessage({ type: 'error', text: `${file.name}: ${validation.message}` });
-          return;
-        }
-        if (!validation.isPerfect) nonPerfectCount += 1;
-      }
-
-      const uploadedUrls: string[] = [];
-      for (const file of filesArray) {
-        const { publicUrl } = await uploadProductImageBundle(file, 'product-gallery');
-        uploadedUrls.push(publicUrl);
-      }
-
-      setFormData((prev) => {
-        const nextImages = replaceGalleryOnUpload
-          ? uploadedUrls
-          : Array.from(new Set([...prev.images, ...uploadedUrls]));
-        return { ...prev, images: nextImages };
+  const addImageUrl = () => {
+    if (imageUrlInput.trim()) {
+      setFormData(prev => {
+        const newImages = [...prev.images, imageUrlInput.trim()];
+        return {
+          ...prev,
+          images: newImages,
+          image: prev.image || imageUrlInput.trim()
+        };
       });
-
-      setFormMessage({
-        type: 'success',
-        text:
-          nonPerfectCount > 0
-            ? `${uploadedUrls.length} gallery image(s) uploaded. ${nonPerfectCount} image(s) are usable but not exact recommended size.`
-            : `${uploadedUrls.length} gallery image(s) uploaded with perfect size.`
-      });
-    } catch (error) {
-      console.error('Gallery image upload failed:', error);
-      setFormMessage({ type: 'error', text: 'Gallery upload failed. Check admin storage permissions.' });
-    } finally {
-      setUploadingGallery(false);
+      setImageUrlInput('');
     }
   };
 
-  const addGalleryUrl = () => {
-    const url = newImageUrl.trim();
-    if (!url) return;
-
-    setFormData((prev) => {
-      if (prev.images.includes(url)) {
-        setFormMessage({ type: 'error', text: 'This image URL already exists in gallery.' });
-        return prev;
-      }
-      return { ...prev, images: [...prev.images, url] };
+  const removeImage = (index: number) => {
+    setFormData(prev => {
+      const newImages = [...prev.images];
+      newImages.splice(index, 1);
+      return {
+        ...prev,
+        images: newImages,
+        image: newImages.length > 0 ? newImages[0] : ''
+      };
     });
-
-    setNewImageUrl('');
   };
 
-  const removeGalleryUrl = (url: string) => {
-    setFormData((prev) => ({ ...prev, images: prev.images.filter((img) => img !== url) }));
-  };
+
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
-
-      <div className="relative w-full max-w-6xl h-[92vh] rounded-3xl bg-[#0b172e] text-slate-100 border border-slate-700/70 overflow-hidden flex flex-col shadow-2xl">
-        <div className="px-8 py-6 border-b border-slate-700/70 bg-[#1a253c] flex items-center justify-between">
-          <h3 className="text-4xl font-black tracking-tight">{initialData ? 'Edit Product' : 'Add New Product'}</h3>
-          <button onClick={onCancel} className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-slate-700/50">
-            <X className="w-8 h-8" />
-          </button>
+    <div className="bg-[#f5f6f8] font-sans text-gray-800 rounded-2xl overflow-hidden shadow-xl relative flex flex-col h-[calc(100vh-4rem)]">
+      
+      {/* Sticky Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center z-10 shadow-sm sticky top-0">
+        <div>
+          <div className="flex items-center gap-2 text-[13px] text-gray-500 mb-1 font-medium">
+            <span className="hover:text-primary cursor-pointer" onClick={onCancel}>Homepage</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+            <span className="hover:text-primary cursor-pointer" onClick={onCancel}>Manage Products</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+            <span className="text-gray-900 font-bold">{initialData ? 'Edit Product' : 'Add Product'}</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900">{initialData ? 'Edit Product' : 'Add Product'}</h1>
         </div>
+        <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+          <X className="w-6 h-6" />
+        </button>
+      </div>
 
-        <div className="px-8 bg-[#1a253c] border-b border-slate-700/70 flex items-center gap-2">
-          <button type="button" className={tabButtonClass(activeTab === 'general')} onClick={() => setActiveTab('general')}>General</button>
-          <button type="button" className={tabButtonClass(activeTab === 'details')} onClick={() => setActiveTab('details')}>Details & Media</button>
-          <button type="button" className={tabButtonClass(activeTab === 'shipping')} onClick={() => setActiveTab('shipping')}>Shipping & Policy</button>
-        </div>
+      <div className="flex-1 overflow-y-auto p-6">
+        {formMessage && (
+          <div className={`mb-6 p-4 rounded-lg ${formMessage.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+            {formMessage.text}
+          </div>
+        )}
 
-        <form id="productForm" onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto px-8 py-7 space-y-5">
-            {formMessage && (
-              <div className={`rounded-xl px-4 py-3 text-sm font-bold border ${formMessage.type === 'error' ? 'bg-red-500/10 text-red-200 border-red-400/30' : 'bg-green-500/10 text-green-200 border-green-400/30'}`}>
-                {formMessage.text}
+        <form id="darazProductForm" onSubmit={handleSubmit} className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
+          
+          {/* Left Main Content */}
+          <div className="flex-1 space-y-6">
+            
+            {/* Section 1: Basic Information */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-lg">
+                <h2 className="text-[15px] font-bold text-gray-800">Basic Information</h2>
               </div>
-            )}
-
-            {activeTab === 'general' && (
-              <div className="space-y-5">
+              <div className="p-6 space-y-8">
+                
+                {/* Product Name */}
                 <div>
-                  <label className="block mb-2 text-sm font-extrabold">Product Title</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                    className="w-full h-14 px-5 rounded-2xl bg-slate-800 border border-slate-600 text-2xl font-semibold"
-                    placeholder="e.g. Wireless Headphones"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Slug">
-                    <input
-                      type="text"
-                      value={formData.slug}
-                      onChange={(e) => setFormData((p) => ({ ...p, slug: e.target.value }))}
-                      className="field-input"
-                      placeholder="auto-from-name-if-empty"
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    <span className="text-red-500 mr-1">*</span>Product Name
+                  </label>
+                  <p className="text-[11px] text-gray-500 mb-2 font-medium">
+                    Multiple language title will be showed when buyers change their APPs' default language setting. Setting it up can help improve product recall in Apps targeted at different languages.
+                  </p>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.name}
+                      onChange={e => setFormData({...formData, name: e.target.value})}
+                      placeholder="Ex. Nikon Coolpix A300 Digital Camera"
+                      className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-[13px] transition-colors"
                     />
-                  </Field>
-                  <Field label="Brand">
-                    <input type="text" value={formData.brand} onChange={(e) => setFormData((p) => ({ ...p, brand: e.target.value }))} className="field-input" />
-                  </Field>
-                  <Field label="Model Number">
-                    <input type="text" value={formData.modelNumber} onChange={(e) => setFormData((p) => ({ ...p, modelNumber: e.target.value }))} className="field-input" />
-                  </Field>
-                  <Field label="SKU">
-                    <input type="text" value={formData.sku} onChange={(e) => setFormData((p) => ({ ...p, sku: e.target.value }))} className="field-input" />
-                  </Field>
-                  <Field label="Price (৳)">
-                    <input type="number" min="0" step="0.01" value={formData.regularPrice} onChange={(e) => setFormData((p) => ({ ...p, regularPrice: parseFloat(e.target.value) || 0 }))} className="field-input" />
-                  </Field>
-                  <Field label="Discount Price (Optional)">
-                    <input type="number" min="0" step="0.01" value={formData.salePrice ?? ''} onChange={(e) => setFormData((p) => ({ ...p, salePrice: e.target.value ? parseFloat(e.target.value) : null }))} className="field-input" />
-                  </Field>
-                  <Field label="Category">
-                    <select value={formData.category} onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))} className="field-input">
-                      {categoryList.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Stock Quantity">
-                    <input type="number" min="0" value={formData.stock} onChange={(e) => setFormData((p) => ({ ...p, stock: parseInt(e.target.value, 10) || 0 }))} className="field-input" placeholder="e.g. 50" />
-                  </Field>
-                  <Field label="Delivery Fee (৳)">
-                    <input type="number" min="0" step="0.01" value={formData.defaultDeliveryFee} onChange={(e) => setFormData((p) => ({ ...p, defaultDeliveryFee: parseFloat(e.target.value) || 0 }))} className="field-input" />
-                  </Field>
-                  <Field label="Status">
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData((p) => ({ ...p, status: e.target.value as 'active' | 'inactive', isActive: e.target.value === 'active' }))}
-                      className="field-input"
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </Field>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'details' && (
-              <div className="space-y-6">
-                <div>
-                  <label className="block mb-2 text-sm font-extrabold">Primary Image</label>
-                  <p className="text-xs text-slate-300 mb-2">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.productPrimary)}</p>
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-                    <div className="relative">
-                      <ImageIcon className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                      <input
-                        type="url"
-                        value={formData.image}
-                        onChange={(e) => setFormData((p) => ({ ...p, image: e.target.value }))}
-                        className="w-full h-14 pl-12 pr-4 rounded-2xl bg-slate-800 border border-slate-600 text-lg"
-                        placeholder="https://example.com/primary-image.jpg"
-                      />
+                    <div className="absolute right-3 top-2.5 text-[11px] text-gray-400 font-medium">
+                      {formData.name.length}/255
                     </div>
-                    <label className={`h-14 px-5 rounded-2xl border border-slate-500 bg-slate-800 flex items-center gap-2 text-sm font-bold cursor-pointer ${uploadingImage ? 'opacity-70 pointer-events-none' : ''}`}>
-                      <Upload className="w-4 h-4" />
-                      {uploadingImage ? 'Uploading...' : 'Upload Primary'}
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleUploadPrimaryImage(e.target.files?.[0])} />
-                    </label>
                   </div>
                 </div>
 
+                {/* Category */}
                 <div>
-                  <label className="block mb-2 text-sm font-extrabold">Product Gallery</label>
-                  <p className="text-xs text-slate-300 mb-2">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.productGallery)}</p>
-                  <label className={`w-full min-h-[140px] rounded-2xl border-2 border-dashed border-slate-500/80 bg-slate-800/50 flex flex-col items-center justify-center text-slate-300 text-lg p-6 cursor-pointer ${uploadingGallery ? 'opacity-70 pointer-events-none' : ''}`}>
-                    <Upload className="w-7 h-7 mb-3" />
-                    {uploadingGallery ? 'Uploading images...' : 'Click to upload multiple images (JPG/PNG)'}
-                    <input type="file" multiple className="hidden" accept="image/*" onChange={(e) => handleUploadGalleryImages(e.target.files)} />
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    <span className="text-red-500 mr-1">*</span>Category
                   </label>
-                  <label className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-slate-300">
-                    <input type="checkbox" checked={replaceGalleryOnUpload} onChange={(e) => setReplaceGalleryOnUpload(e.target.checked)} />
-                    Replace existing images on upload
-                  </label>
+                  <select 
+                    required
+                    value={formData.category}
+                    onChange={e => setFormData({...formData, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-[13px] bg-white cursor-pointer"
+                  >
+                    <option value="" disabled>Select a Category...</option>
+                    {categoryList.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-                  <input
-                    type="url"
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    className="h-12 px-4 rounded-xl bg-slate-800 border border-slate-600"
-                    placeholder="Or paste image URL and add"
-                  />
-                  <button type="button" onClick={addGalleryUrl} className="h-12 px-5 rounded-xl bg-[#ef3340] text-white font-extrabold">
-                    <Plus className="w-4 h-4 inline mr-1" /> Add Image URL
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {formData.images.length === 0 ? (
-                    <p className="text-slate-400">No gallery images yet.</p>
-                  ) : (
-                    formData.images.map((img) => (
-                      <div key={img} className="flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl p-3">
-                        <img src={img} alt="" className="w-12 h-12 rounded-lg object-cover bg-slate-700" />
-                        <span className="text-sm text-slate-200 truncate flex-1">{img}</span>
-                        <button type="button" onClick={() => removeGalleryUrl(img)} className="p-2 text-red-300 hover:text-red-100"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-slate-700 p-4 bg-slate-800/40 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-black">Specifications (Key-Value)</p>
-                    <button
-                      type="button"
-                      onClick={() => setSpecificationRows((prev) => [...prev, { key: '', value: '' }])}
-                      className="text-xs font-bold px-3 py-1 rounded bg-slate-700 text-slate-100"
-                    >
-                      + Add Row
-                    </button>
-                  </div>
-                  {specificationRows.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                      <input
-                        type="text"
-                        value={row.key}
-                        onChange={(e) => setSpecificationRows((prev) => prev.map((r, i) => i === idx ? { ...r, key: e.target.value } : r))}
-                        className="field-input"
-                        placeholder="Key (e.g. Voltage)"
-                      />
-                      <input
-                        type="text"
-                        value={row.value}
-                        onChange={(e) => setSpecificationRows((prev) => prev.map((r, i) => i === idx ? { ...r, value: e.target.value } : r))}
-                        className="field-input"
-                        placeholder="Value (e.g. 12V)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSpecificationRows((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)}
-                        className="px-3 rounded bg-red-600/20 text-red-200"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <Field label="Compatibility (comma separated)">
-                  <input
-                    type="text"
-                    value={compatibilityInput}
-                    onChange={(e) => setCompatibilityInput(e.target.value)}
-                    className="field-input"
-                    placeholder="Toyota Corolla 2018, Honda Civic 2020"
-                  />
-                </Field>
-
+                {/* Product Images */}
                 <div>
-                  <label className="block mb-2 text-sm font-extrabold">Description</label>
-                  <textarea
-                    rows={6}
-                    value={formData.description}
-                    onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
-                    className="w-full p-4 rounded-2xl bg-slate-800 border border-slate-600"
-                    placeholder="Enter product description"
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'shipping' && (
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Weight (kg)">
-                    <input type="number" min="0" step="0.001" value={formData.weight} onChange={(e) => setFormData((p) => ({ ...p, weight: parseFloat(e.target.value) || 0 }))} className="field-input" />
-                  </Field>
-                  <Field label="Delivery Charge (৳)">
-                    <input type="number" min="0" step="0.01" value={formData.deliveryCharge} onChange={(e) => setFormData((p) => ({ ...p, deliveryCharge: parseFloat(e.target.value) || 0 }))} className="field-input" />
-                  </Field>
-                  <Field label="Warranty">
-                    <input type="text" value={formData.warranty} onChange={(e) => setFormData((p) => ({ ...p, warranty: e.target.value }))} className="field-input" placeholder="e.g. 12 Months Official Warranty" />
-                  </Field>
-                  <Field label="Country of Origin">
-                    <input type="text" value={formData.countryOfOrigin} onChange={(e) => setFormData((p) => ({ ...p, countryOfOrigin: e.target.value }))} className="field-input" />
-                  </Field>
-                  <Field label="Warranty (Months)">
-                    <input type="number" min="0" value={formData.warrantyMonths} onChange={(e) => setFormData((p) => ({ ...p, warrantyMonths: parseInt(e.target.value, 10) || 0 }))} className="field-input" />
-                  </Field>
-                  <Field label="Warranty Policy">
-                    <input type="text" value={formData.warrantyPolicy} onChange={(e) => setFormData((p) => ({ ...p, warrantyPolicy: e.target.value }))} className="field-input" placeholder="Replacement/Service policy" />
-                  </Field>
-                </div>
-
-                <div className="rounded-2xl border border-slate-700 p-4 bg-slate-800/40">
-                  <p className="text-sm font-black mb-3">Delivery Charges by City</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {Object.entries(formData.deliveryCharges).map(([city, charge]) => (
-                      <div key={city} className="flex items-center gap-3">
-                        <span className="w-28 text-sm font-bold text-slate-300">{city}</span>
-                        <input type="number" min="0" value={charge} onChange={(e) => handleChargeChange(city, e.target.value)} className="field-input" />
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1 flex items-center gap-1">
+                    <span className="text-red-500">* *</span> Product Images <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
+                  </label>
+                  
+                  <div className="flex flex-wrap gap-4 mt-3">
+                    {formData.images.map((img, idx) => (
+                      <div key={idx} className="relative w-28 h-28 border border-gray-200 rounded group flex items-center justify-center bg-gray-50">
+                        <img src={img} alt="Product" className="max-w-full max-h-full object-contain p-1" />
+                        <button 
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        {formData.image === img && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-primary text-white text-[10px] text-center py-0.5 font-bold">
+                            Main
+                          </div>
+                        )}
                       </div>
                     ))}
+                    <div className="w-28 h-28 border border-dashed border-gray-300 rounded flex flex-col items-center justify-center hover:border-primary hover:bg-primary/10 transition-colors relative overflow-hidden group cursor-pointer bg-gray-50/50">
+                      {uploadingImage ? (
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      ) : (
+                        <Plus className="w-8 h-8 text-gray-400 group-hover:text-primary" />
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        disabled={uploadingImage}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-2 w-full max-w-sm relative">
+                    <input 
+                      type="text" 
+                      placeholder="Or paste Image URL here" 
+                      className="flex-1 text-[13px] px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none"
+                      value={imageUrlInput}
+                      onChange={e => setImageUrlInput(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addImageUrl())}
+                    />
+                    <button type="button" onClick={addImageUrl} className="text-[12px] bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded font-bold hover:bg-gray-200">Add URL</button>
                   </div>
                 </div>
 
-                <Field label="Shipping & Delivery Info">
-                  <textarea rows={4} value={formData.shippingInfo} onChange={(e) => setFormData((p) => ({ ...p, shippingInfo: e.target.value }))} className="field-input !h-auto p-4" />
-                </Field>
-                <Field label="Return & Refund Policy">
-                  <textarea rows={4} value={formData.returnPolicy} onChange={(e) => setFormData((p) => ({ ...p, returnPolicy: e.target.value }))} className="field-input !h-auto p-4" />
-                </Field>
-                <Field label="FAQs (Optional)">
-                  <textarea rows={4} value={formData.faqText} onChange={(e) => setFormData((p) => ({ ...p, faqText: e.target.value }))} className="field-input !h-auto p-4" placeholder="One question/answer per line" />
-                </Field>
-                <Field label="Related Product IDs (comma separated)">
-                  <input type="text" value={relatedIdsInput} onChange={(e) => setRelatedIdsInput(e.target.value)} className="field-input" placeholder="uuid1, uuid2" />
-                </Field>
+                {/* Video */}
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-3 flex items-center gap-1">
+                    Video <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
+                  </label>
+                  <div className="flex gap-6 mb-4 text-[13px] text-gray-700 font-medium">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="videoType" className="w-3.5 h-3.5 text-primary border-gray-300 focus:ring-primary" defaultChecked />
+                      Upload Video
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="videoType" className="w-3.5 h-3.5 text-primary border-gray-300 focus:ring-primary" />
+                      Youtube Link
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="videoType" className="w-3.5 h-3.5 text-primary border-gray-300 focus:ring-primary" />
+                      Media Center
+                    </label>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-28 h-28 border border-dashed border-gray-300 rounded flex flex-col items-center justify-center cursor-not-allowed bg-gray-50">
+                      <Plus className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <div className="text-[11px] text-gray-500 space-y-1.5 mt-2 list-disc pl-4 font-medium">
+                      <li>Min size: 480x480 px. max video length: 60 seconds. max file size: 100MB.</li>
+                      <li>Supported Format: mp4</li>
+                      <li>New Video might take up to 36 hrs to be approved</li>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-            )}
+            </div>
+
+            {/* Section 2: Product Specification */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-lg flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-[15px] font-bold text-gray-800">Product Specification</h2>
+                  <div className="flex items-center gap-1 text-[11px] text-gray-500 font-medium">
+                    Fill Rate: <span className="text-primary bg-primary/10 px-1.5 py-0.5 rounded font-bold">0%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <p className="text-[11px] text-gray-500 mb-5 font-medium leading-relaxed">
+                  Filling in attributes will increase product searchability, driving sales conversion. <br/>
+                  Spot a missing attribute or attribute value? <span className="text-primary cursor-pointer hover:underline">Click me</span>
+                </p>
+                
+                <div className="w-full max-w-md">
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    <span className="text-red-500 mr-1">*</span>Brand
+                  </label>
+                  <select 
+                    value={formData.brand}
+                    onChange={e => setFormData({...formData, brand: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] bg-white cursor-pointer"
+                  >
+                    <option value="No Brand">No Brand</option>
+                    <option value="Sony">Sony</option>
+                    <option value="Samsung">Samsung</option>
+                    <option value="Apple">Apple</option>
+                    <option value="Nikon">Nikon</option>
+                  </select>
+                </div>
+
+                <div className="mt-5 text-primary text-[13px] font-medium cursor-pointer hover:underline flex items-center gap-1 w-max">
+                  Show More <span className="text-[9px]">▼</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Price, Stock & Variants */}
+            
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-lg flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[15px] font-bold text-gray-800">Price, Stock & Variants</h2>
+                  <HelpCircle className="w-4 h-4 text-gray-400" />
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, variants: [...formData.variants, { name: '', price: formData.regularPrice || 0, stock: 0, sku: '', image_url: '' }]})}
+                  className="bg-primary/10 text-primary px-3 py-1 rounded text-sm font-bold flex items-center gap-1 hover:bg-primary/20"
+                >
+                  <Plus className="w-4 h-4" /> Add Variant
+                </button>
+              </div>
+              
+              <div className="p-6">
+                
+                {/* Base Price & Stock */}
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                   <div>
+                      <label className="block text-[13px] font-bold text-gray-700 mb-1">Base Regular Price *</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={formData.regularPrice || ''}
+                        onChange={e => setFormData({...formData, regularPrice: Number(e.target.value)})}
+                        className="w-full border border-gray-300 rounded p-2 outline-none focus:border-primary text-[13px]"
+                      />
+                   </div>
+                   <div>
+                      <label className="block text-[13px] font-bold text-gray-700 mb-1">Base Stock *</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={formData.stock || ''}
+                        onChange={e => setFormData({...formData, stock: Number(e.target.value)})}
+                        className="w-full border border-gray-300 rounded p-2 outline-none focus:border-primary text-[13px]"
+                      />
+                   </div>
+                </div>
+
+                {formData.variants.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                    <table className="w-full text-left text-[13px]">
+                      <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold w-16">Image</th>
+                          <th className="px-4 py-3 font-semibold">Variant Name (e.g. Red, XL)</th>
+                          <th className="px-4 py-3 font-semibold w-24">Price</th>
+                          <th className="px-4 py-3 font-semibold w-24">Stock</th>
+                          <th className="px-4 py-3 font-semibold w-32">SKU</th>
+                          <th className="px-4 py-3 font-semibold w-16 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {formData.variants.map((variant, index) => (
+                          <tr key={index} className="bg-white">
+                            <td className="px-4 py-2">
+                               <div className="relative w-10 h-10 border rounded bg-gray-50 flex items-center justify-center overflow-hidden group cursor-pointer">
+                                 {variant.image_url ? (
+                                   <img src={variant.image_url} alt="var" className="w-full h-full object-cover" />
+                                 ) : (
+                                   <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-primary" />
+                                 )}
+                                 <input 
+                                   type="file" 
+                                   accept="image/*"
+                                   className="absolute inset-0 opacity-0 cursor-pointer"
+                                   onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                         const url = await uploadFile(file, 'products', {});
+                                         const newVars = [...formData.variants];
+                                         newVars[index].image_url = url;
+                                         setFormData({...formData, variants: newVars});
+                                      }
+                                   }}
+                                 />
+                               </div>
+                            </td>
+                            <td className="px-4 py-2">
+                              <input 
+                                type="text" 
+                                value={variant.name}
+                                onChange={e => {
+                                  const newVars = [...formData.variants];
+                                  newVars[index].name = e.target.value;
+                                  setFormData({...formData, variants: newVars});
+                                }}
+                                className="w-full border border-gray-300 rounded px-2 py-1.5 outline-none focus:border-primary"
+                                placeholder="Red, XL"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input 
+                                type="number" 
+                                value={variant.price || ''}
+                                onChange={e => {
+                                  const newVars = [...formData.variants];
+                                  newVars[index].price = Number(e.target.value);
+                                  setFormData({...formData, variants: newVars});
+                                }}
+                                className="w-full border border-gray-300 rounded px-2 py-1.5 outline-none focus:border-primary"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input 
+                                type="number" 
+                                value={variant.stock || ''}
+                                onChange={e => {
+                                  const newVars = [...formData.variants];
+                                  newVars[index].stock = Number(e.target.value);
+                                  setFormData({...formData, variants: newVars});
+                                }}
+                                className="w-full border border-gray-300 rounded px-2 py-1.5 outline-none focus:border-primary"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <input 
+                                type="text" 
+                                value={variant.sku}
+                                onChange={e => {
+                                  const newVars = [...formData.variants];
+                                  newVars[index].sku = e.target.value;
+                                  setFormData({...formData, variants: newVars});
+                                }}
+                                className="w-full border border-gray-300 rounded px-2 py-1.5 outline-none focus:border-primary"
+                              />
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const newVars = formData.variants.filter((_, i) => i !== index);
+                                  setFormData({...formData, variants: newVars});
+                                }}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section 4: Product Description */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-lg">
+                <h2 className="text-[15px] font-bold text-gray-800">Product Description</h2>
+              </div>
+              <div className="p-6 space-y-8">
+                
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-2">Main Description</label>
+                  <div className="border border-gray-300 rounded hover:border-primary/50 transition-colors focus-within:border-primary overflow-hidden">
+                    <div className="bg-gray-50/80 border-b border-gray-300 p-2 flex items-center justify-between">
+                      <div className="flex gap-3 text-gray-600 items-center">
+                        <span className="font-bold px-2 text-[15px] cursor-pointer hover:text-primary">v</span>
+                        <span className="font-bold px-2 text-[15px] cursor-pointer hover:text-primary">B</span>
+                        <span className="font-bold px-2 text-[15px] cursor-pointer hover:text-primary">I</span>
+                        <span className="font-bold px-2 text-[15px] cursor-pointer hover:text-primary underline">U</span>
+                        <span className="font-bold px-2 border-l border-gray-300 pl-4 text-lg cursor-pointer hover:text-primary">≡</span>
+                        <span className="font-medium text-[13px] px-2 cursor-pointer hover:text-primary flex items-center gap-1">
+                          <ImageIcon className="w-4 h-4" /> Image
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" className="text-primary border border-primary px-3 py-1 rounded text-[11px] font-bold flex items-center gap-1 hover:bg-primary/5">
+                           ⛶ Advanced Mode
+                        </button>
+                        <button type="button" className="text-gray-700 border border-gray-300 px-4 py-1 rounded text-[11px] font-bold bg-white hover:bg-gray-50">
+                           Preview
+                        </button>
+                      </div>
+                    </div>
+                    <textarea 
+                      value={formData.description}
+                      onChange={e => setFormData({...formData, description: e.target.value})}
+                      placeholder="Please input"
+                      className="w-full h-40 p-4 outline-none resize-y text-[13px] text-gray-900"
+                    ></textarea>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-2">
+                    <span className="text-red-500 mr-1">*</span>Highlights
+                  </label>
+                  <div className="border border-gray-300 rounded hover:border-primary/50 transition-colors focus-within:border-primary overflow-hidden">
+                    <div className="bg-gray-50/80 border-b border-gray-300 p-2 flex items-center">
+                      <span className="font-bold px-2 text-gray-500 text-lg">≡</span>
+                    </div>
+                    <textarea 
+                      value={formData.highlights}
+                      onChange={e => setFormData({...formData, highlights: e.target.value})}
+                      className="w-full h-32 p-4 outline-none resize-y text-[13px] text-gray-900"
+                    ></textarea>
+                  </div>
+                </div>
+
+                <div className="w-32">
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] bg-white outline-none cursor-pointer">
+                    <option>English</option>
+                    <option>Bengali</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    <span className="text-red-500 mr-1">*</span>What's in the box
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formData.whatsInBox}
+                    onChange={e => setFormData({...formData, whatsInBox: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] text-gray-900"
+                  />
+                </div>
+
+                <div className="text-primary text-[13px] font-medium cursor-pointer hover:underline flex items-center gap-1 w-max">
+                  Show More <span className="text-[9px]">▼</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 5: Shipping & Warranty */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-lg">
+                <h2 className="text-[15px] font-bold text-gray-800">Shipping & Warranty</h2>
+              </div>
+              <div className="p-6 space-y-6">
+                
+                <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                  <span className="text-[13px] font-bold text-gray-700">Switch to enter different package dimensions & weight for variations</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" />
+                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    <span className="text-red-500 mr-1">*</span>Package Weight
+                  </label>
+                  <div className="flex items-center w-full max-w-sm">
+                    <input 
+                      type="number" 
+                      placeholder="0.001~300" 
+                      value={formData.weight || ''}
+                      onChange={e => setFormData({...formData, weight: Number(e.target.value)})}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-l hover:border-primary/50 focus:border-primary outline-none text-[13px] z-10 text-gray-900"
+                    />
+                    <select className="w-20 px-2 py-2 border-y border-r border-gray-300 rounded-r bg-gray-50 text-[13px] outline-none cursor-pointer">
+                      <option>kg</option>
+                      <option>g</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    <span className="text-red-500 mr-1">*</span>Package Length(cm) * Width(cm) * Height(cm)
+                  </label>
+                  <p className="text-[11px] text-gray-500 mb-2 font-medium">How to measure my package dimensions? <span className="text-primary cursor-pointer hover:underline">View Example</span></p>
+                  
+                  <div className="flex items-center gap-2 w-full max-w-2xl">
+                    <input type="number" placeholder="0.01~300" className="flex-1 px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] text-gray-900" value={formData.length || ''} onChange={e => setFormData({...formData, length: Number(e.target.value)})} />
+                    <span className="text-gray-400">×</span>
+                    <input type="number" placeholder="0.01~300" className="flex-1 px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] text-gray-900" value={formData.width || ''} onChange={e => setFormData({...formData, width: Number(e.target.value)})} />
+                    <span className="text-gray-400">×</span>
+                    <input type="number" placeholder="0.01~300" className="flex-1 px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] text-gray-900" value={formData.height || ''} onChange={e => setFormData({...formData, height: Number(e.target.value)})} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-3">Dangerous Goods</label>
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 text-[13px] cursor-pointer font-medium text-gray-700">
+                      <input 
+                        type="radio" 
+                        name="dg" 
+                        checked={formData.dangerousGoods === 'none'}
+                        onChange={() => setFormData({...formData, dangerousGoods: 'none'})}
+                        className="w-4 h-4 text-primary border-gray-300 focus:ring-primary" 
+                      />
+                      None
+                    </label>
+                    <label className="flex items-center gap-2 text-[13px] cursor-pointer font-medium text-gray-700">
+                      <input 
+                        type="radio" 
+                        name="dg" 
+                        checked={formData.dangerousGoods === 'contains'}
+                        onChange={() => setFormData({...formData, dangerousGoods: 'contains'})}
+                        className="w-4 h-4 text-primary border-gray-300 focus:ring-primary" 
+                      />
+                      Contains battery / flammables / liquid
+                    </label>
+                  </div>
+                  <div className="border-b border-gray-100 mt-6"></div>
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                    Warranty Type
+                  </label>
+                  <select 
+                    className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] bg-white cursor-pointer"
+                    value={formData.warranty}
+                    onChange={e => setFormData({...formData, warranty: e.target.value})}
+                  >
+                    <option value="">Select</option>
+                    <option value="No Warranty">No Warranty</option>
+                    <option value="Local Seller Warranty">Local Seller Warranty</option>
+                    <option value="Brand Warranty">Brand Warranty</option>
+                    <option value="International Manufacturer Warranty">International Manufacturer Warranty</option>
+                    <option value="International Seller Warranty">International Seller Warranty</option>
+                  </select>
+                </div>
+
+                {showMoreWarranty && (
+                  <div className="space-y-6 mt-4">
+                    <div>
+                      <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                        Warranty Period
+                      </label>
+                      <select 
+                        className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px] bg-white cursor-pointer"
+                        value={formData.warrantyMonths || ''}
+                        onChange={e => setFormData({...formData, warrantyMonths: Number(e.target.value)})}
+                      >
+                        <option value="">Select</option>
+                        <option value="1">1 Month</option>
+                        <option value="2">2 Months</option>
+                        <option value="3">3 Months</option>
+                        <option value="6">6 Months</option>
+                        <option value="12">1 Year</option>
+                        <option value="24">2 Years</option>
+                        <option value="36">3 Years</option>
+                        <option value="60">5 Years</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                        Warranty Policy
+                      </label>
+                      <input 
+                        type="text" 
+                        className="w-full max-w-2xl px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px]"
+                        value={formData.warrantyPolicy || ''}
+                        onChange={e => setFormData({...formData, warrantyPolicy: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                        Return Policy
+                      </label>
+                      <input 
+                        type="text" 
+                        className="w-full max-w-2xl px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary outline-none text-[13px]"
+                        value={formData.returnPolicy || ''}
+                        onChange={e => setFormData({...formData, returnPolicy: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div 
+                  className="text-primary text-[13px] font-medium cursor-pointer hover:underline flex items-center gap-1 w-max mt-4"
+                  onClick={() => setShowMoreWarranty(!showMoreWarranty)}
+                >
+                  {showMoreWarranty ? 'Show Less ^' : 'More Warranty Settings ▼'}
+                </div>
+              </div>
+            </div>
+
           </div>
 
-          <div className="px-8 py-5 bg-[#1a253c] border-t border-slate-700/70 flex justify-end gap-3">
-            <button type="button" onClick={onCancel} className="px-8 h-12 rounded-xl bg-slate-700 text-slate-100 font-bold">Cancel</button>
-            <button type="submit" disabled={isSaving || uploadingImage || uploadingGallery} className="px-8 h-12 rounded-xl bg-[#ef3340] text-white font-extrabold flex items-center gap-2 disabled:opacity-70">
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {initialData ? 'Save Product' : 'Save Product'}
-            </button>
-          </div>
         </form>
       </div>
 
-      <style>{`
-        .field-input {
-          width: 100%;
-          height: 48px;
-          border-radius: 12px;
-          background: #1e2a40;
-          border: 1px solid #41506c;
-          padding: 0 14px;
-          color: #e2e8f0;
-          font-weight: 700;
-        }
-        .field-input::placeholder { color: #94a3b8; }
-      `}</style>
+      {/* Sticky Footer */}
+      <div className="bg-white border-t border-gray-200 p-4 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 sticky bottom-0">
+         <button 
+           type="button"
+           className="px-8 py-2 text-gray-600 font-bold bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors text-[13px]"
+           onClick={onCancel}
+         >
+           Cancel
+         </button>
+         <button 
+           type="submit"
+           form="darazProductForm"
+           disabled={isSaving}
+           className="px-10 py-2 text-white font-bold bg-primary rounded hover:bg-primary/90 flex items-center justify-center gap-2 min-w-[120px] transition-colors shadow-sm active:scale-95 text-[13px]"
+         >
+           {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+           Submit
+         </button>
+      </div>
+
     </div>
   );
 };
 
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div>
-    <label className="block mb-2 text-sm font-extrabold">{label}</label>
-    {children}
-  </div>
-);
-
-export default ProductForm;
+export default DarazProductForm;

@@ -84,9 +84,9 @@ const InvoiceLayout: React.FC<InvoiceLayoutProps> = ({
       : '';
 
   return (
-    <div className="bg-white p-8 md:p-12 shadow-sm border border-gray-100 max-w-[800px] mx-auto print:shadow-none print:border-none print:p-0 print:max-w-none">
+    <div className="bg-white p-5 md:p-6 shadow-sm border border-gray-100 max-w-[800px] mx-auto print:shadow-none print:border-none print:p-0 print:max-w-none">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12 border-b border-gray-100 pb-8 print:gap-4 print:mb-5 print:pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-5 mb-12 border-b border-gray-100 pb-8 print:gap-4 print:mb-5 print:pb-4">
         <div>
           {logoSrc ? (
             <img src={logoSrc} alt={brandName} className="h-10 mb-4 print:h-8 print:mb-2" />

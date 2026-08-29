@@ -23,6 +23,7 @@ interface CategoryGridProps {
 
 const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectCategory }) => {
   const [categories, setCategories] = useState<Category[]>(defaultCategories);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -71,22 +72,24 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
   }, []);
 
   return (
-    <section className="py-6 sm:py-16 bg-gray-50 border-y border-gray-100">
-      <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section className="py-6 sm:py-8 bg-gray-50 border-y border-gray-100">
+      <div className="px-3 sm:px-4 lg:px-8 max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-4 sm:mb-10">
           <div>
              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Categories</h2>
           </div>
-          <button 
-            onClick={() => onSelectCategory?.('')}
-            className={`text-sm font-bold transition-colors ${!selectedCategory ? 'text-primary' : 'text-gray-900 hover:text-primary'}`}
-          >
-            View All
-          </button>
+          {categories.length > 6 && (
+            <button 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-sm font-bold transition-colors text-primary hover:text-red-700 bg-red-50 px-4 py-2 rounded-full active:scale-95"
+            >
+              {isExpanded ? 'Show Less' : 'View All'}
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-6">
-          {categories.map((cat) => {
+          {(isExpanded ? categories : categories.slice(0, 6)).map((cat) => {
             const IconComponent = IconMap[cat.icon] || CircleDashed;
             const isSelected = selectedCategory === cat.name;
             
@@ -106,10 +109,24 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
                     : 'bg-gray-50 text-gray-600 group-hover:bg-primary group-hover:text-white'
                   }`}>
                   {cat.logoUrl ? (
-                    <img src={cat.logoUrl} alt={cat.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <IconComponent className="w-4 h-4 sm:w-7 sm:h-7" strokeWidth={1.5} />
-                  )}
+                    <img 
+                      src={cat.logoUrl} 
+                      alt={cat.name} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallbackIcon = e.currentTarget.nextElementSibling;
+                        if (fallbackIcon) {
+                          (fallbackIcon as HTMLElement).style.display = 'block';
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <IconComponent 
+                    className="w-4 h-4 sm:w-7 sm:h-7" 
+                    strokeWidth={1.5} 
+                    style={{ display: cat.logoUrl ? 'none' : 'block' }}
+                  />
                 </div>
                 <h3 className={`font-bold text-[13px] sm:text-sm leading-tight transition-colors text-center ${isSelected ? 'text-primary' : 'text-gray-900 group-hover:text-primary'}`}>
                   {cat.name}

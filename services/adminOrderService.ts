@@ -18,6 +18,13 @@ export interface AdminOrderDetail extends Order {
     quantity: number;
     image: string;
   }>;
+  paymentSubmission?: {
+    id: string;
+    paymentMethod: string;
+    transactionReference?: string;
+    documentPath?: string;
+    status: string;
+  };
 }
 
 const mapPaymentStatus = (status?: string): 'Paid' | 'Pending' | 'Failed' => {
@@ -40,6 +47,13 @@ export const getAllAdminOrders = async (): Promise<AdminOrderDetail[]> => {
           quantity,
           price,
           product:products(id, title, image_url)
+        ),
+        payment_submissions(
+          id,
+          payment_method,
+          transaction_reference,
+          document_path,
+          status
         )
       `)
       .order('created_at', { ascending: false });
@@ -48,6 +62,7 @@ export const getAllAdminOrders = async (): Promise<AdminOrderDetail[]> => {
 
     return (data || []).map((order: any) => {
       const shipping = order.shipping_address || {};
+      const submission = order.payment_submissions?.[0];
       return {
         id: order.id,
         customerName: shipping.fullName || 'Guest',
@@ -75,7 +90,14 @@ export const getAllAdminOrders = async (): Promise<AdminOrderDetail[]> => {
           price: Number(item.price) || 0,
           quantity: Number(item.quantity) || 0,
           image: item.product?.image_url || ''
-        }))
+        })),
+        paymentSubmission: submission ? {
+          id: submission.id,
+          paymentMethod: submission.payment_method,
+          transactionReference: submission.transaction_reference,
+          documentPath: submission.document_path,
+          status: submission.status
+        } : undefined
       };
     });
   } catch (error) {
@@ -97,6 +119,27 @@ export const updateOrderStatus = async (orderId: string, status: string): Promis
     return true;
   } catch (error) {
     console.error('Error updating admin order status:', error);
+    return false;
+  }
+};
+
+export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .update({ payment_status: paymentStatus })
+      .eq('id', orderId);
+    if (error) throw error;
+    
+    // Also try to update payment_submissions status if it exists
+    await supabase
+      .from('payment_submissions')
+      .update({ status: paymentStatus === 'paid' ? 'approved' : paymentStatus === 'failed' ? 'rejected' : 'pending' })
+      .eq('order_id', orderId);
+      
+    return true;
+  } catch (error) {
+    console.error('Error updating admin payment status:', error);
     return false;
   }
 };

@@ -22,6 +22,8 @@ interface HeroBanner {
   is_active: boolean;
   sort_order: number;
   created_at: string;
+  mobile_image_url: string | null;
+  settings: any;
 }
 
 interface ProductOption {
@@ -46,6 +48,12 @@ interface HeroForm {
   secondary_target_url: string;
   is_active: boolean;
   sort_order: number;
+  settings: {
+    layout: "left" | "center" | "right";
+    overlay: "dark-gradient" | "light-gradient" | "solid-dark" | "solid-light" | "none";
+    text_theme: "light" | "dark";
+    banner_height: "standard" | "tall";
+  };
 }
 
 const EMPTY_FORM: HeroForm = {
@@ -63,7 +71,13 @@ const EMPTY_FORM: HeroForm = {
   primary_target_url: '',
   secondary_target_url: '',
   is_active: true,
-  sort_order: 0
+  sort_order: 0,
+  settings: {
+    layout: "left",
+    overlay: "dark-gradient",
+    text_theme: "light",
+    banner_height: "standard"
+  }
 };
 
 const parseBannerTargetUrls = (value?: string | null): { primary: string; secondary: string } => {
@@ -137,7 +151,7 @@ const HeroBanners: React.FC = () => {
     if (bannersRes.error) {
       setMessage({ type: 'error', text: toFriendlyError(bannersRes.error.message) });
     } else {
-      setBanners((bannersRes.data || []) as HeroBanner[]);
+      setBanners((bannersRes.data || []) as unknown as HeroBanner[]);
     }
 
     if (!productsRes.error && productsRes.data) {
@@ -259,8 +273,8 @@ const HeroBanners: React.FC = () => {
     setSaving(true);
     const payload = payloadFromForm();
     const response = editingId
-      ? await supabase.from('hero_banners').update(payload).eq('id', editingId)
-      : await supabase.from('hero_banners').insert(payload);
+      ? await supabase.from('hero_banners').update(payload as any).eq('id', editingId)
+      : await supabase.from('hero_banners').insert(payload as any);
 
     setSaving(false);
 
@@ -289,6 +303,12 @@ const HeroBanners: React.FC = () => {
       target_type: banner.target_type,
       target_product_id: banner.target_product_id || '',
       target_category: banner.target_category || '',
+      settings: {
+        layout: banner.settings?.layout || "left",
+        overlay: banner.settings?.overlay || "dark-gradient",
+        text_theme: banner.settings?.text_theme || "light",
+        banner_height: banner.settings?.banner_height || "standard"
+      },
       primary_target_url: parsedUrls.primary,
       secondary_target_url: parsedUrls.secondary,
       is_active: banner.is_active,
@@ -315,7 +335,7 @@ const HeroBanners: React.FC = () => {
 
   const updateBanner = async (id: string, updates: Partial<HeroBanner>) => {
     setMessage(null);
-    const { error } = await supabase.from('hero_banners').update(updates).eq('id', id);
+    const { error } = await supabase.from('hero_banners').update(updates as any).eq('id', id);
     if (error) {
       setMessage({ type: 'error', text: toFriendlyError(error.message) });
       return false;
@@ -400,6 +420,62 @@ const HeroBanners: React.FC = () => {
           value={form.description}
           onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
         />
+
+        
+        {/* Advanced Settings */}
+        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-4">
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Advanced Appearance</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Text Layout</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={form.settings.layout}
+                onChange={(e) => setForm(prev => ({...prev, settings: {...prev.settings, layout: e.target.value as any}}))}
+              >
+                <option value="left">Left Align</option>
+                <option value="center">Center Align</option>
+                <option value="right">Right Align</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Image Overlay</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={form.settings.overlay}
+                onChange={(e) => setForm(prev => ({...prev, settings: {...prev.settings, overlay: e.target.value as any}}))}
+              >
+                <option value="dark-gradient">Dark Gradient (Left)</option>
+                <option value="light-gradient">Light Gradient (Left)</option>
+                <option value="solid-dark">Solid Dark Overlay</option>
+                <option value="solid-light">Solid Light Overlay</option>
+                <option value="none">No Overlay</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Text Theme</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={form.settings.text_theme}
+                onChange={(e) => setForm(prev => ({...prev, settings: {...prev.settings, text_theme: e.target.value as any}}))}
+              >
+                <option value="light">Light (White Text)</option>
+                <option value="dark">Dark (Black Text)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Banner Height</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={form.settings.banner_height}
+                onChange={(e) => setForm(prev => ({...prev, settings: {...prev.settings, banner_height: e.target.value as any}}))}
+              >
+                <option value="standard">Standard (500px)</option>
+                <option value="tall">Tall (600px)</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <select
@@ -551,7 +627,7 @@ const HeroBanners: React.FC = () => {
       </form>
 
       {loading ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 flex justify-center">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 flex justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : (
@@ -583,7 +659,7 @@ const HeroBanners: React.FC = () => {
                             <img src={banner.image_url} alt={banner.title} className="w-14 h-10 object-cover rounded-lg border border-gray-200" />
                           ) : (
                             <div className="w-14 h-10 rounded-lg border border-dashed border-gray-200 flex items-center justify-center text-gray-400">
-                              <ImagePlus className="w-4 h-4" />
+                              <ImageIcon className="w-4 h-4" />
                             </div>
                           )}
                           <div>

@@ -10,7 +10,7 @@
   --color-warning-rgb: 245 158 11;
   --color-danger-rgb: 220 38 38;
 
-  --background-light-rgb: 255 255 255;
+  --background-light-rgb: 249 250 251;
   --background-dark-rgb: 11 18 32;
   --surface-light-rgb: 255 255 255;
   --surface-dark-rgb: 17 24 39;
@@ -304,10 +304,7 @@ html.dark {
   background-color: rgb(var(--background-current-rgb)) !important;
 }
 
-.bg-gray-100,
-.bg-gray-100\/50 {
-  background-color: rgb(var(--surface-current-rgb)) !important;
-}
+
 
 html.dark .shadow-sm,
 html.dark .shadow-md,
@@ -433,4 +430,40 @@ html.dark .product-card-image-surface:hover {
   touch-action: pan-x pan-y;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Invert dark buttons and badges in dark mode */
+html.dark .bg-gray-900,
+html.dark .bg-gray-800,
+html.dark .bg-black {
+  background-color: rgb(var(--text-dark-rgb)) !important;
+  color: rgb(var(--surface-dark-rgb)) !important;
+}
+
+html.dark .bg-gray-900 .text-white,
+html.dark .bg-gray-800 .text-white,
+html.dark .bg-black .text-white {
+  color: rgb(var(--surface-dark-rgb)) !important;
+}
+
+/* Make sure text elements that were manually set to dark gray become light in dark mode */
+html.dark .text-gray-900,
+html.dark .text-gray-800 {
+  color: rgb(var(--text-dark-rgb)) !important;
+}
+
+/* Ensure hover states on dark buttons also invert */
+html.dark .hover\:bg-black:hover,
+html.dark .hover\:bg-gray-900:hover {
+  background-color: rgb(var(--surface-light-rgb)) !important;
+}
+
+/* Fix bg-gray-100/200 for dark mode (since we removed the aggressive override earlier) */
+html.dark .bg-gray-100,
+html.dark .bg-gray-200 {
+  background-color: rgb(var(--surface-current-rgb)) !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: rgb(var(--background-current-rgb)) !important;
 }

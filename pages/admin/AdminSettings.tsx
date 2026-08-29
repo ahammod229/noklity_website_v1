@@ -96,7 +96,7 @@ const AdminSettings: React.FC = () => {
       
       {/* Maintenance Mode Warning Banner */}
       {settings.maintenance.enabled && (
-        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 flex items-start gap-4 animate-in slide-in-from-top-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 flex items-start gap-4 animate-in slide-in-from-top-4">
           <div className="p-3 bg-amber-100 rounded-xl">
             <ShieldAlert className="w-6 h-6 text-amber-600" />
           </div>
@@ -108,7 +108,7 @@ const AdminSettings: React.FC = () => {
       )}
 
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm sticky top-0 z-50">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm sticky top-0 z-50">
         <div>
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Website Settings</h2>
           <p className="text-gray-500 font-medium">Control your branding, layout, and global storefront behavior.</p>
@@ -143,7 +143,7 @@ const AdminSettings: React.FC = () => {
         
         {/* Branding */}
         <SettingsSection id="branding" title="Branding" subtitle="Logos & Identity" icon={Palette}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <ImageUploader 
               label="Header Logo" 
               currentImage={settings.branding.headerLogo}
@@ -286,7 +286,7 @@ const AdminSettings: React.FC = () => {
 
         {/* Footer Settings */}
         <SettingsSection id="footer" title="Footer Configuration" subtitle="Content & Links" icon={Layout}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest">Footer Description</label>
@@ -398,7 +398,7 @@ const AdminSettings: React.FC = () => {
 
       {/* Success Notification */}
       {showSavedToast && (
-        <div className="fixed bottom-8 right-8 z-[100] bg-gray-900 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-8 right-8 z-[100] bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
           <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
             <CheckCircle2 className="w-5 h-5 text-white" />
           </div>

@@ -223,7 +223,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
 
       {/* Active Items Grid */}
       {loading ? (
-        <div className="flex justify-center py-20">
+        <div className="flex justify-center py-10">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
         </div>
       ) : activeItems.length > 0 ? (
@@ -308,7 +308,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-dashed border-gray-200 text-center">
+        <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl border border-dashed border-gray-200 text-center">
           <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
             <Zap className="w-8 h-8 text-gray-300" />
           </div>
@@ -329,10 +329,10 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setIsAddModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
+          <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
             
             {/* Modal Header */}
-            <div className="p-8 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+            <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black text-gray-900">Add to Flash Sale</h3>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Select a product and set discount</p>
@@ -343,7 +343,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               
               {/* Step 1: Select Product */}
               <div className="mb-8">
@@ -361,7 +361,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                 
                 <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl bg-white shadow-inner custom-scrollbar">
                   {loadingCandidates ? (
-                    <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>
+                    <div className="p-5 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>
                   ) : filteredCandidates.length > 0 ? (
                     filteredCandidates.map(product => (
                       <div 
@@ -384,7 +384,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
                       </div>
                     ))
                   ) : (
-                    <div className="p-8 text-center text-gray-400 text-sm">No eligible products found.</div>
+                    <div className="p-5 text-center text-gray-400 text-sm">No eligible products found.</div>
                   )}
                 </div>
               </div>
@@ -424,7 +424,7 @@ const FlashSales: React.FC<FlashSalesProps> = ({ showToast }) => {
             </div>
 
             {/* Footer */}
-            <div className="p-8 border-t border-gray-100 bg-gray-50/50 flex gap-4">
+            <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex gap-4">
               <button 
                 onClick={() => setIsAddModalOpen(false)}
                 className="flex-1 py-4 bg-white border border-gray-200 text-gray-900 font-bold rounded-2xl hover:bg-gray-50 transition-all uppercase tracking-widest text-xs"

@@ -58,7 +58,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8 font-sans">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-5 font-sans">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-4" />
           <p className="text-gray-500 font-bold">Loading Invoice Details...</p>
@@ -69,8 +69,8 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8 font-sans">
-        <div className="bg-white p-12 rounded-[2.5rem] shadow-xl text-center max-w-md border border-gray-100">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-5 font-sans">
+        <div className="bg-white p-6 rounded-2xl shadow-xl text-center max-w-md border border-gray-100">
           <AlertCircle className="w-16 h-16 text-primary mx-auto mb-6" />
           <h2 className="text-2xl font-black text-gray-900 mb-2">Invoice Error</h2>
           <p className="text-gray-500 mb-8 font-medium">{error}</p>
@@ -122,7 +122,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
         </div>
       </div>
 
-      <main className="flex-grow py-8 md:py-12 px-4 print:flex-none print:p-0">
+      <main className="flex-grow py-8 md:py-6 px-4 print:flex-none print:p-0">
         <InvoiceLayout 
           orderId={data.id} 
           date={data.date} 
@@ -130,7 +130,7 @@ const Invoice: React.FC<InvoicePageProps> = ({ orderId, onNavigate }) => {
           paymentStatus={data.paymentStatus}
         >
           {/* Billing Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12 print:gap-5 print:mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12 print:gap-5 print:mb-6">
             <div>
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Billed To</h3>
               <p className="text-sm font-black text-gray-900 mb-1">{data.customer.name}</p>

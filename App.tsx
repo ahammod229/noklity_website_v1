@@ -682,6 +682,7 @@ const AppContent: React.FC = () => {
                 ? navigate('help')
                 : showToast('Support module is disabled for this plan.', 'error')
             }
+            onNotificationsClick={() => navigate('notifications')}
             onWishlistClick={() => navigate('wishlist')}
             wishlistCount={wishlist.length}
             user={user}

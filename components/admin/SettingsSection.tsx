@@ -11,8 +11,8 @@ interface SettingsSectionProps {
 
 const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, subtitle, icon: Icon, children }) => {
   return (
-    <section id={id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden scroll-mt-24">
-      <div className="p-8 md:p-10 bg-gray-50/50 border-b border-gray-50 flex items-center gap-4">
+    <section id={id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-24">
+      <div className="p-5 md:p-6 bg-gray-50/50 border-b border-gray-50 flex items-center gap-4">
         <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100">
           <Icon className="w-6 h-6" />
         </div>
@@ -23,7 +23,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, subtitle, 
           )}
         </div>
       </div>
-      <div className="p-8 md:p-10 space-y-8">
+      <div className="p-5 md:p-6 space-y-8">
         {children}
       </div>
     </section>

@@ -57,7 +57,7 @@ const AdminLanguage: React.FC = () => {
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl pb-24">
       
       {/* Header Panel */}
-      <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 sticky top-0 z-50">
+      <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-5 sticky top-0 z-50">
         <div className="flex items-center gap-6">
           <div className="w-16 h-16 rounded-[1.5rem] bg-red-50 flex items-center justify-center text-primary shadow-inner">
             <Languages className="w-8 h-8" />
@@ -94,8 +94,8 @@ const AdminLanguage: React.FC = () => {
       </div>
 
       {/* Global Config Card */}
-      <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-2">
               <Globe className="w-5 h-5 text-gray-400" />
@@ -142,7 +142,7 @@ const AdminLanguage: React.FC = () => {
       </div>
 
       {/* Content Editor */}
-      <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm min-h-[600px]">
+      <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm min-h-[600px]">
         <LanguageTabs 
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -153,7 +153,7 @@ const AdminLanguage: React.FC = () => {
 
       {/* Success Notification */}
       {showToast && (
-        <div className="fixed bottom-8 right-8 z-[100] bg-gray-900 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-8 right-8 z-[100] bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
           <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
             <CheckCircle2 className="w-5 h-5 text-white" />
           </div>

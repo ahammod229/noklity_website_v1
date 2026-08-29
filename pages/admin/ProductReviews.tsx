@@ -39,7 +39,7 @@ const ProductReviews: React.FC = () => {
   }, []);
 
   const updateReview = async (id: string, updates: Partial<AdminReview>) => {
-    const { error } = await supabase.from('product_reviews').update(updates).eq('id', id);
+    const { error } = await supabase.from('product_reviews').update(updates as any).eq('id', id);
     if (error) {
       alert(error.message || 'Failed to update review');
       return;
@@ -61,11 +61,11 @@ const ProductReviews: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 flex justify-center">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 flex justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : reviews.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center text-gray-500 font-medium">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center text-gray-500 font-medium">
           No reviews found yet.
         </div>
       ) : (

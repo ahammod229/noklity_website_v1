@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Edit2,
   ChevronRight,
+  Upload,
   X
 } from 'lucide-react';
 
@@ -58,9 +59,10 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   
-  const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nogad' | 'bank_transfer'>('nogad');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [selectedBankCode, setSelectedBankCode] = useState<string>('');
+  const [bkashTrxId, setBkashTrxId] = useState('');
   const [transactionReference, setTransactionReference] = useState('');
   const [documentType, setDocumentType] = useState('Transfer Proof');
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -69,15 +71,8 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const [billingConfig, setBillingConfig] = useState(() => ({
     shippingFee: initialSiteConfig.defaultShippingFee
   }));
-  const configuredCodeSet = new Set(paymentMethods.map((m) => m.code));
-  const featurePaymentEnabled: Record<'bkash' | 'nogad' | 'bank_transfer', boolean> = {
-    bkash: canUseFeature('payment_bkash'),
-    nogad: canUseFeature('payment_nogad'),
-    bank_transfer: canUseFeature('payment_bank_transfer')
-  };
-  const checkoutMethods = (['nogad', 'bkash', 'bank_transfer'] as const).filter((code) =>
-    featurePaymentEnabled[code] && (configuredCodeSet.size === 0 ? true : configuredCodeSet.has(code))
-  );
+  // Dynamic checkout methods from DB
+  const checkoutMethods = paymentMethods.map((m) => m.code);
 
   // Calculations
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -182,6 +177,10 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
     if (error || !data) return;
     setPaymentMethods(data);
+    // Auto-select the first method if nothing is selected yet
+    if (data.length > 0) {
+      setPaymentMethod((prev) => prev || data[0].code);
+    }
   };
 
   const handleAddAddress = async (data: Omit<Address, 'id'>) => {
@@ -291,39 +290,45 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
       });
       
       if (result.success && result.orderId) {
-        if (paymentMethod === 'bkash') {
-          const bkashResult = await startBkashPaymentSession(result.orderId, total);
-          if (!bkashResult.success || !bkashResult.bkashURL) {
-            setCheckoutMessage({
-              type: 'error',
-              text: bkashResult.error || 'Unable to initiate bKash payment. Please try again.'
+        const selectedMethodObj = paymentMethods.find((m) => m.code === paymentMethod);
+        
+        if (selectedMethodObj?.type === 'mobile_banking') {
+          const currentUserId = user?.uid || null;
+          // Guest checkouts will have null user_id, which might fail RLS on payment_submissions if user_id is required
+          // However, we also save to orders table directly
+          try {
+            await supabase.from('payment_submissions').insert({
+              order_id: result.orderId,
+              user_id: currentUserId,
+              payment_method: selectedMethodObj.code,
+              transaction_reference: bkashTrxId.trim(),
+              status: 'pending'
             });
-            return;
+          } catch(e) {
+            console.warn('Could not insert payment_submissions, relying on orders table fallback.');
           }
 
-          window.location.assign(bkashResult.bkashURL);
-          return;
-        }
+          await supabase
+            .from('orders')
+            .update({
+              transaction_id: bkashTrxId.trim(),
+              payment_status: 'pending',
+              status: 'Pending'
+            })
+            .eq('id', result.orderId);
 
-        if (paymentMethod === 'nogad') {
-          const paymentResult = await verifyPaymentStatus(result.orderId, 'nogad');
-          if (!paymentResult.success) {
-            await markPaymentFailed(result.orderId, paymentResult.error);
-            onNavigate('payment-failed', result.orderId);
-            return;
-          }
           await clearCart();
-          onNavigate('payment-success', result.orderId);
+          onNavigate('order-success', result.orderId);
           return;
         }
 
-        if (paymentMethod === 'bank_transfer') {
+        if (selectedMethodObj?.type === 'bank_transfer') {
           const currentUserId = user?.uid || null;
           let documentPath: string | null = null;
           if (proofFile) {
             const folderName = currentUserId || 'guest';
             const isImage = proofFile.type.startsWith('image/');
-            const uploadFile = isImage
+            const fileToUpload = isImage
               ? (
                   await optimizeImageForUpload(proofFile, {
                     targetWidth: 1600,
@@ -334,42 +339,52 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                   })
                 ).file
               : proofFile;
-            const ext = uploadFile.name.split('.').pop() || (isImage ? 'webp' : 'bin');
+            const ext = fileToUpload.name.split('.').pop() || (isImage ? 'webp' : 'bin');
             const filePath = `${folderName}/${result.orderId}-${Date.now()}.${ext}`;
             try {
-              const { path: newPath } = await uploadFile('payment-proofs', filePath, uploadFile, { upsert: false });
+              const uploadRes = await supabase.storage.from('payment-proofs').upload(filePath, fileToUpload, { upsert: false });
+              if (uploadRes.error) throw uploadRes.error;
+              const newPath = uploadRes.data?.path;
               documentPath = newPath;
             } catch (uploadError) {
               console.error('Failed to upload payment proof:', uploadError);
             }
           }
 
-          await supabase.from('payment_submissions').insert({
-            order_id: result.orderId,
-            user_id: currentUserId,
-            payment_method: 'bank_transfer',
-            bank_code: selectedBankCode || null,
-            document_type: documentType || null,
-            transaction_reference: transactionReference.trim() || null,
-            document_path: documentPath,
-            status: 'pending'
-          });
-
+          try {
+            await supabase.from('payment_submissions').insert({
+              order_id: result.orderId,
+              user_id: currentUserId,
+              payment_method: selectedMethodObj.code,
+              bank_code: selectedBankCode || null,
+              document_type: documentType || null,
+              transaction_reference: transactionReference.trim() || null,
+              document_path: documentPath,
+              status: 'pending'
+            });
+          } catch(e) {
+            console.warn('Could not insert bank transfer payment_submissions.');
+          }
+          
           await supabase
             .from('orders')
             .update({
-              transaction_id: transactionReference.trim(),
+              transaction_id: transactionReference.trim() || null,
               payment_status: 'pending',
               status: 'Pending'
             })
             .eq('id', result.orderId);
+
+          await clearCart();
+          onNavigate('order-success', result.orderId);
+          return;
         }
 
-        // Bank transfer remains pending until admin confirms.
+        // Fallback for Cash on Delivery or generic methods
         await clearCart();
         onNavigate('order-success', result.orderId);
       } else {
-        onNavigate('payment-failed');
+        setCheckoutMessage({ type: 'error', text: (result as any).error || 'Failed to process order' });
       }
     } catch (error: any) {
       console.error("Order failed", error);
@@ -381,20 +396,13 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
   const bankMethods = paymentMethods.filter((m) => m.type === 'bank_transfer');
 
-  useEffect(() => {
-    const available = (['bkash', 'nogad', 'bank_transfer'] as const).filter((code) =>
-      paymentMethods.length === 0 ? true : paymentMethods.some((m) => m.code === code)
-    );
-    if (available.length > 0 && !available.includes(paymentMethod)) {
-      setPaymentMethod(available[0]);
-    }
-  }, [paymentMethods, paymentMethod]);
+
 
   // Empty State
   if (cart.length === 0 && !isProcessingOrder) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="bg-white p-12 rounded-[2.5rem] shadow-xl border border-gray-100 text-center max-w-md w-full">
+        <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-100 text-center max-w-md w-full">
           <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShoppingBag className="w-10 h-10 text-gray-300" />
           </div>
@@ -413,7 +421,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
-      <main className="flex-grow py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+      <main className="flex-grow py-6 sm:py-8 px-3 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <button 
             onClick={() => onNavigate('home')}
             className="flex items-center text-sm font-bold text-gray-500 hover:text-gray-900 mb-8 transition-colors group"
@@ -424,7 +432,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
         <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 tracking-tight">Checkout</h1>
 
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+        <div className="flex flex-col lg:flex-row gap-5 lg:gap-6">
           
           {/* LEFT COLUMN: Shipping & Payment */}
           <div className="flex-1 space-y-8">
@@ -481,7 +489,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
             </section>
 
             {isGuestCheckout && (
-              <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
+              <section className="bg-white p-4 sm:p-4 md:p-6 rounded-[2rem] shadow-sm border border-gray-200">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
                     <Mail className="w-5 h-5" />
@@ -508,187 +516,186 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
               </section>
             )}
 
-            {/* 2. Payment Method */}
-            <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-gray-200">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600">
-                        <CreditCard className="w-5 h-5" />
+                        {/* 2. Payment Method */}
+            <section className="bg-white p-4 sm:p-6 rounded-[2rem] shadow-sm border border-gray-200">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                        <CreditCard className="w-5 h-5 text-gray-600" />
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900">Payment Method</h2>
+                    <h2 className="text-lg font-black text-gray-900">Payment Method</h2>
                 </div>
 
-                <div className="space-y-3">
-                    {checkoutMethods.length === 0 && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
-                        No payment methods are enabled for this plan. Please update plan/feature settings.
-                      </div>
-                    )}
-                    {checkoutMethods.includes('bkash') && (
-                    <label 
-                        className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                            paymentMethod === 'bkash' 
-                            ? 'border-primary bg-red-50/30' 
-                            : 'border-gray-100 hover:border-gray-200'
-                        }`}
-                    >
-                        <input 
-                            type="radio" 
-                            name="payment" 
-                            value="bkash"
-                            checked={paymentMethod === 'bkash'}
-                            onChange={() => setPaymentMethod('bkash')}
-                            className="w-5 h-5 text-primary border-gray-300 focus:ring-primary"
-                        />
-                        <div className="ml-4 flex-1">
-                            <span className="block font-bold text-gray-900">{paymentMethods.find((m) => m.code === 'bkash')?.name || 'bKash'}</span>
-                            <span className="text-xs text-gray-500">Instant mobile payment</span>
-                        </div>
-                        <Smartphone className={`w-6 h-6 ${paymentMethod === 'bkash' ? 'text-primary' : 'text-gray-300'}`} />
-                    </label>
-                    )}
-
-                    {checkoutMethods.includes('nogad') && (
-                    <label 
-                        className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                            paymentMethod === 'nogad'
-                            ? 'border-primary bg-red-50/30'
-                            : 'border-gray-100 hover:border-gray-200'
-                        }`}
-                    >
-                        <input 
-                            type="radio" 
-                            name="payment" 
-                            value="nogad"
-                            checked={paymentMethod === 'nogad'}
-                            onChange={() => setPaymentMethod('nogad')}
-                            className="w-5 h-5 text-primary border-gray-300 focus:ring-primary"
-                        />
-                        <div className="ml-4 flex-1">
-                            <span className="block font-bold text-gray-900">{paymentMethods.find((m) => m.code === 'nogad')?.name || 'Nogad'}</span>
-                            <span className="text-xs text-gray-500">Instant mobile payment</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <div className="w-8 h-5 bg-blue-500/80 rounded"></div>
-                            <div className="w-8 h-5 bg-amber-400/90 rounded"></div>
-                        </div>
-                    </label>
-                    )}
-
-                    {checkoutMethods.includes('bank_transfer') && (
-                    <label 
-                        className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                            paymentMethod === 'bank_transfer'
-                            ? 'border-primary bg-red-50/30'
-                            : 'border-gray-100 hover:border-gray-200'
-                        }`}
-                    >
-                        <input 
-                            type="radio" 
-                            name="payment" 
-                            value="bank_transfer"
-                            checked={paymentMethod === 'bank_transfer'}
-                            onChange={() => setPaymentMethod('bank_transfer')}
-                            className="w-5 h-5 text-primary border-gray-300 focus:ring-primary"
-                        />
-                        <div className="ml-4 flex-1">
-                            <span className="block font-bold text-gray-900">{paymentMethods.find((m) => m.code === 'bank_transfer')?.name || 'Bank Transfer'}</span>
-                            <span className="text-xs text-gray-500">Manual confirmation required</span>
-                        </div>
-                        <Landmark className={`w-6 h-6 ${paymentMethod === 'bank_transfer' ? 'text-primary' : 'text-gray-300'}`} />
-                    </label>
-                    )}
-                </div>
-
-                {paymentMethod === 'bank_transfer' && (
-                  <div className="mt-6 border border-green-200 bg-green-50/40 rounded-2xl p-5 space-y-4">
-                    <h3 className="text-lg font-black text-gray-900">Bank Payment</h3>
-                    <p className="text-sm text-gray-600">Select your bank to view transfer details.</p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {bankMethods.map((bank) => (
-                        <button
-                          key={bank.id}
-                          type="button"
-                          onClick={() => setSelectedBankCode(bank.code)}
-                          className={`text-left rounded-xl border-2 p-4 transition-all ${
-                            selectedBankCode === bank.code ? 'border-primary bg-red-50' : 'border-gray-200 bg-white'
-                          }`}
-                        >
-                          <p className="text-sm font-black text-gray-900">{bank.name}</p>
-                          <p className="text-xs text-gray-500">{bank.code}</p>
-                        </button>
-                      ))}
-                    </div>
-
-                    {selectedBankCode && (
-                      <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-3">
-                        {(() => {
-                          const selectedBank = bankMethods.find((b) => b.code === selectedBankCode);
-                          const details = (selectedBank?.account_details || {}) as Record<string, string>;
-                          return (
-                            <>
-                              <p className="font-black text-gray-900">{selectedBank?.name}</p>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <InfoTile label="Bank Address" value={details.bank_address || details.branch || 'N/A'} />
-                                <InfoTile label="Account Holder" value={details.account_holder || 'N/A'} />
-                                <InfoTile label="Account Number" value={details.account_number || 'N/A'} />
-                                <InfoTile label="Routing Number" value={details.routing_number || 'N/A'} />
-                                <InfoTile label="SWIFT Code" value={details.swift_code || 'N/A'} />
-                                <InfoTile label="Bank Code" value={details.bank_code || selectedBank?.code || 'N/A'} />
-                              </div>
-                              {selectedBank?.instructions && (
-                                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                  {selectedBank.instructions}
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    <div className="space-y-3">
-                      <h4 className="font-black text-gray-900">Upload Payment Document</h4>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Document Type</label>
-                        <select
-                          value={documentType}
-                          onChange={(e) => setDocumentType(e.target.value)}
-                          className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white font-semibold"
-                        >
-                          <option>Transfer Proof</option>
-                          <option>Bank Challan</option>
-                          <option>Deposit Slip</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Transaction Reference</label>
-                        <input
-                          type="text"
-                          value={transactionReference}
-                          onChange={(e) => setTransactionReference(e.target.value)}
-                          className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white font-semibold"
-                          placeholder="Enter bank transaction reference"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">Upload Challan (Optional)</label>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => setProofFile(e.target.files?.[0] || null)}
-                          className="w-full h-12 px-3 py-2 rounded-xl border border-gray-200 bg-white"
-                        />
-                      </div>
-                    </div>
+                {paymentMethods.length === 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                    No payment methods available. Please check back later.
                   </div>
                 )}
+
+                {/* Method List */}
+                <div className="space-y-2">
+                  {paymentMethods.map(method => {
+                    const isSelected = paymentMethod === method.code;
+                    return (
+                      <div 
+                        key={method.code}
+                        onClick={() => setPaymentMethod(method.code)}
+                        className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                          isSelected 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-gray-100 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'border-primary' : 'border-gray-300'
+                        }`}>
+                          {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                        </div>
+
+                        {method.logo_url ? (
+                          <img src={method.logo_url} alt="" className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-100 flex-shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            {method.type === 'mobile_banking' ? <Smartphone className="w-4 h-4 text-gray-500" /> : <CreditCard className="w-4 h-4 text-gray-500" />}
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 text-sm">{method.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {method.type === 'mobile_banking' ? 'Mobile Payment' : method.type === 'bank_transfer' ? 'Bank Transfer' : 'Cash on Delivery'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Detail Panel — shows based on selected method */}
+                {(() => {
+                  const sel = paymentMethods.find(m => m.code === paymentMethod);
+                  if (!sel) return null;
+
+                  // ─── Mobile Banking (bKash, Nagad, Rocket, etc.) ───
+                  if (sel.type === 'mobile_banking') {
+                    const num = (sel.account_details as any)?.mobile_number || 'Not Set';
+                    return (
+                      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
+                        <p className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                          <Smartphone className="w-4 h-4" /> {sel.name} Payment
+                        </p>
+                        <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-700 space-y-1">
+                          {sel.instructions ? (
+                            <div className="whitespace-pre-wrap leading-relaxed">{sel.instructions}</div>
+                          ) : (
+                            <>
+                              <p>Send money to: <strong className="text-gray-900 text-base tracking-wide">{num}</strong></p>
+                              <p>Amount: <strong className="text-gray-900">৳{total}</strong></p>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-800 mb-1.5">
+                            Transaction ID (TrxID) <span className="text-red-500">*</span>
+                          </label>
+                          <input 
+                            type="text"
+                            value={bkashTrxId}
+                            onChange={(e) => setBkashTrxId(e.target.value)}
+                            placeholder="e.g. 9B8XJ78Z1A"
+                            className="w-full bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 font-mono uppercase text-sm"
+                          />
+                          <p className="text-xs text-gray-400 mt-1.5">Check your SMS or App for the TrxID.</p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ─── Bank Transfer ───
+                  if (sel.type === 'bank_transfer') {
+                    const d = (sel.account_details || {}) as Record<string, string>;
+                    const hasDetails = d.account_number || d.account_holder || d.branch || d.bank_address;
+                    return (
+                      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
+                        <p className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                          <Landmark className="w-4 h-4" /> {sel.name} — Bank Details
+                        </p>
+
+                        {hasDetails && (
+                          <div className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {d.account_holder && <InfoTile label="Account Holder" value={d.account_holder} />}
+                              {d.account_number && <InfoTile label="Account Number" value={d.account_number} />}
+                              {(d.bank_address || d.branch) && <InfoTile label="Branch" value={d.bank_address || d.branch || ''} />}
+                              {d.routing_number && <InfoTile label="Routing Number" value={d.routing_number} />}
+                              {d.swift_code && <InfoTile label="SWIFT Code" value={d.swift_code} />}
+                            </div>
+                          </div>
+                        )}
+
+                        {sel.instructions && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900 whitespace-pre-wrap">
+                            {sel.instructions}
+                          </div>
+                        )}
+
+                        {/* Upload proof */}
+                        <div>
+                          <label className="block text-sm font-bold text-gray-800 mb-1.5">
+                            Payment Receipt <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-5 bg-white flex flex-col items-center justify-center hover:border-primary transition-colors cursor-pointer">
+                            <input 
+                              type="file" 
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) setProofFile(file);
+                              }}
+                            />
+                            {proofFile ? (
+                              <div className="text-center">
+                                <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                                <p className="font-bold text-gray-900 text-sm truncate max-w-[200px]">{proofFile.name}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{(proofFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                <p className="text-xs text-primary font-bold mt-1">Click to replace</p>
+                              </div>
+                            ) : (
+                              <div className="text-center">
+                                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                <p className="font-bold text-gray-900 text-sm">Upload receipt</p>
+                                <p className="text-xs text-gray-500 mt-0.5">JPEG, PNG or PDF (Max 3MB)</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Transaction reference */}
+                        <div>
+                          <label className="block text-sm font-bold text-gray-800 mb-1.5">
+                            Transaction Reference <span className="text-gray-400 font-normal">(Optional)</span>
+                          </label>
+                          <input 
+                            type="text"
+                            value={transactionReference}
+                            onChange={(e) => setTransactionReference(e.target.value)}
+                            placeholder="e.g. TR-298374928"
+                            className="w-full bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 font-mono text-sm"
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ─── COD or other types — no extra input needed ───
+                  return null;
+                })()}
             </section>
           </div>
 
           {/* RIGHT COLUMN: Order Summary */}
           <div className="lg:w-[420px] flex-shrink-0">
-            <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-lg border border-gray-200 sticky top-24">
+            <div className="bg-white p-4 sm:p-4 md:p-6 rounded-[2rem] shadow-lg border border-gray-200 sticky top-24">
                 <h2 className="text-xl font-black text-gray-900 mb-6 pb-4 border-b border-gray-100">Order Summary</h2>
                 
                 {/* Items List */}
@@ -772,7 +779,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                     </div>
                 )}
                 {checkoutMessage && (
-                    <div className={`mt-3 text-xs font-bold py-2 px-3 rounded-lg border ${checkoutMessage.type === 'error' ? 'text-red-700 bg-red-50 border-red-200' : 'text-green-700 bg-green-50 border-green-200'}`}>
+                    <div className={`mt-3 text-xs font-bold py-2 px-3 rounded-lg border ${checkoutMessage.type === 'error' ? 'text-red-700 bg-red-50 border-red-200' : 'text-green-700 bg-green-50 border-gray-200'}`}>
                         {checkoutMessage.text}
                     </div>
                 )}
@@ -797,7 +804,7 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto space-y-3 pb-safe">
+            <div className="p-3 sm:p-4 overflow-y-auto space-y-3 pb-safe">
               {addresses.map(addr => (
                 <div 
                   key={addr.id}

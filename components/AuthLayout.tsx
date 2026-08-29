@@ -92,8 +92,8 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle, onBa
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-          <div className="p-8">
+        <div className="bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
+          <div className="p-5">
             {children}
           </div>
         </div>

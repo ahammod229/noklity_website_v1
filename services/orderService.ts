@@ -1,6 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import { auth } from './firebaseClient';
+import { createNotification } from './notificationService';
 import { CartItem, Order } from '../types';
 import { getTenantConfig } from './tenantConfigService';
 import { getShortOrderId } from '../utils/orderId';
@@ -164,6 +165,19 @@ export const createOrder = async (orderData: OrderData): Promise<{ success: bool
     });
 
     if (error) throw error;
+
+    // Fire-and-forget: send "Order Placed" notification
+    const currentUser = auth.currentUser;
+    if (currentUser?.uid && data) {
+      const shortId = getShortOrderId(data);
+      createNotification({
+        user_id: currentUser.uid,
+        title: 'Order Placed Successfully!',
+        message: `Your order #${shortId} has been placed. We'll notify you when it's being processed.`,
+        type: 'order_placed',
+        link: `/orders/${data}`,
+      }).catch(() => {}); // silent fail
+    }
 
     return {
       success: true,

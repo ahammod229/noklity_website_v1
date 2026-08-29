@@ -14,7 +14,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onView, onTogg
   const { formatCurrency } = useCurrency();
   if (isLoading) {
     return (
-      <div className="bg-white rounded-[2rem] border border-gray-100 p-8 sm:p-24 flex flex-col items-center justify-center">
+      <div className="bg-white rounded-[2rem] border border-gray-100 p-5 sm:p-24 flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-primary/10 border-t-primary rounded-full animate-spin mb-4" />
         <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Loading Customer Database</p>
       </div>
@@ -38,7 +38,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onView, onTogg
           <tbody className="divide-y divide-gray-50">
             {customers.length === 0 && (
               <tr>
-                <td className="px-8 py-12 text-center text-sm font-semibold text-gray-500" colSpan={6}>
+                <td className="px-8 py-6 text-center text-sm font-semibold text-gray-500" colSpan={6}>
                   No customers found for current filters.
                 </td>
               </tr>

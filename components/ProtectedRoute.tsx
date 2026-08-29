@@ -16,7 +16,7 @@ interface ProtectedRouteProps {
 
 const AccessDenied: React.FC<{ onNavigate: (view: any) => void }> = ({ onNavigate }) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
-    <div className="bg-white rounded-3xl shadow-lg border border-red-100 p-10 max-w-md w-full text-center">
+    <div className="bg-white rounded-xl shadow-lg border border-red-100 p-6 max-w-md w-full text-center">
       <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-5">
         <ShieldOff className="w-8 h-8 text-red-500" />
       </div>
@@ -161,7 +161,7 @@ const LoadingScreen: React.FC<{ message?: string }> = ({
   message = 'Verifying access...',
 }) => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center bg-gray-50">
-    <div className="flex flex-col items-center p-8 bg-white rounded-3xl shadow-sm border border-gray-100">
+    <div className="flex flex-col items-center p-5 bg-white rounded-xl shadow-sm border border-gray-100">
       <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
       <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">{message}</p>
     </div>

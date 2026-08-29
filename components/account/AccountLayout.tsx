@@ -29,8 +29,8 @@ const AccountLayout: React.FC<AccountLayoutProps> = ({
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-12">
-          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-6 py-3 sm:py-6 lg:py-6">
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-5">
             {/* Navigation Section */}
             <div className="lg:w-72 flex-shrink-0">
               <AccountSidebar 

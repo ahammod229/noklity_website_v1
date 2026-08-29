@@ -19,9 +19,10 @@ interface PaymentMethod {
 interface PaymentFormState {
   code: string;
   name: string;
-  type: 'mobile_banking' | 'bank_transfer';
+  type: 'mobile_banking' | 'bank_transfer' | 'cod';
   logo_url: string;
   instructions: string;
+  mobile_number: string;
   bank_address: string;
   account_holder: string;
   account_number: string;
@@ -38,6 +39,7 @@ const defaultForm: PaymentFormState = {
   type: 'mobile_banking',
   logo_url: '',
   instructions: '',
+  mobile_number: '',
   bank_address: '',
   account_holder: '',
   account_number: '',
@@ -71,7 +73,11 @@ const PaymentMethods: React.FC = () => {
   };
 
   const buildAccountDetails = (state: PaymentFormState) => {
-    if (state.type !== 'bank_transfer') return {};
+    if (state.type === 'mobile_banking') {
+      return {
+        mobile_number: state.mobile_number.trim()
+      };
+    }
     return {
       bank_address: state.bank_address.trim(),
       account_holder: state.account_holder.trim(),
@@ -178,9 +184,10 @@ const PaymentMethods: React.FC = () => {
     setEditForm({
       code: method.code || '',
       name: method.name || '',
-      type: method.type === 'bank_transfer' ? 'bank_transfer' : 'mobile_banking',
+      type: method.type as 'mobile_banking' | 'bank_transfer' | 'cod',
       logo_url: method.logo_url || '',
       instructions: method.instructions || '',
+      mobile_number: details.mobile_number || '',
       bank_address: details.bank_address || '',
       account_holder: details.account_holder || '',
       account_number: details.account_number || '',
@@ -290,9 +297,10 @@ const PaymentMethods: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Code (bkash)" value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))} />
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-          <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as 'mobile_banking' | 'bank_transfer' }))}>
+          <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as 'mobile_banking' | 'bank_transfer' | 'cod' }))}>
             <option value="mobile_banking">Mobile Banking</option>
             <option value="bank_transfer">Bank Transfer</option>
+            <option value="cod">Cash on Delivery</option>
           </select>
           <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Logo URL" value={form.logo_url} onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))} />
           <button onClick={addMethod} disabled={saving || uploadingLogo} className="px-3 py-2 rounded-lg bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-70">
@@ -306,6 +314,11 @@ const PaymentMethods: React.FC = () => {
         </label>
         <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.paymentLogo)}</p>
         <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Instructions" value={form.instructions} onChange={(e) => setForm((p) => ({ ...p, instructions: e.target.value }))} />
+        {form.type === 'mobile_banking' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Mobile Number (e.g. 017...)" value={form.mobile_number} onChange={(e) => setForm((p) => ({ ...p, mobile_number: e.target.value }))} />
+          </div>
+        )}
         {form.type === 'bank_transfer' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Bank Address / Branch" value={form.bank_address} onChange={(e) => setForm((p) => ({ ...p, bank_address: e.target.value }))} />
@@ -324,9 +337,10 @@ const PaymentMethods: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Code" value={editForm.code} onChange={(e) => setEditForm((p) => ({ ...p, code: e.target.value }))} />
             <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} />
-            <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" value={editForm.type} onChange={(e) => setEditForm((p) => ({ ...p, type: e.target.value as 'mobile_banking' | 'bank_transfer' }))}>
+            <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" value={editForm.type} onChange={(e) => setEditForm((p) => ({ ...p, type: e.target.value as 'mobile_banking' | 'bank_transfer' | 'cod' }))}>
               <option value="mobile_banking">Mobile Banking</option>
               <option value="bank_transfer">Bank Transfer</option>
+            <option value="cod">Cash on Delivery</option>
             </select>
             <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Logo URL" value={editForm.logo_url} onChange={(e) => setEditForm((p) => ({ ...p, logo_url: e.target.value }))} />
             <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" type="number" placeholder="Sort order" value={editForm.sort_order} onChange={(e) => setEditForm((p) => ({ ...p, sort_order: Number(e.target.value || 0) }))} />
@@ -344,6 +358,12 @@ const PaymentMethods: React.FC = () => {
           <p className="text-xs text-gray-500">{formatImageGuideHint(ADMIN_IMAGE_GUIDES.paymentLogo)}</p>
 
           <textarea className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="Instructions" value={editForm.instructions} onChange={(e) => setEditForm((p) => ({ ...p, instructions: e.target.value }))} />
+
+          {editForm.type === 'mobile_banking' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-bold" placeholder="Mobile Number (e.g. 017...)" value={editForm.mobile_number} onChange={(e) => setEditForm((p) => ({ ...p, mobile_number: e.target.value }))} />
+            </div>
+          )}
 
           {editForm.type === 'bank_transfer' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -368,7 +388,7 @@ const PaymentMethods: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">

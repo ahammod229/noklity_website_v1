@@ -299,6 +299,29 @@ export const assertFeatureEnabled = async (featureKey: FeatureKey, fallbackMessa
 export const isHostAllowed = (hostOrUrl: string, config: TenantRuntimeConfig) => {
   const normalizedHost = normalizeHost(hostOrUrl);
   if (!normalizedHost) return true;
+
+  // Always allow local development hosts (localhost, local IPs, tunnel services)
+  const devHostPatterns = [
+    'localhost',
+    '127.0.0.1',
+  ];
+  if (devHostPatterns.includes(normalizedHost)) return true;
+
+  // Allow local network IPs: 192.168.x.x, 172.x.x.x, 10.x.x.x
+  if (
+    /^192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(normalizedHost) ||
+    /^172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(normalizedHost) ||
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(normalizedHost)
+  ) return true;
+
+  // Allow tunnel domains for mobile testing
+  if (
+    normalizedHost.endsWith('.loca.lt') ||
+    normalizedHost.endsWith('.trycloudflare.com') ||
+    normalizedHost.endsWith('.ngrok.io') ||
+    normalizedHost.endsWith('.ngrok-free.app')
+  ) return true;
+
   return config.allowedHosts.some((allowedHost) => {
     if (!allowedHost) return false;
     return normalizedHost === allowedHost || normalizedHost.endsWith(`.${allowedHost}`);

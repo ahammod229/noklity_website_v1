@@ -18,7 +18,7 @@ const OrderSuccess: React.FC<OrderSuccessProps> = ({ onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
-      <div className="bg-white max-w-lg w-full rounded-[2rem] shadow-2xl border border-white/50 p-8 md:p-12 text-center animate-in zoom-in-95 duration-500 relative overflow-hidden">
+      <div className="bg-white max-w-lg w-full rounded-[2rem] shadow-2xl border border-white/50 p-5 md:p-6 text-center animate-in zoom-in-95 duration-500 relative overflow-hidden">
         
         {/* Background Decoration */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-red-500 to-primary"></div>

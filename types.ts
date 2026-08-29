@@ -1,4 +1,23 @@
 
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  name: string;
+  sku?: string;
+  price: number;
+  stock: number;
+  image_url?: string;
+  created_at?: string;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  logo_url?: string;
+  created_at?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -26,6 +45,8 @@ export interface Product {
   stock?: number;
   description?: string;
   specifications?: Record<string, string>;
+  keywords?: string;
+  keyFeatures?: string[];
   compatibility?: string[];
   weight?: number;
   deliveryCharge?: number;
@@ -33,6 +54,13 @@ export interface Product {
   countryOfOrigin?: string;
   status?: 'active' | 'inactive';
   isFlashSale?: boolean;
+  isPreorder?: boolean;
+  preorderExpectedDate?: string;
+  // Video
+  videoUrl?: string;
+  videoProvider?: 'youtube' | 'upload' | 'media_center';
+  // Variants
+  variants?: ProductVariant[];
 }
 
 export interface CartItem extends Product {

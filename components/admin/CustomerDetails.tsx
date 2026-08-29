@@ -101,12 +101,12 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-end p-4 sm:p-6 lg:p-8">
+    <div className="fixed inset-0 z-[100] flex items-center justify-end p-4 sm:p-6 lg:p-5">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
       
-      <div className="relative bg-white w-full max-w-xl h-full rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-500">
+      <div className="relative bg-white w-full max-w-xl h-full rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-500">
         {/* Header */}
-        <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
+        <div className="p-5 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-black text-gray-900 mb-1">Customer 360</h2>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest">ID: {customer.id.slice(0, 8)}</p>
@@ -117,7 +117,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-5 space-y-10 custom-scrollbar">
           {contactMessage && (
             <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${
               contactMessage.type === 'error'
@@ -230,7 +230,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onClose, on
         </div>
 
         {/* Action Footer */}
-        <div className="p-8 border-t border-gray-100 flex gap-4">
+        <div className="p-5 border-t border-gray-100 flex gap-4">
            {customer.status === 'Active' ? (
              <button 
                 onClick={() => onToggleStatus(customer.id, 'Blocked')}

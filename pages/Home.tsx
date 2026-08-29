@@ -119,6 +119,7 @@ const Home: React.FC<HomeProps> = ({
   const handleNavigateToSearch = () => {
     window.history.pushState({}, '', '/search');
     window.dispatchEvent(new PopStateEvent('popstate'));
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const featuredProducts = useMemo(() => {
@@ -169,7 +170,7 @@ const Home: React.FC<HomeProps> = ({
         )}
         
         {/* Featured / Catalog Section */}
-        <section id="products-section" className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-[620px] sm:min-h-[600px]">
+        <section id="products-section" className="py-8 sm:py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-[620px] sm:min-h-[600px]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 mb-6 sm:mb-10">
             <div>
               <span className="text-primary font-bold uppercase tracking-widest text-xs mb-2 block">
@@ -210,7 +211,7 @@ const Home: React.FC<HomeProps> = ({
           ) : (
             <>
               {featuredProducts.length > 0 ? (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-5">
                   {featuredProducts.map((product) => (
                     <ProductCard 
                       key={product.id} 
@@ -221,7 +222,7 @@ const Home: React.FC<HomeProps> = ({
                   ))}
                 </div>
               ) : (
-                 <div className="text-center py-14 sm:py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                 <div className="text-center py-14 sm:py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                     <p className="text-gray-500 font-medium">No products found in this category.</p>
                     <button 
                       onClick={() => onSelectCategory('')}
@@ -249,7 +250,7 @@ const Home: React.FC<HomeProps> = ({
         {/* Promo Banner */}
         {canUseFeature('support_tickets') && (
         <section className="py-4 sm:py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="rounded-2xl sm:rounded-[2rem] border border-gray-200 bg-gradient-to-r from-gray-900 to-gray-800 text-white p-5 sm:p-8 md:p-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
+          <div className="rounded-2xl sm:rounded-[2rem] border border-gray-200 bg-gradient-to-r from-gray-900 to-gray-800 text-white p-5 sm:p-5 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
             <div>
               <p className="text-[11px] uppercase tracking-[0.25em] font-black text-red-300">Customer Support</p>
               <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight mt-2">Need help with order, payment, or delivery?</h3>
@@ -266,9 +267,9 @@ const Home: React.FC<HomeProps> = ({
         )}
 
         {newsletterEnabled && (
-          <section className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <section className="py-8 sm:py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <div
-              className="bg-gray-900 rounded-2xl sm:rounded-[2rem] p-5 sm:p-8 md:p-16 flex flex-col md:flex-row items-start md:items-center justify-between overflow-hidden relative shadow-2xl"
+              className="bg-gray-900 rounded-2xl sm:rounded-[2rem] p-5 sm:p-5 md:p-5 flex flex-col md:flex-row items-start md:items-center justify-between overflow-hidden relative shadow-2xl"
               style={
                 newsletterBackgroundImageUrl
                   ? {
@@ -291,7 +292,7 @@ const Home: React.FC<HomeProps> = ({
                     placeholder={newsletterInputPlaceholder}
                     className="flex-1 px-5 py-4 rounded-xl sm:rounded-r-none border-none focus:ring-2 focus:ring-primary outline-none text-gray-900 placeholder-gray-500"
                   />
-                  <button type="submit" className="bg-primary text-white font-bold px-8 py-4 rounded-xl sm:rounded-l-none hover:bg-red-700 transition-colors">
+                  <button type="submit" className="bg-primary text-white font-bold px-6 py-3 rounded-xl sm:rounded-l-none hover:bg-red-700 transition-colors">
                     {newsletterButtonText}
                   </button>
                 </form>

@@ -84,7 +84,7 @@ const Security: React.FC<SecurityProps> = ({ onLoginClick, cartItemCount, onCart
           </div>
         )}
 
-        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 md:p-10">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 md:p-6">
           <div className="flex items-center gap-3 mb-8">
             <div className="p-3 bg-blue-50 rounded-2xl">
               <ShieldCheck className="w-6 h-6 text-blue-600" />
@@ -153,7 +153,7 @@ const Security: React.FC<SecurityProps> = ({ onLoginClick, cartItemCount, onCart
           </form>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 md:p-10">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 md:p-6">
           <h3 className="text-lg font-black text-gray-900 mb-3">Session Management</h3>
           <p className="text-sm font-semibold text-gray-600 mb-5">
             If you logged in on another device, you can end all active sessions for better account safety.

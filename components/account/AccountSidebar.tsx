@@ -40,7 +40,7 @@ const AccountSidebar: React.FC<AccountSidebarProps> = ({ activeTab, onNavigate, 
   return (
     <div className="w-full">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden sticky top-24">
+      <aside className="hidden lg:block bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden sticky top-24">
         <div className="p-6 bg-gray-50/50 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center font-black text-xl shadow-lg shadow-red-500/20 relative overflow-hidden">
@@ -142,6 +142,14 @@ const AccountSidebar: React.FC<AccountSidebarProps> = ({ activeTab, onNavigate, 
             </button>
           );
         })}
+        <button
+          onClick={onLogout}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-full whitespace-nowrap text-[10px] font-black uppercase tracking-wide transition-all bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+          type="button"
+        >
+          <LogOut className="w-3 h-3" />
+          Logout
+        </button>
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className="flex items-center gap-1.5 px-3 py-2 rounded-full whitespace-nowrap text-[10px] font-black uppercase tracking-wide transition-all bg-gray-100 text-gray-500 hover:bg-gray-200"

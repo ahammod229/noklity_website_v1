@@ -175,7 +175,7 @@ const Orders: React.FC<OrdersProps> = ({
                     </div>
                 );
             }) : (
-                <div className="text-center py-12">
+                <div className="text-center py-6">
                     <p className="text-gray-500">No orders found.</p>
                 </div>
             )}

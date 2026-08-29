@@ -19,8 +19,8 @@ const PaymentFailed: React.FC<PaymentFailedProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
-      <main className="flex-grow flex items-center justify-center p-4 md:py-16">
-        <div className="bg-white max-w-xl w-full rounded-[2.5rem] shadow-2xl border border-gray-100 p-8 md:p-12 text-center animate-in zoom-in-95 duration-500 relative overflow-hidden">
+      <main className="flex-grow flex items-center justify-center p-4 md:py-8">
+        <div className="bg-white max-w-xl w-full rounded-2xl shadow-2xl border border-gray-100 p-5 md:p-6 text-center animate-in zoom-in-95 duration-500 relative overflow-hidden">
           
           {/* Top Decorative bar */}
           <div className="absolute top-0 left-0 w-full h-2 bg-primary"></div>
@@ -37,7 +37,7 @@ const PaymentFailed: React.FC<PaymentFailedProps> = ({
             </p>
 
             {/* Error Details Card */}
-            <div className="bg-red-50/50 rounded-3xl p-6 mb-10 border border-red-100 text-left">
+            <div className="bg-red-50/50 rounded-xl p-6 mb-10 border border-red-100 text-left">
                 <div className="flex items-start gap-4 mb-4">
                   <div className="p-2 bg-white rounded-lg shadow-sm">
                     <AlertCircle className="w-5 h-5 text-primary" />

@@ -291,6 +291,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
           padding: 16px 14px;
           z-index: 2;
           color: #ffffff;
+          min-width: 0;
         }
         .nk-hero-mobile-badge {
           display: inline-flex;
@@ -305,25 +306,32 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
           padding: 3px 10px;
           border-radius: 100px;
           margin-bottom: 6px;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .nk-hero-mobile-title {
-          font-size: 19px;
+          font-size: 17px;
           font-weight: 800;
-          line-height: 1.2;
+          line-height: 1.25;
           color: #ffffff;
-          white-space: nowrap;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
           overflow: hidden;
           text-overflow: ellipsis;
-          margin-bottom: 3px;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+          margin-bottom: 4px;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+          word-break: break-word;
         }
         .nk-hero-mobile-desc {
-          font-size: 12px;
-          color: rgba(255,255,255,0.82);
+          font-size: 11px;
+          color: rgba(255,255,255,0.80);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
           font-weight: 500;
         }
         .nk-hero-mobile-btns {
@@ -332,20 +340,20 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
           align-items: center;
         }
         .nk-hero-mobile-btn {
-          min-height: 44px;
-          min-width: 44px;
+          min-height: 40px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           font-size: 12px;
           font-weight: 700;
-          padding: 10px 18px;
+          padding: 9px 16px;
           border-radius: 100px;
           border: none;
           cursor: pointer;
           transition: opacity 0.15s ease, transform 0.1s ease;
           white-space: nowrap;
           -webkit-tap-highlight-color: transparent;
+          flex-shrink: 0;
         }
         .nk-hero-mobile-btn:active {
           transform: scale(0.96);
@@ -354,7 +362,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
         .nk-hero-mobile-btn-primary {
           background-color: #e61c43;
           color: #ffffff;
-          box-shadow: 0 4px 16px rgba(230,28,67,0.35);
+          box-shadow: 0 4px 14px rgba(230,28,67,0.40);
         }
         .nk-hero-mobile-btn-secondary {
           background-color: rgba(255,255,255,0.18);
@@ -363,16 +371,12 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
         }
-        /* Landscape mode — cap height so banner isn't too tall */
         @media (orientation: landscape) and (max-height: 500px) {
-          .nk-hero-mobile {
-            aspect-ratio: 16 / 7;
-          }
+          .nk-hero-mobile { aspect-ratio: 16 / 7; }
         }
       ` }} />
 
       {isLoading ? (
-        /* ─── Loading skeleton ─── */
         <div className="w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '4/3.2' }}>
           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -381,88 +385,79 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
       ) : (
         <>
           {/* ══════════════════════════════════════════
-              MOBILE HERO  (hidden on md+)
+              MOBILE HERO  (visible below md only)
           ══════════════════════════════════════════ */}
           <div
-            className="md:hidden relative"
+            className="md:hidden"
+            style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, touchAction: 'pan-y' }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
           >
-            {/* Slide track */}
+            {/* Slide track — MUST be width 100% and no overflow */}
             <div
-              className="flex"
               style={{
+                display: 'flex',
+                width: '100%',
                 transform: `translateX(calc(${-activeIndex * 100}% + ${dragOffset}px))`,
-                transition: isDragging ? 'none' : 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+                transition: isDragging ? 'none' : 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1)',
+                willChange: 'transform',
               }}
             >
               {displayedBanners.map((banner) => {
                 const mobileImg = (banner as any).mobile_image_url || banner.image_url;
-                const mobileDesc = (banner as any).badge_text || banner.description || '';
+                const descText = banner.description || '';
                 return (
-                  <div key={`mob-${banner.id}`} className="nk-hero-mobile flex-shrink-0 w-full" style={{ minWidth: '100%' }}>
+                  <div
+                    key={`mob-${banner.id}`}
+                    className="nk-hero-mobile"
+                    style={{ flexShrink: 0, width: '100%', minWidth: '100%' }}
+                  >
                     {/* Background image */}
                     {mobileImg ? (
-                      <img
-                        src={mobileImg}
-                        alt={banner.title}
-                        loading="eager"
-                        decoding="async"
-                      />
+                      <img src={mobileImg} alt={banner.title} loading="eager" decoding="async" draggable={false} />
                     ) : (
-                      /* Placeholder gradient when no image */
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'linear-gradient(135deg,#1a1a2e,#e61c43)'
-                      }} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,#1a1a2e,#e61c43)' }} />
                     )}
 
-                    {/* Dark gradient overlay */}
+                    {/* Gradient overlay */}
                     <div className="nk-hero-mobile-overlay" />
 
                     {/* Content */}
                     <div className="nk-hero-mobile-content">
-                      {/* Badge */}
                       {banner.badge_text && (
                         <div className="nk-hero-mobile-badge">
-                          <Zap style={{ width: 9, height: 9, fill: '#fff' }} />
-                          {banner.badge_text}
+                          <Zap style={{ width: 9, height: 9, fill: '#fff', flexShrink: 0 }} />
+                          <span>{banner.badge_text}</span>
                         </div>
                       )}
 
-                      {/* Title — 1 line, ellipsis */}
                       <div className="nk-hero-mobile-title">
-                        {banner.title}
-                        {banner.highlight_text ? ` ${banner.highlight_text}` : ''}
+                        {banner.title}{banner.highlight_text ? ` ${banner.highlight_text}` : ''}
                       </div>
 
-                      {/* Short description — 1 line, ellipsis */}
-                      {mobileDesc && (
-                        <div className="nk-hero-mobile-desc">{mobileDesc}</div>
+                      {descText && (
+                        <div className="nk-hero-mobile-desc">{descText}</div>
                       )}
 
-                      {/* Action buttons */}
                       <div className="nk-hero-mobile-btns">
                         <button
                           className="nk-hero-mobile-btn nk-hero-mobile-btn-primary"
                           disabled={isNavigating}
                           onClick={(e) => { e.stopPropagation(); handleBannerAction('primary'); }}
-                          aria-label={banner.primary_button_text}
                         >
                           {isNavigating
-                            ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
-                            : <>{banner.primary_button_text} <ArrowRight style={{ width: 12, height: 12, marginLeft: 4 }} /></>
+                            ? <Loader2 style={{ width: 13, height: 13 }} />
+                            : <>{banner.primary_button_text}<ArrowRight style={{ width: 12, height: 12, marginLeft: 4 }} /></>
                           }
                         </button>
                         {banner.secondary_button_text && (
                           <button
                             className="nk-hero-mobile-btn nk-hero-mobile-btn-secondary"
                             onClick={(e) => { e.stopPropagation(); handleBannerAction('secondary'); }}
-                            aria-label={banner.secondary_button_text}
                           >
-                            Details
+                            {banner.secondary_button_text}
                           </button>
                         )}
                       </div>
@@ -472,47 +467,39 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
               })}
             </div>
 
-            {/* Mobile slide dots */}
+            {/* Slide indicator dots — compact, inside the banner */}
             {displayedBanners.length > 1 && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1.5 backdrop-blur-md z-10">
-                {displayedBanners.map((banner, index) => (
-                  <button
-                    key={`mob-dot-${banner.id}`}
-                    onClick={(e) => { e.stopPropagation(); goToBanner(index); }}
+              <div style={{
+                position: 'absolute',
+                bottom: 12,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                zIndex: 10,
+                pointerEvents: 'none',
+              }}>
+                {displayedBanners.map((_, index) => (
+                  <span
+                    key={`dot-${index}`}
                     style={{
-                      height: 8,
-                      width: index === activeIndex ? 24 : 8,
-                      borderRadius: 100,
-                      backgroundColor: index === activeIndex ? '#ffffff' : 'rgba(255,255,255,0.45)',
-                      border: 'none',
-                      cursor: 'pointer',
-                      minHeight: 44,
-                      minWidth: index === activeIndex ? 44 : 44,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      background: 'none',
-                    }}
-                    aria-label={`Go to banner ${index + 1}`}
-                  >
-                    <span style={{
                       display: 'block',
-                      height: 8,
-                      width: index === activeIndex ? 24 : 8,
+                      height: 5,
+                      width: index === activeIndex ? 18 : 5,
                       borderRadius: 100,
                       backgroundColor: index === activeIndex ? '#ffffff' : 'rgba(255,255,255,0.45)',
-                      transition: 'width 0.3s ease, background-color 0.3s ease',
-                    }} />
-                  </button>
+                      transition: 'width 0.3s ease',
+                      flexShrink: 0,
+                    }}
+                  />
                 ))}
               </div>
             )}
 
-            {/* Error text */}
             {errorText && (
-              <p className="mt-2 text-xs text-red-500 font-semibold text-center">
-                {errorText.includes('hero_banners') ? 'Banners not ready yet.' : errorText}
+              <p style={{ marginTop: 8, fontSize: 12, color: '#ef4444', textAlign: 'center', fontWeight: 600 }}>
+                {errorText.includes('hero_banners') ? 'Banners not available.' : errorText}
               </p>
             )}
           </div>
@@ -526,7 +513,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
-            className="hidden md:block relative rounded-[2.5rem] overflow-hidden md:h-[500px] lg:h-[520px] w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer"
+            className={`hidden md:block relative rounded-2xl overflow-hidden ${(() => { const h = (activeBanner as any).settings?.banner_height; return h === "tall" ? "md:h-[600px] lg:h-[650px]" : "md:h-[500px] lg:h-[520px]"; })()} w-full shadow-2xl shadow-gray-200 group transform transition-all hover:shadow-gray-300 cursor-pointer`}
           >
             {/* Desktop slide track */}
             <div
@@ -549,17 +536,41 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                     fetchPriority="high"
                     className="w-full h-full object-cover object-center transform transition-transform duration-[20s] group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-950/90 via-gray-900/50 to-transparent" />
+                  {/* Dynamic Overlay per banner */}
+                  {(() => {
+                    const overlay = (banner as any).settings?.overlay || 'dark-gradient';
+                    switch (overlay) {
+                      case 'dark-gradient': return <div className="absolute inset-0 bg-gradient-to-r from-gray-950/90 via-gray-900/50 to-transparent" />;
+                      case 'light-gradient': return <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/50 to-transparent" />;
+                      case 'solid-dark': return <div className="absolute inset-0 bg-gray-950/60" />;
+                      case 'solid-light': return <div className="absolute inset-0 bg-white/60" />;
+                      default: return null;
+                    }
+                  })()}
                 </div>
               ))}
             </div>
 
             {/* Desktop content overlay */}
-            <div className="relative h-full flex items-center px-12 lg:px-16">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 md:p-10 rounded-3xl max-w-lg w-full text-white shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-primary/40 rounded-full blur-[60px] pointer-events-none" />
+            {(() => {
+              const activeSettings = (activeBanner as any).settings || {};
+              const layout = activeSettings.layout || 'left';
+              const textTheme = activeSettings.text_theme || 'light';
+              
+              const justifyClass = layout === 'center' ? 'justify-center' : layout === 'right' ? 'justify-end' : 'justify-start';
+              const textJustify = layout === 'center' ? 'text-center' : layout === 'right' ? 'text-right' : 'text-left';
+              const boxAlign = layout === 'center' ? 'items-center mx-auto' : layout === 'right' ? 'items-end ml-auto' : 'items-start';
+              const textColorClass = textTheme === 'dark' ? 'text-gray-900' : 'text-white';
+              const subTextColorClass = textTheme === 'dark' ? 'text-gray-700' : 'text-gray-200';
+              const glassmorphismClass = textTheme === 'dark' ? 'bg-white/40 border-white/40' : 'bg-black/30 border-white/10';
+
+              return (
+            <div className={`relative h-full flex items-center px-12 lg:px-16 ${justifyClass}`}>
+              <div className={`${glassmorphismClass} backdrop-blur-md border p-6 md:p-8 rounded-2xl max-w-lg w-full ${textColorClass} ${textJustify} shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 flex flex-col ${boxAlign}`}>
+              
+                {textTheme === 'light' && <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-primary/40 rounded-full blur-[60px] pointer-events-none" />}
                 <div className="relative z-10">
-                  <div className="inline-flex items-center gap-2 bg-primary px-3 py-1.5 rounded-full mb-6 shadow-lg shadow-red-900/20 border border-white/10">
+                  <div className={`inline-flex items-center gap-2 bg-primary px-3 py-1.5 rounded-full mb-6 shadow-lg border border-white/10 ${textTheme === "dark" ? "shadow-red-900/10" : "shadow-red-900/20"}`}>
                     <Zap className="w-3.5 h-3.5 text-white fill-white animate-pulse" />
                     <span className="text-white text-[11px] font-extrabold tracking-widest uppercase">{activeBanner.badge_text}</span>
                   </div>
@@ -569,7 +580,7 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                       <><br /><span className="text-primary drop-shadow-md">{activeBanner.highlight_text}</span></>
                     ) : null}
                   </h1>
-                  <p className="text-gray-200 text-sm md:text-base mb-8 leading-relaxed font-medium opacity-90 max-w-sm">
+                  <p className={`${subTextColorClass} text-sm md:text-base mb-8 leading-relaxed font-medium opacity-90 max-w-sm`}>
                     {activeBanner.description || 'Explore premium parts handpicked for your vehicle.'}
                   </p>
                   <div className="flex gap-4">
@@ -583,19 +594,21 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleBannerAction('secondary'); }}
-                      className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-bold py-4 px-8 rounded-full transition-all duration-300 backdrop-blur-sm hover:-translate-y-1"
+                      className={`backdrop-blur-sm text-sm font-bold py-4 px-8 rounded-full transition-all duration-300 hover:-translate-y-1 border ${textTheme === "dark" ? "bg-gray-900/10 hover:bg-gray-900/20 border-gray-900/20 text-gray-900" : "bg-white/10 hover:bg-white/20 border-white/20 text-white"}`}
                     >
                       {activeBanner.secondary_button_text}
                     </button>
                   </div>
                   {errorText && (
-                    <p className="mt-4 text-xs text-amber-200 font-semibold">
+                    <p className={`mt-4 text-xs font-semibold ${textTheme === "dark" ? "text-red-600" : "text-amber-200"}`}>
                       {errorText.includes('hero_banners') ? 'Hero banners are not ready in database yet.' : errorText}
                     </p>
                   )}
                 </div>
               </div>
             </div>
+            );
+            })()}
 
             {/* Desktop slide dots */}
             {displayedBanners.length > 1 && (
@@ -618,4 +631,3 @@ const Hero: React.FC<HeroProps> = ({ onProductClick, onSelectCategory }) => {
 };
 
 export default Hero;
-

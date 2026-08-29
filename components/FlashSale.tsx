@@ -33,7 +33,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart, onSh
 
   if (isLoading) {
     return (
-      <section className="min-h-[520px] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <section className="min-h-[520px] py-8 sm:py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="flex items-center justify-between gap-3 mb-6 sm:mb-8">
           <div className="h-8 w-36 rounded-full bg-gray-100 animate-pulse" />
           <div className="h-8 w-24 rounded-full bg-gray-100 animate-pulse" />
@@ -41,7 +41,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart, onSh
         <div className="flex overflow-hidden gap-4 sm:gap-6 pb-6 sm:pb-8 -mx-4 px-4 sm:mx-0 sm:px-0">
           {[0, 1].map((item) => (
             <div key={item} className="min-w-[82vw] sm:min-w-[260px] md:min-w-[280px] rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm">
-              <div className="aspect-square rounded-3xl bg-gray-100 animate-pulse" />
+              <div className="aspect-square rounded-xl bg-gray-100 animate-pulse" />
               <div className="mt-4 h-4 w-3/4 rounded-full bg-gray-100 animate-pulse" />
               <div className="mt-3 h-4 w-1/2 rounded-full bg-gray-100 animate-pulse" />
             </div>
@@ -54,7 +54,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart, onSh
   if (products.length === 0) return null;
 
   return (
-    <section className="min-h-[520px] py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section className="min-h-[520px] py-8 sm:py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8">
         <div className="flex items-center gap-3 sm:gap-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Flash Sale</h2>
@@ -71,6 +71,7 @@ const FlashSale: React.FC<FlashSaleProps> = ({ onProductClick, onAddToCart, onSh
               }
               window.history.pushState({}, '', '/search');
               window.dispatchEvent(new PopStateEvent('popstate'));
+              window.scrollTo({ top: 0, behavior: 'instant' });
             }}
             className="group inline-flex items-center text-sm font-bold text-gray-900 hover:text-primary transition-colors self-end sm:self-auto"
         >

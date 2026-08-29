@@ -205,7 +205,7 @@ const SiteSettings: React.FC = () => {
 
   return (
     <div className="max-w-4xl space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex justify-between items-center bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+      <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
         <div>
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Site Content</h2>
           <p className="text-gray-500 font-medium">Manage global website information and assets.</p>
@@ -220,9 +220,9 @@ const SiteSettings: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Branding */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
           <div className="flex items-center gap-3 mb-4">
             <Globe className="w-5 h-5 text-gray-400" />
             <h3 className="text-lg font-black text-gray-900">Branding</h3>
@@ -268,7 +268,7 @@ const SiteSettings: React.FC = () => {
         </div>
 
         {/* Contact Info */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
           <div className="flex items-center gap-3 mb-4">
             <MessageCircle className="w-5 h-5 text-gray-400" />
             <h3 className="text-lg font-black text-gray-900">Contact & Footer</h3>

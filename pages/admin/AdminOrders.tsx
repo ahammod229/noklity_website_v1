@@ -153,9 +153,9 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
       {selectedOrder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setSelectedOrder(null)} />
-          <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
+          <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
             
-            <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
+            <div className="p-5 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-black text-gray-900 mb-1">Order #{selectedOrder.id}</h2>
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Placed on {selectedOrder.date}</p>
@@ -179,8 +179,8 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 
                 {/* Left: Product Details */}
                 <div className="lg:col-span-2 space-y-8">
@@ -277,7 +277,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            <div className="p-8 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-4">
+            <div className="p-5 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-4">
               <div className="flex-1 flex gap-3">
                  <select 
                    value={selectedOrder.status}
@@ -291,7 +291,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                    <option value="Cancelled">Cancelled</option>
                  </select>
               </div>
-              <button className="flex-1 px-8 py-4 bg-primary text-white font-black rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-500/20">
+              <button className="flex-1 px-6 py-3 bg-primary text-white font-black rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-500/20">
                 Generate Label
               </button>
             </div>

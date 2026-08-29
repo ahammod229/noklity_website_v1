@@ -82,7 +82,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
   if (loading) {
     return (
       <AccountLayout activeTab="addresses" onNavigate={onNavigate} onCartClick={onCartClick} onLoginClick={onLoginClick} cartItemCount={cartItemCount} title="Shipping Addresses">
-        <div className="bg-white p-6 sm:p-20 rounded-[3rem] border border-gray-100 flex flex-col items-center justify-center">
+        <div className="bg-white p-6 sm:p-5 rounded-2xl border border-gray-100 flex flex-col items-center justify-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
           <p className="text-gray-500 font-bold">Fetching your addresses...</p>
         </div>
@@ -113,7 +113,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
         </div>
 
         {error ? (
-          <div className="bg-red-50 p-8 rounded-3xl border border-red-100 text-center">
+          <div className="bg-red-50 p-5 rounded-xl border border-red-100 text-center">
             <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
             <p className="text-red-700 font-bold">{error}</p>
             <button onClick={fetchAddresses} className="mt-4 text-sm font-bold text-red-700 underline">Try Again</button>
@@ -127,7 +127,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
                   address.isDefault ? 'border-primary ring-1 ring-primary/20 shadow-xl shadow-red-500/5' : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
-                <div className="p-6 md:p-8">
+                <div className="p-4 md:p-6">
                   <div className="flex justify-between items-start mb-6">
                     <div className={`p-3 rounded-2xl ${address.isDefault ? 'bg-red-50' : 'bg-gray-50'}`}>
                       {address.label === 'Home' ? (
@@ -181,7 +181,7 @@ const Addresses: React.FC<AddressesProps> = ({ onLoginClick, cartItemCount, onCa
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-[3rem] p-6 sm:p-16 border border-dashed border-gray-200 flex flex-col items-center text-center">
+          <div className="bg-white rounded-2xl p-6 sm:p-5 border border-dashed border-gray-200 flex flex-col items-center text-center">
             <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6">
               <MapPin className="w-10 h-10 text-gray-200" strokeWidth={1} />
             </div>

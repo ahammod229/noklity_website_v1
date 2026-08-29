@@ -20,7 +20,8 @@ import {
   Truck
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getSteadfastDeliveryStatus } from '../../services/steadfastDeliveryService';
+import { SteadfastDeliveryStatus } from '../../services/steadfastDeliveryService';
+import { createNotification } from '../../services/notificationService';
 import OrderTable from '../../components/admin/OrderTable';
 import { Order } from '../../types';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -28,13 +29,14 @@ import { getShortOrderId, formatShortOrderId } from '../../utils/orderId';
 import {
   createSteadfastParcelForOrder,
   getSteadfastConfig,
-  SteadfastDeliveryStatus,
+  
   SteadfastTrackingState,
   syncSteadfastTrackingForOrder
 } from '../../services/steadfastDeliveryService';
 
 // Extended type for Admin purposes matching the UI needs
 export interface AdminOrderDetail extends Order {
+  userId?: string;
   paymentStatus: 'Paid' | 'Pending' | 'Failed';
   paymentMethod: string;
   phone: string;
@@ -198,6 +200,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
           
           return {
             id: order.id,
+            userId: order.user_id,
             customerName: shipping.fullName || 'Guest',
             email: shipping.email || order.user?.email || 'N/A',
             phone: shipping.phone || 'N/A',
@@ -233,13 +236,19 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
             })),
             paymentSubmission: order.payment_submissions?.[0]
               ? {
-                  transactionReference: order.payment_submissions[0].transaction_reference,
+                  transactionReference: order.payment_submissions[0].transaction_reference || order.transaction_id,
                   documentType: order.payment_submissions[0].document_type,
                   documentPath: order.payment_submissions[0].document_path,
                   status: order.payment_submissions[0].status,
                   createdAt: order.payment_submissions[0].created_at
                 }
-              : null
+              : order.transaction_id 
+                ? {
+                    transactionReference: order.transaction_id,
+                    status: order.payment_status || 'pending',
+                    createdAt: order.created_at
+                  }
+                : null
           };
         });
         setOrders(mappedOrders);
@@ -265,6 +274,19 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
       // Update local state
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: normalizedStatus } : o));
       
+      // Send Notification
+      const currentOrder = orders.find(o => o.id === orderId);
+      if (currentOrder && currentOrder.userId) {
+        const shortId = formatShortOrderId(orderId);
+        createNotification({
+          user_id: currentOrder.userId,
+          title: 'Order Status Updated',
+          message: `Your order #${shortId} is now ${normalizedStatus}.`,
+          type: 'order_status',
+          link: `/orders/${orderId}`,
+        }).catch(() => {});
+      }
+      
       // Update modal state if open
       if (selectedOrder?.id === orderId) {
         setSelectedOrder(prev => prev ? { ...prev, status: normalizedStatus } : null);
@@ -289,10 +311,56 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                 : 'Status updated, but parcel creation failed.'
           });
         }
+      } else {
+        setMessage({ type: 'success', text: `Order status updated to ${normalizedStatus}` });
       }
     } catch (error) {
-      console.error('Error updating order status:', error);
-      alert('Failed to update order status');
+      console.error('Error updating status:', error);
+      setMessage({ type: 'error', text: 'Failed to update order status' });
+    }
+  };
+
+  const handleUpdatePaymentStatus = async (orderId: string, newPaymentStatus: string) => {
+    try {
+      // payment_status should be lowercase in DB ('pending', 'paid', 'failed')
+      const dbStatus = newPaymentStatus.toLowerCase();
+      
+      const { error } = await supabase
+        .from('orders')
+        .update({ payment_status: dbStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Update payment_submissions if it exists
+      await supabase
+        .from('payment_submissions')
+        .update({ status: dbStatus === 'paid' ? 'approved' : dbStatus === 'failed' ? 'rejected' : 'pending' })
+        .eq('order_id', orderId);
+
+      // Update local state
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newPaymentStatus as 'Paid'|'Pending'|'Failed' } : o));
+      
+      // Send Notification
+      const currentOrder = orders.find(o => o.id === orderId);
+      if (currentOrder && currentOrder.userId) {
+        const shortId = formatShortOrderId(orderId);
+        createNotification({
+          user_id: currentOrder.userId,
+          title: 'Payment Status Updated',
+          message: `The payment for your order #${shortId} has been marked as ${newPaymentStatus}.`,
+          type: 'payment_status',
+          link: `/orders/${orderId}`,
+        }).catch(() => {});
+      }
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, paymentStatus: newPaymentStatus as 'Paid'|'Pending'|'Failed' } : null);
+      }
+
+      setMessage({ type: 'success', text: `Payment status updated to ${newPaymentStatus}` });
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      setMessage({ type: 'error', text: 'Failed to update payment status' });
     }
   };
 
@@ -632,9 +700,9 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
       {selectedOrder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in" onClick={() => setSelectedOrder(null)} />
-          <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
+          <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95">
             
-            <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
+            <div className="p-5 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-black text-gray-900 mb-1">Order {formatShortOrderId(selectedOrder.id)}</h2>
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Placed on {selectedOrder.date}</p>
@@ -665,8 +733,8 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 
                 {/* Left: Product Details */}
                 <div className="lg:col-span-2 space-y-8">
@@ -757,11 +825,19 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                       <CreditCard className="w-3.5 h-3.5" /> Payment
                     </h3>
                     <div className="flex flex-col gap-3">
-                       <div className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase text-center ${
-                         selectedOrder.paymentStatus === 'Paid' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-yellow-50 text-yellow-600 border-yellow-100'
-                       }`}>
-                         {selectedOrder.paymentStatus}
-                       </div>
+                       <select 
+                         value={selectedOrder.paymentStatus}
+                         onChange={(e) => handleUpdatePaymentStatus(selectedOrder.id, e.target.value)}
+                         className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase text-center focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer transition-colors ${
+                           selectedOrder.paymentStatus === 'Paid' ? 'bg-green-50 text-green-600 border-green-100 hover:bg-green-100' : 
+                           selectedOrder.paymentStatus === 'Failed' ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100' :
+                           'bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100'
+                         }`}
+                       >
+                         <option value="Pending">PENDING</option>
+                         <option value="Paid">PAID</option>
+                         <option value="Failed">FAILED</option>
+                       </select>
                        <p className="text-xs font-bold text-gray-700 text-center">{selectedOrder.paymentMethod}</p>
                        {selectedOrder.paymentSubmission?.transactionReference && (
                         <p className="text-[11px] text-gray-500 text-center">
@@ -870,7 +946,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            <div className="p-8 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-4">
+            <div className="p-5 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-4">
               <div className="flex-1 flex gap-3">
                  <select 
                    value={normalizeOrderStatus(selectedOrder.status)}
@@ -884,7 +960,7 @@ const AdminOrders: React.FC<AdminOrdersProps> = ({ onNavigate }) => {
                    ))}
                  </select>
               </div>
-              <button className="flex-1 px-8 py-4 bg-primary text-white font-black rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-500/20">
+              <button className="flex-1 px-6 py-3 bg-primary text-white font-black rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-500/20">
                 Update Status
               </button>
             </div>

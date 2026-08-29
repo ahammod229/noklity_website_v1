@@ -162,7 +162,7 @@ const AdminCustomers: React.FC = () => {
            </button>
            <button
              onClick={handleAddCustomer}
-             className="flex items-center gap-2 px-8 py-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200"
+             className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-200"
            >
              <UserPlus className="w-4 h-4" />
              Add Customer
@@ -189,7 +189,7 @@ const AdminCustomers: React.FC = () => {
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
-            <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-5 group hover:border-primary/20 transition-all">
+            <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5 group hover:border-primary/20 transition-all">
               <div className={`w-14 h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
                 <Icon className="w-6 h-6" strokeWidth={2.5} />
               </div>

@@ -23,7 +23,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   const { formatCurrency } = useCurrency();
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-20">
+      <div className="flex justify-center items-center py-10">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
@@ -31,7 +31,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
 
   if (products.length === 0) {
     return (
-      <div className="text-center py-20 text-gray-500">
+      <div className="text-center py-10 text-gray-500">
         No products found.
       </div>
     );

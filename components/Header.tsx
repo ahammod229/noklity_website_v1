@@ -1,12 +1,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, X, LogOut } from 'lucide-react';
+import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, X, LogOut, Bell } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTenantConfig } from '../contexts/TenantConfigContext';
 import { getPublicSiteConfig, getPublicSiteConfigSnapshot } from '../services/siteConfigService';
 import { getSearchSuggestions, SearchSuggestion } from '../services/searchService';
+import { getUnreadCount, subscribeToNotifications } from '../services/notificationService';
 import OptimizedImage from './ui/OptimizedImage';
 import { BREAKPOINTS } from '../constants/breakpoints';
 
@@ -16,6 +17,7 @@ interface HeaderProps {
   onCartClick?: () => void;
   onHelpClick?: () => void;
   onWishlistClick?: () => void;
+  onNotificationsClick?: () => void;
   wishlistCount?: number;
   user?: User | null;
 }
@@ -31,6 +33,7 @@ const Header: React.FC<HeaderProps> = ({
   onCartClick, 
   onHelpClick,
   onWishlistClick,
+  onNotificationsClick,
   wishlistCount = 0,
   user: _propUser // Kept for compatibility with callers
 }) => {
@@ -55,12 +58,29 @@ const Header: React.FC<HeaderProps> = ({
   const [logoLoadFailed, setLogoLoadFailed] = useState(false);
   const hasUploadedLogo = Boolean(logoSrc && !logoLoadFailed);
 
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  useEffect(() => {
+    if (user?.uid) {
+      getUnreadCount(user.uid).then(setUnreadNotificationCount);
+      const unsubscribe = subscribeToNotifications(user.uid, (newNotif) => {
+        if (!newNotif.is_read) {
+          setUnreadNotificationCount(prev => prev + 1);
+        }
+      });
+      return () => unsubscribe();
+    } else {
+      setUnreadNotificationCount(0);
+    }
+  }, [user?.uid]);
+
   const isLoggedIn = !!user;
   const handleLogout = async () => {
     try {
       await signOut();
+      window.location.reload();
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('Error logging out:', error);
     }
   };
 
@@ -68,25 +88,19 @@ const Header: React.FC<HeaderProps> = ({
     setIsMobileSearchFocused(false);
   };
 
-  const submitSearch = (value: string, closeMobile = false) => {
-    const next = value.trim();
-    const path = next ? `/search?q=${encodeURIComponent(next)}` : '/search';
-    window.history.pushState({}, '', path);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-    setDesktopSearchQuery(next);
-    setMobileSearchQuery(next);
-    setIsDesktopSearchFocused(false);
-    if (closeMobile) {
+  const submitSearch = (query: string, fromMobile = false) => {
+    if (query.trim()) {
+      window.location.href = `/search?q=${encodeURIComponent(query.trim())}`;
+    }
+    if (fromMobile) {
       setIsMobileSearchFocused(false);
+    } else {
+      setIsDesktopSearchFocused(false);
     }
   };
 
-  const openSuggestion = (productId: string) => {
-    if (!productId) return;
-    window.history.pushState({}, '', `/product/${productId}`);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-    setIsDesktopSearchFocused(false);
-    setIsMobileSearchFocused(false);
+  const openSuggestion = (id: string) => {
+    window.location.href = `/product/${id}`;
   };
 
   useEffect(() => {
@@ -191,7 +205,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 h-[68px] sm:h-[72px] md:h-[80px] font-sans transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
-        <div className="flex justify-between items-center h-full gap-4 lg:gap-8">
+        <div className="flex justify-between items-center h-full gap-4 lg:gap-5">
           
           {/* LEFT: Logo (Image Based) */}
           <a href="/" onClick={closeMobileOverlays} className="flex-shrink-0 min-w-0 flex items-center gap-3 group relative z-50">
@@ -281,12 +295,12 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* CENTER: Search Bar (Desktop) */}
-          <div className="hidden md:flex flex-1 max-w-3xl px-4 lg:px-12">
-            <div ref={desktopSearchWrapperRef} className="relative w-full group">
+          {/* Desktop Search Bar */}
+          <div ref={desktopSearchWrapperRef} className="hidden md:flex flex-1 max-w-2xl mx-8 relative z-50">
+            <div className="relative w-full group">
               <input
                 type="text"
-                placeholder="Search for parts, brands, or models..."
+                placeholder="Search by keywords, part number, or brand..."
                 value={desktopSearchQuery}
                 onFocus={() => setIsDesktopSearchFocused(true)}
                 onChange={(e) => setDesktopSearchQuery(e.target.value)}
@@ -295,7 +309,7 @@ const Header: React.FC<HeaderProps> = ({
                     submitSearch(desktopSearchQuery);
                   }
                 }}
-                className="w-full bg-gray-50 text-gray-900 border border-gray-200 rounded-full h-[46px] pl-6 pr-12 focus:bg-white focus:border-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-100 transition-all duration-300 placeholder-gray-400 text-[15px] shadow-sm group-hover:bg-white group-hover:shadow-md"
+                className="w-full h-12 bg-gray-50 border-2 border-transparent group-hover:border-gray-200 focus:bg-white rounded-full pl-5 pr-12 text-sm font-semibold text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-0 transition-all duration-300"
               />
               <button
                 type="button"
@@ -352,7 +366,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-3 sm:gap-6">
             
             {/* Desktop Navigation Icons */}
-            <div className="hidden md:flex items-center gap-6 lg:gap-8">
+            <div className="hidden md:flex items-center gap-6 lg:gap-5">
               <NavIcon 
                 icon={Heart} 
                 label="Wishlist" 
@@ -374,13 +388,6 @@ const Header: React.FC<HeaderProps> = ({
                 active={isLoggedIn}
               />
 
-              {isLoggedIn && (
-                <NavIcon 
-                  icon={LogOut} 
-                  label="Logout" 
-                  onClick={handleLogout}
-                />
-              )}
             </div>
 
             <div className="hidden md:flex items-center z-50" />

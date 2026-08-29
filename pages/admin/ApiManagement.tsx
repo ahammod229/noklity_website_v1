@@ -225,7 +225,7 @@ const ApiManagement: React.FC = () => {
       payload.last_checked_at = new Date().toISOString();
     }
 
-    const { error } = await supabase.from('api_integrations').update(payload).eq('id', id);
+    const { error } = await supabase.from('api_integrations').update(payload as any).eq('id', id);
     if (error) {
       alert(error.message || 'Failed to update integration');
       return;
@@ -500,7 +500,7 @@ const ApiManagement: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 flex justify-center">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 flex justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : (

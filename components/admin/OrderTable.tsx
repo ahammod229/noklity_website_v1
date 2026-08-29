@@ -15,7 +15,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onView, isLoading }) =>
   const { formatCurrency } = useCurrency();
   if (isLoading) {
     return (
-      <div className="bg-white rounded-3xl border border-gray-100 p-20 flex flex-col items-center justify-center">
+      <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
         <p className="text-gray-500 font-bold">Loading orders...</p>
       </div>
@@ -24,7 +24,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, onView, isLoading }) =>
 
   if (orders.length === 0) {
     return (
-      <div className="bg-white rounded-3xl border border-gray-100 p-20 flex flex-col items-center justify-center text-center">
+      <div className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col items-center justify-center text-center">
         <Package className="w-16 h-16 text-gray-200 mb-6" strokeWidth={1} />
         <h3 className="text-xl font-black text-gray-900 mb-2">No orders found</h3>
         <p className="text-gray-500 max-w-sm font-medium">We couldn't find any orders matching your current filters.</p>

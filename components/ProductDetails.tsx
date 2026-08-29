@@ -10,11 +10,13 @@ import {
   Star,
   X,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Home
 } from 'lucide-react';
 import ProductTabs from './ProductTabs';
 import { useCurrency } from '../hooks/useCurrency';
 import { useWishlist } from '../contexts/WishlistContext';
+import { useCart } from '../contexts/CartContext';
 import OptimizedImage from './ui/OptimizedImage';
 import { supabase } from '../lib/supabase';
 import { normalizeProductFaqItems } from '../utils/productFaq';
@@ -52,6 +54,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
 }) => {
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const { formatCurrency } = useCurrency();
+  const { cartCount, setIsCartOpen } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
@@ -408,14 +411,14 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
   };
 
   const handleAddToCart = async () => {
-    if (isOutOfStock) return;
+    if (!product.isPreorder && isOutOfStock) return;
     setIsProcessing(true);
     await onAddToCart(product, quantity);
     setIsProcessing(false);
   };
 
   const handleBuyNow = async () => {
-    if (isOutOfStock) return;
+    if (!product.isPreorder && isOutOfStock) return;
     setIsProcessing(true);
     await onAddToCart(product, quantity);
     setIsProcessing(false);
@@ -793,78 +796,108 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
             cursor: not-allowed;
           }
           .nk-prod-btn-buy {
-            background-color: #2ca5e0;
+            background-color: #38bdf8;
+            border-radius: 0;
           }
           .nk-prod-btn-buy:hover:not(:disabled) {
-            background-color: #1d95cc;
+            background-color: #0ea5e9;
           }
           .nk-prod-btn-cart {
-            background-color: #e61c43;
+            background-color: #f97316;
+            border-radius: 0;
           }
           .nk-prod-btn-cart:hover:not(:disabled) {
-            background-color: #c8102e;
+            background-color: #ea580c;
+          }
+          .stitch-prod-media-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: #f3f4f6;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .stitch-top-icon-btn {
+            background-color: rgba(0, 0, 0, 0.4);
+            color: #ffffff;
+            border-radius: 9999px;
+            padding: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            backdrop-filter: blur(4px);
+          }
+          .stitch-price-section {
+            background-color: #0d9488;
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+          }
+          .stitch-product-info {
+            padding: 16px;
+            background-color: #ffffff;
+          }
+          .stitch-product-options {
+            margin-top: 8px;
+            background-color: #ffffff;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #4b5563;
+            border-top: 1px solid #f3f4f6;
+            border-bottom: 1px solid #f3f4f6;
           }
         ` }} />
 
-        {/* Sticky top navigation header */}
-        <header className="sticky top-0 z-40 bg-white border-b border-gray-200 nk-prod-header">
-          <div className="px-3 pt-3 pb-2 flex items-start gap-2.5">
-            <button
-              onClick={onClose}
-              className="h-11 w-11 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center flex-shrink-0"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-
-            <div className="min-w-0 flex-1">
-              <h1 className="text-[18px] leading-[1.15] font-black text-gray-900 line-clamp-2">{product.name}</h1>
-              <p className="mt-1 text-[10px] uppercase tracking-wide text-gray-500 font-bold line-clamp-1">
-                {product.brand || 'NOKLITY'} · {product.category || 'Product'}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleShareClick}
-                className="h-11 w-11 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center"
-                aria-label="Share product"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleWishlistToggle}
-                className={`h-11 w-11 rounded-full flex items-center justify-center ${
-                  isWishlisted ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700'
-                }`}
-                aria-label="Toggle wishlist"
-              >
-                <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
+        {/* BEGIN: Stitch Mobile Layout */}
+        <div className="bg-gray-100 min-h-screen pb-16 relative shadow-lg max-w-md mx-auto">
+          
+          {/* Product Image Section */}
+          <section className="stitch-prod-media-container">
+            {/* Top Navigation / Icons Overlay */}
+            <div className="absolute top-4 left-4 z-10">
+              <button onClick={onHomeClick || onClose} className="stitch-top-icon-btn">
+                <Home className="w-5 h-5" />
               </button>
             </div>
-          </div>
-        </header>
+            <div className="absolute top-4 right-4 flex space-x-2 z-10">
+              <button onClick={handleWishlistToggle} className="stitch-top-icon-btn">
+                <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current text-red-500' : ''}`} />
+              </button>
+              <button onClick={() => setIsCartOpen(true)} className="stitch-top-icon-btn relative">
+                <ShoppingCart className="w-5 h-5" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center border border-white">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </button>
+              <button onClick={handleShareClick} className="stitch-top-icon-btn">
+                <Share2 className="w-5 h-5" />
+              </button>
+            </div>
 
-        {/* Updated Inner Content Area */}
-        <div className="nk-prod-container">
-          {/* Product Media Display */}
-          <div className="relative">
+            {/* Image */}
             <button
               type="button"
               onClick={openImageViewer}
-              className="w-full nk-prod-media-container block text-left"
+              className="w-full h-full block text-left outline-none"
               onTouchStart={handleMainImageTouchStart}
               onTouchMove={handleMainImageTouchMove}
               onTouchEnd={handleMainImageTouchEnd}
-              aria-label="Open image viewer"
             >
-              {discountPercentage > 0 && (
-                <span className="nk-prod-discount-badge">-{discountPercentage}% off</span>
-              )}
               <OptimizedImage
                 src={activeImage}
                 alt={product.name}
-                className="nk-prod-media-image mx-auto"
+                className="w-full h-full object-contain mx-auto"
                 width={640}
                 height={640}
                 responsiveWidths={PRODUCT_DETAIL_SAFE_WIDTHS}
@@ -873,77 +906,80 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
               />
             </button>
             
-            {galleryImages.length > 1 && (
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10 pointer-events-none">
-                {galleryImages.map((_, index) => (
-                  <div
-                    key={index}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      index === activeImageIndex ? 'bg-primary w-4' : 'bg-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Product Metadata & Price Block */}
-          <div className="nk-prod-metadata">
-            <div className="nk-prod-brand">
-              {product.brand || 'NOKLITY'} • {product.category || 'Product'}
+            {/* Image Indicator */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-3 py-1 rounded-full z-10 font-medium">
+              {activeImageIndex + 1}/{galleryImages.length || 1}
             </div>
-            <h2 className="nk-prod-heading">{product.name}</h2>
-            <div className="nk-prod-rating-row" aria-label={`${product.rating.toFixed(1)} out of 5 stars`}>
-              <span className="nk-prod-stars" role="img" aria-label={`${product.rating.toFixed(0)} stars`}>
-                {'★'.repeat(Math.round(product.rating || 0)) + '☆'.repeat(5 - Math.round(product.rating || 0))}
-              </span>
-              <span className="nk-prod-rating-text">({product.rating.toFixed(1)}/5 ratings)</span>
-            </div>
-          </div>
+          </section>
 
-          <div className="nk-prod-price-card">
-            <div className="nk-prod-price-row">
-              <span className="nk-prod-current-price">{formatCurrency(product.price)}</span>
+          {/* Price & Sale Section */}
+          <section className="bg-primary text-white flex justify-between items-center px-3 py-2.5 relative overflow-hidden">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 flex-1 min-w-0 pr-2">
+              <span className="text-[17px] sm:text-[19px] font-bold leading-none tracking-tight">{formatCurrency(product.price)}</span>
               {product.originalPrice && (
-                <span className="nk-prod-original-price">{formatCurrency(product.originalPrice)}</span>
+                <span className="line-through text-white/75 text-[11px] leading-none">{formatCurrency(product.originalPrice)}</span>
+              )}
+              {discountPercentage > 0 && (
+                <span className="bg-white text-primary text-[10px] font-black px-1.5 py-0.5 rounded-sm leading-none shadow-sm">-{discountPercentage}%</span>
               )}
             </div>
-            <div 
-              className="nk-prod-stock-badge"
-              style={isOutOfStock ? { backgroundColor: '#ffeef0', color: '#e61c43' } : undefined}
-            >
-              {isOutOfStock ? 'Out of Stock' : 'In Stock'}
+            <div className="text-right flex flex-col items-end pl-2 flex-shrink-0">
+              <div className="flex items-center gap-1 mb-1">
+                <span className="text-[9px] font-bold italic leading-[1.1] text-right">PAYDAY<br/>SALE</span>
+                <span className="bg-yellow-400 text-gray-900 text-[9px] font-black px-1.5 py-0.5 rounded-sm ml-1 shadow-sm">HOT DEAL</span>
+              </div>
+              <div className="text-[10px] text-white/90 font-medium leading-none">
+                Stock: <span className="font-bold text-white">{isOutOfStock ? 'Out' : maxStock}</span>
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Quantity Selector Block */}
-          <div className="nk-prod-qty-container">
-            <div className="nk-prod-qty-label-wrapper">
-              <span className="nk-prod-qty-label">Quantity</span>
-              <span className="nk-prod-qty-stock-info">
-                {isOutOfStock ? "Out of Stock" : `(${maxStock} units available)`}
-              </span>
+          {/* Product Info */}
+          <section className="stitch-product-info">
+            <div className="flex justify-between items-start gap-2">
+              <h1 className="text-[17px] leading-tight text-gray-800 font-medium">
+                {product.isPreorder && (
+                  <span className="inline-block bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm mr-1.5 align-text-bottom">
+                    PRE-ORDER
+                  </span>
+                )}
+                {product.brand && (
+                  <span className="inline-block bg-primary text-white text-[10px] font-bold px-1.5 rounded-sm mr-1.5 align-text-bottom">
+                    {product.brand.substring(0, 2).toUpperCase()}
+                  </span>
+                )}
+                {product.name}
+              </h1>
             </div>
-            <div className="nk-prod-qty-selector">
-              <button
-                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-                disabled={quantity <= 1 || isOutOfStock}
-                className="nk-prod-qty-btn"
-                aria-label="Decrease quantity"
-              >
-                -
-              </button>
-              <span className="nk-prod-qty-value">{quantity}</span>
-              <button
-                onClick={() => setQuantity((prev) => Math.min(maxStock, prev + 1))}
-                disabled={quantity >= maxStock || isOutOfStock}
-                className="nk-prod-qty-btn"
-                aria-label="Increase quantity"
-              >
-                +
-              </button>
+            
+            {product.isPreorder && product.preorderExpectedDate && (
+              <div className="mt-2.5 text-[12px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-1.5 rounded-md border border-orange-100 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                Expected Delivery: {product.preorderExpectedDate}
+              </div>
+            )}
+
+            <div className="flex items-center mt-3 text-sm">
+              <div className="flex text-yellow-400 text-xs mr-2">
+                {'★'.repeat(Math.round(product.rating || 0)) + '☆'.repeat(5 - Math.round(product.rating || 0))}
+              </div>
+              <span className="text-gray-500 font-medium">{product.rating.toFixed(1)} ({mobileReviews.length})</span>
             </div>
-          </div>
+          </section>
+
+          {/* Product Options & Quantity */}
+          <section className="stitch-product-options">
+            <span className="text-sm font-medium text-gray-700">Product Options & Quantity</span>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center border border-gray-300 rounded overflow-hidden shadow-sm">
+                 <button onClick={(e) => { e.stopPropagation(); setQuantity((prev) => Math.max(1, prev - 1)); }} disabled={quantity <= 1 || isOutOfStock} className="px-3 py-1 bg-gray-50 text-gray-700 disabled:opacity-50 font-bold border-r border-gray-300">-</button>
+                 <span className="px-3 py-1 text-sm font-bold bg-white min-w-[36px] text-center">{quantity}</span>
+                 <button onClick={(e) => { e.stopPropagation(); setQuantity((prev) => Math.min(maxStock, prev + 1)); }} disabled={quantity >= maxStock || isOutOfStock} className="px-3 py-1 bg-gray-50 text-gray-700 disabled:opacity-50 font-bold border-l border-gray-300">+</button>
+              </div>
+            </div>
+          </section>
+          
+          <div className="px-3 pt-3">
 
           {/* Dynamic Specifications Block */}
           <section className="nk-prod-section">
@@ -966,7 +1002,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
           <section className="nk-prod-section">
             <h3 className="nk-prod-section-header">Product Description</h3>
             <p className="nk-prod-desc-text whitespace-pre-line">
-              {product.description || 'No description available for this product.'}
+              <div dangerouslySetInnerHTML={{ __html: product.description || "No description available for this product." }} className="prose max-w-none text-gray-700 text-sm leading-relaxed" />
             </p>
           </section>
 
@@ -1019,6 +1055,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
           </section>
         </div>
       </div>
+    </div>
 
       <div className="hidden md:block bg-gray-100 border-t border-gray-200">
         <div className="max-w-[1240px] mx-auto px-4 lg:px-6 py-5 md:py-6">
@@ -1104,7 +1141,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
 
               <div className="lg:col-span-8 p-4 lg:p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <h1 className="text-[34px] leading-tight font-medium text-gray-900">{product.name}</h1>
+                  <h1 className="text-[34px] leading-tight font-medium text-gray-900">
+                    {product.isPreorder && (
+                      <span className="inline-block bg-orange-500 text-white text-[14px] font-bold px-2 py-0.5 rounded mr-2 align-middle">PRE-ORDER</span>
+                    )}
+                    {product.name}
+                  </h1>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleShareClick}
@@ -1148,6 +1190,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                       <span className="rounded-md bg-red-50 px-2 py-1 text-sm font-bold text-primary">-{discountPercentage}%</span>
                     )}
                   </div>
+                  {product.isPreorder && product.preorderExpectedDate && (
+                    <div className="mt-3 text-[15px] font-semibold text-orange-600 bg-orange-50 px-4 py-2.5 rounded-lg border border-orange-100 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                      Expected Delivery: {product.preorderExpectedDate}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-5 pt-5 border-t border-gray-200">
@@ -1186,17 +1234,17 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
                 <div className="mt-5 grid grid-cols-2 gap-3">
                 <button
                   onClick={handleBuyNow}
-                  disabled={isProcessing || isOutOfStock}
+                  disabled={isProcessing || (!product.isPreorder && isOutOfStock)}
                   className="h-12 rounded-md bg-[#22a6df] text-white font-black text-lg leading-none hover:bg-[#1d95c7] transition-colors disabled:bg-gray-300 disabled:text-gray-500"
                 >
-                  Buy Now
+                  {product.isPreorder ? 'Pre-order Now' : 'Buy Now'}
                 </button>
                 <button
                   onClick={handleAddToCart}
-                  disabled={isProcessing || isOutOfStock}
+                  disabled={isProcessing || (!product.isPreorder && isOutOfStock)}
                   className="h-12 rounded-md bg-primary text-white font-black text-lg leading-none hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
                 >
-                  Add to Cart
+                  {product.isPreorder ? 'Pre-order to Cart' : 'Add to Cart'}
                 </button>
                 </div>
               </div>
@@ -1329,36 +1377,34 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
       {/* ── Mobile Fixed Bottom Action Bar ── */}
       {/* Hidden on md+. Sits above MobileBottomNav (z-65). Smooth show/hide on scroll. */}
       <div
-        className={`md:hidden nk-prod-action-bar${!isMobileActionBarVisible ? ' hidden-bar' : ''}${
-          isImageViewerOpen ? ' hidden-bar' : ''
+        className={`md:hidden fixed bottom-0 left-0 right-0 w-full bg-white flex h-[56px] border-t border-gray-200 transition-transform duration-300 z-[60] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] ${
+          isMobileActionBarVisible && !isImageViewerOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         aria-hidden={isImageViewerOpen}
       >
-        {/* Total price preview */}
-        <div className="nk-prod-action-bar-total">
-          <span className="nk-prod-action-bar-total-label">Total</span>
-          <span className="nk-prod-action-bar-total-price">{formatCurrency(mobileActionTotal)}</span>
+        <div className="flex flex-[1.1] items-center justify-start pl-3 pr-1 text-gray-600 bg-white min-w-0">
+          <div className="flex flex-col items-start w-full min-w-0">
+            <span className="text-[9px] uppercase font-bold text-gray-400 leading-none tracking-wider mb-1">Total</span>
+            <span className="text-[14px] sm:text-[15px] font-black text-primary leading-none truncate w-full">{formatCurrency(mobileActionTotal)}</span>
+          </div>
         </div>
-
-        {/* Action buttons */}
-        <div className="nk-prod-action-bar-btns">
-          <button
-            onClick={handleBuyNow}
-            disabled={isProcessing || isOutOfStock}
-            className="nk-prod-btn nk-prod-btn-buy"
-            aria-label="Buy Now"
-          >
-            {isProcessing ? '...' : 'Buy Now'}
-          </button>
-          <button
-            onClick={handleAddToCart}
-            disabled={isProcessing || isOutOfStock}
-            className="nk-prod-btn nk-prod-btn-cart"
-            aria-label="Add to Cart"
-          >
-            {isProcessing ? '...' : 'Add to Cart'}
-          </button>
-        </div>
+        <button
+          onClick={handleBuyNow}
+          disabled={isProcessing || (!product.isPreorder && isOutOfStock)}
+          className="flex-[1.2] bg-accent hover:bg-accent/90 text-white font-bold text-[13px] disabled:opacity-50 transition-colors h-full flex items-center justify-center"
+          aria-label={product.isPreorder ? 'Pre-order Now' : 'Buy Now'}
+        >
+          {isProcessing ? '...' : (product.isPreorder ? 'Pre-order Now' : 'Buy Now')}
+        </button>
+        <button
+          onClick={handleAddToCart}
+          disabled={isProcessing || (!product.isPreorder && isOutOfStock)}
+          className="flex-[1.2] bg-primary hover:bg-primary/90 text-white font-bold text-[13px] disabled:opacity-50 transition-colors h-full flex items-center justify-center"
+          aria-label={product.isPreorder ? 'Pre-order to Cart' : 'Add to Cart'}
+        >
+          {isProcessing ? '...' : (product.isPreorder ? 'Pre-order to Cart' : 'Add to Cart')}
+        </button>
       </div>
     </div>
   );

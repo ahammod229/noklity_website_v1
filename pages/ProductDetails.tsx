@@ -98,7 +98,7 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
           robots="noindex, nofollow"
         />
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-md w-full border border-gray-100">
+          <div className="bg-white p-5 rounded-xl shadow-xl text-center max-w-md w-full border border-gray-100">
             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="w-8 h-8 text-primary" />
             </div>

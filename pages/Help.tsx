@@ -202,7 +202,7 @@ const Help: React.FC<HelpProps> = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans">
       <main className="flex-grow">
-        <section className="bg-gray-50 border-b border-gray-100 py-16 text-center px-4">
+        <section className="bg-gray-50 border-b border-gray-100 py-8 text-center px-4">
           <div className="inline-flex items-center justify-center p-3 bg-white rounded-full shadow-sm mb-6">
             <HelpCircle className="w-6 h-6 text-primary" />
           </div>
@@ -210,9 +210,9 @@ const Help: React.FC<HelpProps> = () => {
           <p className="text-xl text-gray-500 font-medium">How can we assist you today?</p>
         </section>
 
-        <div className="max-w-5xl mx-auto px-4 py-16 space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm hover:shadow-xl transition-all duration-300 group">
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-xl transition-all duration-300 group">
               <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Mail className="w-7 h-7 text-primary" />
               </div>
@@ -223,7 +223,7 @@ const Help: React.FC<HelpProps> = () => {
               </a>
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm hover:shadow-xl transition-all duration-300 group">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-xl transition-all duration-300 group">
               <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <MessageCircle className="w-7 h-7 text-green-600" />
               </div>
@@ -238,7 +238,7 @@ const Help: React.FC<HelpProps> = () => {
             </div>
           </div>
 
-          <section ref={ticketFormRef} id="support-ticket" className="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm">
+          <section ref={ticketFormRef} id="support-ticket" className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="mb-6">
               <h3 className="text-2xl font-bold text-gray-900">Create Support Ticket</h3>
               <p className="text-gray-500 font-medium">Submit your issue and it will appear in Admin Support Center.</p>

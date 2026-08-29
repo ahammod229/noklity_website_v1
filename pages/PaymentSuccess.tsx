@@ -44,8 +44,8 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
-      <main className="flex-grow flex items-center justify-center p-4 md:py-16">
-        <div className="bg-white max-w-xl w-full rounded-[2.5rem] shadow-2xl border border-gray-100 p-8 md:p-12 text-center animate-in zoom-in-95 duration-500 relative overflow-hidden">
+      <main className="flex-grow flex items-center justify-center p-4 md:py-8">
+        <div className="bg-white max-w-xl w-full rounded-2xl shadow-2xl border border-gray-100 p-5 md:p-6 text-center animate-in zoom-in-95 duration-500 relative overflow-hidden">
           
           {/* Top Decorative bar */}
           <div className="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
@@ -62,7 +62,7 @@ const PaymentSuccess: React.FC<PaymentSuccessProps> = ({
             </p>
 
             {/* Order Summary Card */}
-            <div className="bg-gray-50 rounded-3xl p-6 mb-10 border border-gray-100 text-left space-y-4">
+            <div className="bg-gray-50 rounded-xl p-6 mb-10 border border-gray-100 text-left space-y-4">
                 <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Confirmation Summary</h3>
                 
                 <div className="flex justify-between items-center pb-3 border-b border-gray-200/50">

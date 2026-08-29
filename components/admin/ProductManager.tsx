@@ -56,6 +56,8 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
           rating: row.rating,
           isFlashSale: row.is_flash_sale,
           description: row.description,
+          isPreorder: row.is_preorder,
+          preorderExpectedDate: row.preorder_expected_date,
         };
       });
       setProducts(mappedProducts);
@@ -119,10 +121,14 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
     const payload = {
       title: formData.name,
       category: formData.category,
+      brand: formData.brand,
       price: formData.regularPrice,
       discount_price: formData.salePrice && formData.salePrice < formData.regularPrice ? formData.salePrice : null,
       stock: formData.stock,
-      image_url: formData.image,
+      sku: formData.sku,
+      image_url: formData.image || formData.images[0] || '',
+      image_urls: formData.images,
+      description: formData.description,
       is_flash_sale: formData.isFlashSale,
       rating: editingProduct ? undefined : 0, 
     };
@@ -156,6 +162,18 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  
+  if (isModalOpen) {
+    return (
+      <ProductForm 
+        initialData={editingProduct}
+        onSubmit={handleSubmit}
+        onCancel={handleCloseModal}
+        isSaving={isSaving}
+      />
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -197,16 +215,6 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
           onToggleFlashSale={handleToggleFlashSale}
         />
       </div>
-
-      {/* Modal Form Component */}
-      {isModalOpen && (
-        <ProductForm 
-          initialData={editingProduct}
-          onSubmit={handleSubmit}
-          onCancel={handleCloseModal}
-          isSaving={isSaving}
-        />
-      )}
     </div>
   );
 };

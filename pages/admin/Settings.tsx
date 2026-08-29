@@ -547,7 +547,7 @@ const createDefaultManagedPages = (values: Record<string, string>): ManagedPageI
     slug,
     title: values[mapItem.titleKey] || slug,
     content: values[mapItem.contentKey] || '',
-    section: mapItem.section,
+    section: mapItem.section as ManagedPageSection,
     isEnabled: true,
     order: index + 1
   }));

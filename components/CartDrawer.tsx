@@ -78,7 +78,12 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start">
-                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug">{item.name}</h3>
+                      <h3 className="text-sm font-bold text-gray-900 line-clamp-2 leading-snug">
+                        {item.isPreorder && (
+                          <span className="inline-block bg-orange-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm mr-1.5 align-middle">PRE-ORDER</span>
+                        )}
+                        {item.name}
+                      </h3>
                       <button 
                         onClick={() => onRemoveItem(item.id)}
                         className="text-gray-300 hover:text-red-500 transition-colors p-2 rounded-md hover:bg-red-50"

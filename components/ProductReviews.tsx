@@ -69,9 +69,9 @@ const ProductReviews: React.FC = () => {
         Customer Reviews
       </h3>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
         {/* Rating Summary */}
-        <div className="lg:col-span-1 p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm h-fit">
+        <div className="lg:col-span-1 p-6 bg-gray-50 rounded-xl border border-gray-100 shadow-sm h-fit">
           <div className="text-center mb-6">
             <span className="text-5xl font-black text-gray-900">{averageRating}</span>
             <div className="flex justify-center gap-1 my-2">
@@ -114,7 +114,7 @@ const ProductReviews: React.FC = () => {
 
         {/* Review Form (Expandable) */}
         <div className={`lg:col-span-2 space-y-8 ${showForm ? 'block' : 'hidden'}`}>
-          <div className="p-8 border-2 border-dashed border-gray-200 rounded-3xl bg-white animate-in slide-in-from-top-4 duration-300">
+          <div className="p-5 border-2 border-dashed border-gray-200 rounded-xl bg-white animate-in slide-in-from-top-4 duration-300">
             <h4 className="text-lg font-bold text-gray-900 mb-6">Share your experience</h4>
             
             <div className="space-y-6">
@@ -221,7 +221,7 @@ const ProductReviews: React.FC = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center py-10 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+              <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                 <p className="text-gray-500 font-medium mb-4">No reviews yet. Be the first to share your thoughts!</p>
                 <button 
                   onClick={() => setShowForm(true)}

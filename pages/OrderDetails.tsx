@@ -191,7 +191,7 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8 font-sans">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-5 font-sans">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-4" />
           <p className="text-gray-500 font-bold">Loading Order Details...</p>
@@ -202,8 +202,8 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8 font-sans">
-        <div className="bg-white p-12 rounded-[2.5rem] shadow-xl text-center max-w-md border border-gray-100">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-5 font-sans">
+        <div className="bg-white p-6 rounded-2xl shadow-xl text-center max-w-md border border-gray-100">
           <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-6" />
           <h2 className="text-2xl font-black text-gray-900 mb-2">Order Not Found</h2>
           <p className="text-gray-500 mb-8 font-medium">
@@ -402,13 +402,13 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             
             {/* Left Column - Details */}
             <div className="lg:col-span-2 space-y-8">
                 
                 {/* Timeline */}
-                <section className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <section className="bg-white p-6 sm:p-5 rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <h2 className="text-lg font-bold text-gray-900 mb-8">Order Status</h2>
                     
                     {isCancelled ? (

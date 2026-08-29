@@ -274,7 +274,7 @@ const OrderManager: React.FC = () => {
                 </tr>
               )) : (
                   <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-6 text-center text-gray-500">
                           <Package className="w-12 h-12 mx-auto text-gray-300 mb-3" />
                           <p className="font-medium">No orders found matching your criteria.</p>
                       </td>
@@ -329,7 +329,7 @@ const OrderManager: React.FC = () => {
                   </div>
 
                   {/* Modal Body */}
-                  <div className="overflow-y-auto p-6 md:p-8 flex flex-col lg:flex-row gap-8">
+                  <div className="overflow-y-auto p-4 md:p-6 flex flex-col lg:flex-row gap-5">
                       {/* Left: Items */}
                       <div className="flex-1 space-y-6">
                           <div>

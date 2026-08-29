@@ -210,7 +210,7 @@ const Finance: React.FC = () => {
           <h3 className="text-lg font-black text-gray-900">History</h3>
         </div>
         {loading ? (
-          <div className="px-6 py-16 flex flex-col items-center justify-center">
+          <div className="px-6 py-8 flex flex-col items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
             <p className="text-sm font-bold text-gray-500">Loading finance history...</p>
           </div>
