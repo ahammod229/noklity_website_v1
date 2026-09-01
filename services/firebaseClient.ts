@@ -6,23 +6,21 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-const getEnv = (key: string): string => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) {
-    return (import.meta as any).env[key] as string;
-  }
-  if (typeof process !== 'undefined' && process.env?.[key]) {
-    return process.env[key] as string;
+const getEnv = (viteKey: string | undefined, processKey: string): string => {
+  if (viteKey) return viteKey;
+  if (typeof process !== 'undefined' && process.env && process.env[processKey]) {
+    return process.env[processKey] as string;
   }
   return '';
 };
 
 const firebaseConfig = {
-  apiKey:            getEnv('VITE_FIREBASE_API_KEY'),
-  authDomain:        getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
-  projectId:         getEnv('VITE_FIREBASE_PROJECT_ID'),
-  storageBucket:     getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
-  appId:             getEnv('VITE_FIREBASE_APP_ID'),
+  apiKey:            getEnv(import.meta.env.VITE_FIREBASE_API_KEY, 'VITE_FIREBASE_API_KEY'),
+  authDomain:        getEnv(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, 'VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId:         getEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID, 'VITE_FIREBASE_PROJECT_ID'),
+  storageBucket:     getEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, 'VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, 'VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId:             getEnv(import.meta.env.VITE_FIREBASE_APP_ID, 'VITE_FIREBASE_APP_ID'),
 };
 
 // Avoid re-initializing if HMR reloads this module

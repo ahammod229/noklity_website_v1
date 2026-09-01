@@ -59,17 +59,17 @@ interface CatalogApiResponse<T> {
   data: T;
 }
 
-const getEnvVar = (key: string) => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) {
-    return String((import.meta as any).env[key]);
+const getEnvVar = (viteKey: string | undefined, processKey: string) => {
+  if (viteKey !== undefined) {
+    return String(viteKey);
   }
-  if (typeof process !== 'undefined' && process.env?.[key]) {
-    return String(process.env[key]);
+  if (typeof process !== 'undefined' && process.env?.[processKey]) {
+    return String(process.env[processKey]);
   }
   return '';
 };
 
-const EXPLICIT_API_BASE_URL = String(getEnvVar('VITE_API_BASE_URL') || '').trim();
+const EXPLICIT_API_BASE_URL = String(getEnvVar(import.meta.env.VITE_API_BASE_URL, 'VITE_API_BASE_URL') || '').trim();
 const API_BASE_URL = EXPLICIT_API_BASE_URL.replace(/\/+$/, '');
 const CATALOG_API_ENABLED = Boolean(API_BASE_URL);
 const CATALOG_API_TIMEOUT_MS = 1200;

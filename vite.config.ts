@@ -18,26 +18,6 @@ export default defineConfig(() => {
       plugins: [react()],
       build: {
         chunkSizeWarningLimit: 700,
-        rollupOptions: {
-          output: {
-            manualChunks(id) {
-              if (id.includes('node_modules')) {
-                if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-                  return 'react-vendor';
-                }
-                if (id.includes('@supabase')) {
-                  return 'supabase-vendor';
-                }
-                if (id.includes('framer-motion') || id.includes('lucide-react')) {
-                  return 'ui-vendor';
-                }
-                return 'vendor';
-              }
-
-              return undefined;
-            }
-          }
-        }
       },
       resolve: {
         alias: {

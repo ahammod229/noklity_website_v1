@@ -73,24 +73,25 @@ const asErrorMessage = (error: unknown) => {
   return 'Steadfast request failed.';
 };
 
-const getEnvVar = (key: string): string => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.[key]) {
-    return String((import.meta as any).env[key]);
+const getEnvVar = (viteKey: string | undefined, processKey: string): string => {
+  if (viteKey !== undefined) {
+    return String(viteKey);
   }
-  if (typeof process !== 'undefined' && process.env?.[key]) {
-    return String(process.env[key]);
+  if (typeof process !== 'undefined' && process.env?.[processKey]) {
+    return String(process.env[processKey]);
   }
   return '';
 };
 
 const getSupabaseFunctionEndpoint = () => {
-  const baseUrl = getEnvVar('VITE_SUPABASE_URL').trim().replace(/\/+$/, '');
+  const baseUrl = getEnvVar(import.meta.env.VITE_SUPABASE_URL, 'VITE_SUPABASE_URL').trim().replace(/\/+$/, '');
   if (!baseUrl) return '';
   return `${baseUrl}/functions/v1/steadfast-delivery`;
 };
 
 const getSupabaseAnonKey = () =>
-  (getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY')).trim();
+  (getEnvVar(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'VITE_SUPABASE_PUBLISHABLE_KEY') || 
+   getEnvVar(import.meta.env.VITE_SUPABASE_ANON_KEY, 'VITE_SUPABASE_ANON_KEY')).trim();
 
 const isRelayLikeError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;

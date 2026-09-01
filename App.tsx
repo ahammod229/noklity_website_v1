@@ -92,7 +92,7 @@ const applyDocumentFavicon = (faviconUrl?: string) => {
 };
 
 const RouteLoadingFallback: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
-  <div className={`${compact ? 'min-h-[160px]' : 'min-h-[60vh]'} flex items-center justify-center bg-white`}>
+  <div className={`${compact ? 'min-h-[160px]' : 'min-h-[60vh]'} flex items-center justify-center bg-transparent`}>
     <div className="flex flex-col items-center gap-3">
       <Loader2 className="w-9 h-9 text-gray-300 animate-spin" />
       <p className="text-[11px] font-black uppercase tracking-[0.22em] text-gray-400">Loading</p>

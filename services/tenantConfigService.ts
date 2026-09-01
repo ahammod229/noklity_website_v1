@@ -23,12 +23,12 @@ let tenantCache: TenantRuntimeConfig | null = null;
 let tenantCacheUpdatedAt = 0;
 let inflightTenantConfigPromise: Promise<TenantRuntimeConfig> | null = null;
 
-const getEnv = (key: string) => {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
-    return String((import.meta as any).env[key]);
+const getEnv = (viteKey: string | undefined, processKey: string) => {
+  if (viteKey !== undefined) {
+    return String(viteKey);
   }
-  if (typeof process !== 'undefined' && process.env?.[key]) {
-    return String(process.env[key]);
+  if (typeof process !== 'undefined' && process.env?.[processKey]) {
+    return String(process.env[processKey]);
   }
   return '';
 };
@@ -110,7 +110,7 @@ const normalizeConfigShape = (input: Partial<TenantConfig>): TenantConfig => {
   };
 };
 
-const getLicenseBypass = () => parseBoolean(getEnv(LICENSE_BYPASS_ENV), false);
+const getLicenseBypass = () => parseBoolean(getEnv(import.meta.env.VITE_TENANT_LICENSE_BYPASS, 'VITE_TENANT_LICENSE_BYPASS'), false);
 
 const validateLicense = (licenseKey: string, licenseStatus: TenantConfig['licenseStatus'], planName: string) => {
   if (getLicenseBypass()) return true;
@@ -185,24 +185,24 @@ const getDbConfig = async (): Promise<Partial<TenantConfig>> => {
 };
 
 const getEnvConfig = (): Partial<TenantConfig> => {
-  const envFeatureFlags = normalizeFeatureFlagOverrides(getEnv('VITE_TENANT_FEATURE_FLAGS'));
+  const envFeatureFlags = normalizeFeatureFlagOverrides(getEnv(import.meta.env.VITE_TENANT_FEATURE_FLAGS, 'VITE_TENANT_FEATURE_FLAGS'));
   return {
-    brandName: getEnv('VITE_TENANT_BRAND_NAME') || undefined,
-    brandLogoUrl: getEnv('VITE_TENANT_BRAND_LOGO_URL') || undefined,
-    primaryColor: getEnv('VITE_TENANT_PRIMARY_COLOR') || undefined,
-    secondaryColor: getEnv('VITE_TENANT_SECONDARY_COLOR') || undefined,
-    supportEmail: getEnv('VITE_TENANT_SUPPORT_EMAIL') || undefined,
-    companyName: getEnv('VITE_TENANT_COMPANY_NAME') || undefined,
-    companyAddress: getEnv('VITE_TENANT_COMPANY_ADDRESS') || undefined,
-    companyPhone: getEnv('VITE_TENANT_COMPANY_PHONE') || undefined,
-    domain: getEnv('VITE_TENANT_DOMAIN') || undefined,
-    allowedHosts: parseAllowedHosts(getEnv('VITE_TENANT_ALLOWED_HOSTS'), []),
-    timezone: getEnv('VITE_TENANT_TIMEZONE') || undefined,
-    currency: getEnv('VITE_TENANT_CURRENCY') || undefined,
-    planName: normalizePlanName(getEnv('VITE_TENANT_PLAN_NAME')),
+    brandName: getEnv(import.meta.env.VITE_TENANT_BRAND_NAME, 'VITE_TENANT_BRAND_NAME') || undefined,
+    brandLogoUrl: getEnv(import.meta.env.VITE_TENANT_BRAND_LOGO_URL, 'VITE_TENANT_BRAND_LOGO_URL') || undefined,
+    primaryColor: getEnv(import.meta.env.VITE_TENANT_PRIMARY_COLOR, 'VITE_TENANT_PRIMARY_COLOR') || undefined,
+    secondaryColor: getEnv(import.meta.env.VITE_TENANT_SECONDARY_COLOR, 'VITE_TENANT_SECONDARY_COLOR') || undefined,
+    supportEmail: getEnv(import.meta.env.VITE_TENANT_SUPPORT_EMAIL, 'VITE_TENANT_SUPPORT_EMAIL') || undefined,
+    companyName: getEnv(import.meta.env.VITE_TENANT_COMPANY_NAME, 'VITE_TENANT_COMPANY_NAME') || undefined,
+    companyAddress: getEnv(import.meta.env.VITE_TENANT_COMPANY_ADDRESS, 'VITE_TENANT_COMPANY_ADDRESS') || undefined,
+    companyPhone: getEnv(import.meta.env.VITE_TENANT_COMPANY_PHONE, 'VITE_TENANT_COMPANY_PHONE') || undefined,
+    domain: getEnv(import.meta.env.VITE_TENANT_DOMAIN, 'VITE_TENANT_DOMAIN') || undefined,
+    allowedHosts: parseAllowedHosts(getEnv(import.meta.env.VITE_TENANT_ALLOWED_HOSTS, 'VITE_TENANT_ALLOWED_HOSTS'), []),
+    timezone: getEnv(import.meta.env.VITE_TENANT_TIMEZONE, 'VITE_TENANT_TIMEZONE') || undefined,
+    currency: getEnv(import.meta.env.VITE_TENANT_CURRENCY, 'VITE_TENANT_CURRENCY') || undefined,
+    planName: normalizePlanName(getEnv(import.meta.env.VITE_TENANT_PLAN_NAME, 'VITE_TENANT_PLAN_NAME')),
     featureFlags: envFeatureFlags,
-    licenseKey: getEnv('VITE_TENANT_LICENSE_KEY') || undefined,
-    licenseStatus: (getEnv('VITE_TENANT_LICENSE_STATUS') as TenantConfig['licenseStatus']) || undefined
+    licenseKey: getEnv(import.meta.env.VITE_TENANT_LICENSE_KEY, 'VITE_TENANT_LICENSE_KEY') || undefined,
+    licenseStatus: (getEnv(import.meta.env.VITE_TENANT_LICENSE_STATUS, 'VITE_TENANT_LICENSE_STATUS') as TenantConfig['licenseStatus']) || undefined
   };
 };
 

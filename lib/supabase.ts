@@ -3,21 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types';
 import { auth } from '../services/firebaseClient';
 
-const getEnvVar = (key: string) => {
-  // Check import.meta.env (Vite standard)
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env[key]) {
-    return (import.meta as any).env[key];
-  }
-  // Fallback to process.env if available (some environments)
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
+const getEnvVar = (viteKey: string | undefined, processKey: string) => {
+  if (viteKey) return viteKey;
+  if (typeof process !== 'undefined' && process.env && process.env[processKey]) {
+    return process.env[processKey];
   }
   return '';
 };
 
-let supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+let supabaseUrl = getEnvVar(import.meta.env.VITE_SUPABASE_URL, 'VITE_SUPABASE_URL');
 const supabasePublishableKey =
-  getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY');
+  getEnvVar(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'VITE_SUPABASE_PUBLISHABLE_KEY') || 
+  getEnvVar(import.meta.env.VITE_SUPABASE_ANON_KEY, 'VITE_SUPABASE_ANON_KEY');
 
 // Ensure URL has protocol
 if (supabaseUrl && !supabaseUrl.startsWith('http')) {

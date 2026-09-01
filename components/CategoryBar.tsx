@@ -28,6 +28,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
   const [headerCats, setHeaderCats] = useState<CachedCategory[]>([]);
   const [allCats, setAllCats] = useState<CachedCategory[]>([]);
   const [hoveredCat, setHoveredCat] = useState<string | null>(null);
+  const [hoveredRect, setHoveredRect] = useState<{ left: number; top: number; width: number } | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -57,6 +58,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 4);
     setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    setHoveredCat(null); // hide on scroll
   }, []);
 
   useEffect(() => {
@@ -85,8 +87,12 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
     setHoveredCat(null);
   };
 
-  const onHoverEnter = (id: string) => {
+  const onHoverEnter = (id: string, e?: React.MouseEvent) => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    if (e && e.currentTarget) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoveredRect({ left: rect.left, top: rect.bottom, width: rect.width });
+    }
     setHoveredCat(id);
   };
   const onHoverLeave = () => {
@@ -142,7 +148,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
               <div
                 key={cat.id}
                 className="relative flex-shrink-0"
-                onMouseEnter={() => onHoverEnter(cat.id)}
+                onMouseEnter={(e) => onHoverEnter(cat.id, e)}
                 onMouseLeave={onHoverLeave}
               >
                 {/* Category button */}
@@ -179,66 +185,74 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
                   )}
                 </button>
 
-                {/* Subcategory dropdown — with invisible hover bridge on top */}
-                {subs.length > 0 && isHovered && (
-                  <div
-                    onMouseEnter={() => onHoverEnter(cat.id)}
-                    onMouseLeave={onHoverLeave}
-                    className="
-                      absolute left-0 min-w-[220px] max-w-[300px]
-                      z-50
-                    "
-                    style={{
-                      top: 'calc(100% - 2px)',
-                      paddingTop: '4px', /* invisible bridge — fills gap between button and dropdown */
-                    }}
-                  >
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-2xl py-2 overflow-hidden">
-                      {/* Category header */}
-                      <div className="px-4 py-2 mb-1 border-b border-gray-100 flex items-center gap-2">
-                        {cat.logo_url ? (
-                          <img src={cat.logo_url} alt={cat.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
-                        ) : (
-                          <CircleDashed className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                        )}
-                        <span className="text-[11px] font-black uppercase tracking-widest text-gray-400">
-                          {cat.name}
-                        </span>
-                      </div>
-                      {subs.map(sub => (
-                        <button
-                          key={sub.id}
-                          onClick={() => handleSubcatClick(sub)}
-                          className={`
-                            w-full flex items-center gap-3 px-4 py-2.5 text-left
-                            text-sm font-semibold transition-colors
-                            ${activeCategory === sub.name
-                              ? 'bg-red-50 text-primary'
-                              : 'text-gray-700 hover:bg-red-50 hover:text-primary'
-                            }
-                          `}
-                        >
-                          {sub.logo_url ? (
-                            <img
-                              src={sub.logo_url}
-                              alt={sub.name}
-                              className="w-6 h-6 rounded-lg object-cover flex-shrink-0 border border-gray-100"
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                              <CircleDashed className="w-3.5 h-3.5 text-gray-400" />
-                            </div>
-                          )}
-                          <span>{sub.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Dropdown removed from here, it's rendered outside the scroll container */}
               </div>
             );
           })}
         </div>
+
+        {/* Subcategory dropdown — rendered outside scroll container */}
+        {hoveredCat && hoveredRect && (() => {
+          const cat = headerCats.find(c => c.id === hoveredCat);
+          if (!cat) return null;
+          const subs = getSubcats(cat.id);
+          if (subs.length === 0) return null;
+          
+          return (
+            <div
+              onMouseEnter={() => {
+                if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+              }}
+              onMouseLeave={onHoverLeave}
+              className="fixed z-50 min-w-[220px] max-w-[300px]"
+              style={{
+                top: `${hoveredRect.top - 2}px`,
+                left: `${hoveredRect.left}px`,
+                paddingTop: '4px', /* invisible bridge */
+              }}
+            >
+              <div className="bg-white border border-gray-200 rounded-xl shadow-2xl py-2 overflow-hidden">
+                <div className="px-4 py-2 mb-1 border-b border-gray-100 flex items-center gap-2">
+                  {cat.logo_url ? (
+                    <img src={cat.logo_url} alt={cat.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
+                  ) : (
+                    <CircleDashed className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  )}
+                  <span className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+                    {cat.name}
+                  </span>
+                </div>
+                {subs.map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => handleSubcatClick(sub)}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-2.5 text-left
+                      text-sm font-semibold transition-colors
+                      ${activeCategory === sub.name
+                        ? 'bg-red-50 text-primary'
+                        : 'text-gray-700 hover:bg-red-50 hover:text-primary'
+                      }
+                    `}
+                  >
+                    {sub.logo_url ? (
+                      <img
+                        src={sub.logo_url}
+                        alt={sub.name}
+                        className="w-6 h-6 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <CircleDashed className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                    )}
+                    <span>{sub.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Right scroll shadow ── */}
         {canScrollRight && (
