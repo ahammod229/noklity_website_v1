@@ -126,6 +126,15 @@ const fetchCatalogFromApi = async <T>(path: string): Promise<T | null> => {
   }
 };
 
+// Columns needed for product cards (catalog list view) — excludes heavy text fields
+const CATALOG_LIST_COLUMNS = [
+  'id', 'title', 'slug', 'brand', 'model_number', 'sku', 'category',
+  'price', 'discount_price', 'image_url', 'image_urls',
+  'rating', 'stock', 'status', 'is_active', 'is_flash_sale',
+  'created_at', 'weight', 'country_of_origin', 'delivery_charge',
+  'default_delivery_fee', 'tax_percent', 'warranty', 'warranty_months'
+].join(',');
+
 export const getProducts = async (category?: string | null): Promise<Product[]> => {
   try {
     if (!(await isFeatureEnabledFast('catalog_public'))) {
@@ -144,9 +153,12 @@ export const getProducts = async (category?: string | null): Promise<Product[]> 
       return mernProducts;
     }
 
+    // Use specific columns (not SELECT *) to reduce payload size
     let query = supabase
       .from('products')
-      .select('*')
+      .select(CATALOG_LIST_COLUMNS)
+      .eq('is_active', true)
+      .neq('status', 'inactive')
       .order('created_at', { ascending: false });
 
     if (category) {
@@ -156,7 +168,6 @@ export const getProducts = async (category?: string | null): Promise<Product[]> 
     const { data, error } = await query;
 
     if (error) {
-      // Check for network/fetch errors specifically
       if (error.message && error.message.includes('Failed to fetch')) {
         console.warn('Network error: Unable to fetch products. Checking connection...');
       } else {
@@ -215,10 +226,13 @@ export const getFlashSaleProducts = async (): Promise<Product[]> => {
       return mernProducts;
     }
 
+    // Added is_active + status server-side filter to reduce transferred rows
     const { data, error } = await supabase
       .from('products')
-      .select('*')
-      .eq('is_flash_sale', true);
+      .select(CATALOG_LIST_COLUMNS)
+      .eq('is_flash_sale', true)
+      .eq('is_active', true)
+      .neq('status', 'inactive');
 
     if (error) {
       if (error.message && error.message.includes('Failed to fetch')) {

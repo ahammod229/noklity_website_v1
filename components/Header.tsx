@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, X, LogOut, Bell } from 'lucide-react';
+import { Search, ShoppingCart, Heart, User as UserIcon, CircleHelp, X, LogOut, Bell, Menu } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,6 +10,7 @@ import { getSearchSuggestions, SearchSuggestion } from '../services/searchServic
 import { getUnreadCount, subscribeToNotifications } from '../services/notificationService';
 import OptimizedImage from './ui/OptimizedImage';
 import { BREAKPOINTS } from '../constants/breakpoints';
+import CategorySidebar from './CategorySidebar';
 
 interface HeaderProps {
   onLoginClick?: () => void;
@@ -20,6 +21,9 @@ interface HeaderProps {
   onNotificationsClick?: () => void;
   wishlistCount?: number;
   user?: User | null;
+  onSelectCategory?: (category: string) => void;
+  /** Called when mobile hamburger is tapped — lets parent open the shared sidebar */
+  onOpenSidebar?: () => void;
 }
 
 const getQueryFromUrl = () => {
@@ -35,7 +39,9 @@ const Header: React.FC<HeaderProps> = ({
   onWishlistClick,
   onNotificationsClick,
   wishlistCount = 0,
-  user: _propUser // Kept for compatibility with callers
+  user: _propUser,
+  onSelectCategory,
+  onOpenSidebar,
 }) => {
   const { user, signOut } = useAuth();
   const { theme } = useTheme();
@@ -49,6 +55,10 @@ const Header: React.FC<HeaderProps> = ({
   const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const mobileSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Sidebar state (for mobile) ──
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const initialConfig = getPublicSiteConfigSnapshot();
   const initialLogo = theme === 'dark'
     ? (initialConfig.headerLogoDark || initialConfig.headerLogoLight || '')
@@ -203,32 +213,63 @@ const Header: React.FC<HeaderProps> = ({
   }, [activeQuery]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 h-[68px] sm:h-[72px] md:h-[80px] font-sans transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
-        <div className="flex justify-between items-center h-full gap-4 lg:gap-5">
-          
-          {/* LEFT: Logo (Image Based) */}
-          <a href="/" onClick={closeMobileOverlays} className="flex-shrink-0 min-w-0 flex items-center gap-3 group relative z-50">
-            {hasUploadedLogo ? (
-              <img 
-                src={logoSrc}
-                alt={siteName} 
-                width={244}
-                height={70}
-                className="w-auto object-contain transition-transform duration-300 group-hover:scale-105 h-[34px] sm:h-[34px] md:h-[48px] max-w-[150px] sm:max-w-[180px] md:max-w-[340px]"
-                onError={() => {
-                  setLogoLoadFailed(true);
-                }}
-              />
-            ) : (
-              <span className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-gray-900 truncate">
-                {siteName}
-              </span>
-            )}
-          </a>
+    <>
+      {/* ── Category Sidebar ── */}
+      <CategorySidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onSelectCategory={(cat, sub) => {
+          const target = sub || cat;
+          if (target) {
+            onSelectCategory?.(target);
+          } else {
+            onSelectCategory?.('');
+          }
+          setSidebarOpen(false);
+        }}
+      />
 
-          {/* Mobile Inline Search (beside logo) */}
-          <div ref={mobileSearchWrapperRef} className="md:hidden flex-1 min-w-0">
+      {/* ── Main Header ── */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 font-sans transition-all duration-300">
+        {/* Top bar: Logo + Search + Icons */}
+        <div className="h-[68px] sm:h-[72px] md:h-[80px]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+            <div className="flex justify-between items-center h-full gap-4 lg:gap-5">
+
+              {/* ── Hamburger + Logo ── */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Hamburger button — mobile only — opens sidebar/category browser */}
+                <button
+                  onClick={() => { onOpenSidebar?.(); setSidebarOpen(true); }}
+                  className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-primary flex-shrink-0"
+                  aria-label="Browse categories"
+                  title="Browse all categories"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+
+                {/* Hamburger button — desktop only (in header bar) — HIDDEN, only shown in nav strip */}
+                {/* Logo */}
+                <a href="/" onClick={closeMobileOverlays} className="flex-shrink-0 min-w-0 flex items-center gap-3 group relative z-50">
+                  {hasUploadedLogo ? (
+                    <img
+                      src={logoSrc}
+                      alt={siteName}
+                      width={244}
+                      height={70}
+                      className="w-auto object-contain transition-transform duration-300 group-hover:scale-105 h-[34px] sm:h-[34px] md:h-[48px] max-w-[150px] sm:max-w-[180px] md:max-w-[340px]"
+                      onError={() => { setLogoLoadFailed(true); }}
+                    />
+                  ) : (
+                    <span className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-gray-900 truncate">
+                      {siteName}
+                    </span>
+                  )}
+                </a>
+              </div>
+
+              {/* Mobile Inline Search */}
+              <div ref={mobileSearchWrapperRef} className="md:hidden flex-1 min-w-0">
             <div className="relative">
               <input
                 ref={mobileSearchInputRef}
@@ -295,8 +336,8 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Desktop Search Bar */}
-          <div ref={desktopSearchWrapperRef} className="hidden md:flex flex-1 max-w-2xl mx-8 relative z-50">
+              {/* Desktop Search Bar */}
+              <div ref={desktopSearchWrapperRef} className="hidden md:flex flex-1 max-w-2xl mx-8 relative z-50">
             <div className="relative w-full group">
               <input
                 type="text"
@@ -362,40 +403,23 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* RIGHT: Icons */}
-          <div className="flex items-center gap-3 sm:gap-6">
-            
-            {/* Desktop Navigation Icons */}
-            <div className="hidden md:flex items-center gap-6 lg:gap-5">
-              <NavIcon 
-                icon={Heart} 
-                label="Wishlist" 
-                badge={wishlistCount}
-                onClick={onWishlistClick} 
-              />
-              <NavIcon 
-                icon={ShoppingCart} 
-                label="Cart" 
-                badge={cartItemCount} 
-                onClick={onCartClick}
-              />
-              <NavIcon icon={CircleHelp} label="Help" onClick={onHelpClick} />
-              
-              <NavIcon 
-                icon={UserIcon} 
-                label={isLoggedIn ? "Account" : "Login"} 
-                onClick={onLoginClick} 
-                active={isLoggedIn}
-              />
+              {/* RIGHT: Icons */}
+              <div className="flex items-center gap-3 sm:gap-6">
+                <div className="hidden md:flex items-center gap-6 lg:gap-5">
+                  <NavIcon icon={Heart} label="Wishlist" badge={wishlistCount} onClick={onWishlistClick} />
+                  <NavIcon icon={ShoppingCart} label="Cart" badge={cartItemCount} onClick={onCartClick} />
+                  <NavIcon icon={CircleHelp} label="Help" onClick={onHelpClick} />
+                  <NavIcon icon={UserIcon} label={isLoggedIn ? "Account" : "Login"} onClick={onLoginClick} active={isLoggedIn} />
+                </div>
+                <div className="hidden md:flex items-center z-50" />
+              </div>
 
-            </div>
+            </div>{/* end flex row */}
+          </div>{/* end max-w */}
+        </div>{/* end top bar height */}
 
-            <div className="hidden md:flex items-center z-50" />
-          </div>
-        </div>
-      </div>
-
-    </header>
+      </header>
+    </>
   );
 };
 

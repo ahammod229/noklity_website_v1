@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Category } from '../types';
 import { Disc, Settings, Wind, Gauge, Armchair, CircleDashed } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getCategories } from '../services/categoryCache';
 
 const defaultCategories: Category[] = [
   { id: '1', name: 'Brakes', icon: 'Disc', count: 0 },
@@ -27,21 +28,14 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const [{ data: categoryRows, error: categoryError }, { data: productRows }] = await Promise.all([
-        supabase
-          .from('categories')
-          .select('id,name,icon,logo_url')
-          .eq('is_active', true)
-          .order('name', { ascending: true }),
+      // Use shared cache for categories, only fetch product counts separately
+      const [categoryRows, { data: productRows }] = await Promise.all([
+        getCategories(),
         supabase
           .from('products')
           .select('category')
           .eq('status', 'active')
       ]);
-
-      if (categoryError || !categoryRows) {
-        return;
-      }
 
       const counts: Record<string, number> = {};
       (productRows || []).forEach((p: any) => {
@@ -49,13 +43,15 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
         counts[p.category] = (counts[p.category] || 0) + 1;
       });
 
-      const mapped: Category[] = categoryRows.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        icon: c.icon || 'CircleDashed',
-        logoUrl: c.logo_url || undefined,
-        count: counts[c.name] || 0
-      }));
+      const mapped: Category[] = categoryRows
+        .filter(c => !c.parent_id) // Only main categories in grid
+        .map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          icon: c.icon || 'CircleDashed',
+          logoUrl: c.logo_url || undefined,
+          count: counts[c.name] || 0
+        }));
       if (mapped.length > 0) {
         setCategories(mapped);
       }
@@ -94,25 +90,26 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
             const isSelected = selectedCategory === cat.name;
             
             return (
-              <div 
-                key={cat.id} 
+              <div
+                key={cat.id}
                 onClick={() => onSelectCategory?.(cat.name)}
-                className={`group cursor-pointer bg-white rounded-2xl border px-3 py-3 sm:p-6 flex flex-col items-center justify-center transition-all duration-300 min-h-[112px] sm:min-h-0
-                  ${isSelected 
-                    ? 'border-primary shadow-lg ring-1 ring-primary transform -translate-y-1' 
+                className={`group cursor-pointer bg-white rounded-2xl border px-3 py-3 sm:p-5 flex flex-col items-center justify-center transition-all duration-300 min-h-[112px] sm:min-h-0
+                  ${isSelected
+                    ? 'border-primary shadow-lg ring-1 ring-primary transform -translate-y-1'
                     : 'border-gray-200/60 hover:shadow-lg hover:border-primary/20 hover:-translate-y-1'
                   }`}
               >
-                <div className={`w-9 h-9 sm:w-14 sm:h-14 rounded-full flex items-center justify-center mb-2 sm:mb-4 transition-all duration-300 overflow-hidden
+                {/* Image/Icon — bigger circle, same card */}
+                <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mb-2 sm:mb-3 transition-all duration-300 overflow-hidden flex-shrink-0
                   ${isSelected
                     ? 'bg-primary text-white'
                     : 'bg-gray-50 text-gray-600 group-hover:bg-primary group-hover:text-white'
                   }`}>
                   {cat.logoUrl ? (
-                    <img 
-                      src={cat.logoUrl} 
-                      alt={cat.name} 
-                      className="w-full h-full object-cover" 
+                    <img
+                      src={cat.logoUrl}
+                      alt={cat.name}
+                      className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         const fallbackIcon = e.currentTarget.nextElementSibling;
@@ -122,13 +119,13 @@ const CategoryGrid: React.FC<CategoryGridProps> = ({ selectedCategory, onSelectC
                       }}
                     />
                   ) : null}
-                  <IconComponent 
-                    className="w-4 h-4 sm:w-7 sm:h-7" 
-                    strokeWidth={1.5} 
+                  <IconComponent
+                    className="w-6 h-6 sm:w-9 sm:h-9"
+                    strokeWidth={1.5}
                     style={{ display: cat.logoUrl ? 'none' : 'block' }}
                   />
                 </div>
-                <h3 className={`font-bold text-[13px] sm:text-sm leading-tight transition-colors text-center ${isSelected ? 'text-primary' : 'text-gray-900 group-hover:text-primary'}`}>
+                <h3 className={`font-bold text-[12px] sm:text-sm leading-tight transition-colors text-center ${isSelected ? 'text-primary' : 'text-gray-900 group-hover:text-primary'}`}>
                   {cat.name}
                 </h3>
                 <span className="text-[10px] uppercase font-bold text-gray-400 mt-1 tracking-wide">{cat.count} items</span>

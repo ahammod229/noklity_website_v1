@@ -25,6 +25,7 @@ export interface ProductFormData {
   modelNumber: string;
   sku: string;
   category: string;
+  subcategory: string;  // NEW: subcategory field
   regularPrice: number;
   salePrice: number | null;
   stock: number;
@@ -62,12 +63,19 @@ export interface ProductFormData {
   whatsInBox: string;
 }
 
+interface CategoryTreeItem {
+  id: string;
+  name: string;
+  children: { id: string; name: string }[];
+}
+
 interface ProductFormProps {
   initialData?: Product;
   onSubmit: (data: ProductFormData) => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
-  categories?: string[];
+  categories?: string[]; // kept for backward compat
+  categoryTree?: CategoryTreeItem[]; // NEW: structured tree
 }
 
 const DEFAULT_CATEGORIES = [
@@ -80,7 +88,8 @@ const DarazProductForm: React.FC<ProductFormProps> = ({
   onSubmit,
   onCancel,
   isSaving,
-  categories
+  categories,
+  categoryTree = []
 }) => {
   const [showMoreWarranty, setShowMoreWarranty] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
@@ -89,7 +98,8 @@ const DarazProductForm: React.FC<ProductFormProps> = ({
     brand: 'No Brand',
     modelNumber: '',
     sku: '',
-    category: categories?.[0] || 'Engine',
+    category: categories?.[0] || '',
+    subcategory: '',
     regularPrice: 0,
     salePrice: null,
     stock: 0,
@@ -132,6 +142,36 @@ const DarazProductForm: React.FC<ProductFormProps> = ({
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [formMessage, setFormMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  // Subcategory options based on selected category
+  const [subcategoryOptions, setSubcategoryOptions] = useState<{ id: string; name: string }[]>([]);
+
+  // Update subcategory options when category changes
+  useEffect(() => {
+    if (!formData.category || categoryTree.length === 0) {
+      // Fallback: fetch from DB directly
+      const fetchSubs = async () => {
+        if (!formData.category) { setSubcategoryOptions([]); return; }
+        const { data } = await (await import('../../lib/supabase')).supabase
+          .from('categories')
+          .select('id,name')
+          .eq('is_active', true)
+          .filter('parent_id', 'not.is', null);
+        // Filter by parent name matching
+        const subs = (data || []) as { id: string; name: string }[];
+        setSubcategoryOptions(subs);
+      };
+      fetchSubs();
+      return;
+    }
+    const parent = categoryTree.find(c => c.name === formData.category);
+    const subs = parent ? parent.children : [];
+    setSubcategoryOptions(subs);
+    // Reset subcategory if it's not in new list
+    if (subs.length > 0 && !subs.find(s => s.name === formData.subcategory)) {
+      setFormData(prev => ({ ...prev, subcategory: '' }));
+    }
+  }, [formData.category, categoryTree]);
+
 
   const categoryList = useMemo(
     () => (categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES),
@@ -148,6 +188,7 @@ const DarazProductForm: React.FC<ProductFormProps> = ({
         modelNumber: initialData.modelNumber || '',
         sku: initialData.sku || '',
         category: initialData.category,
+        subcategory: (initialData as any).subcategory || '',
         regularPrice: initialData.originalPrice || initialData.price,
         salePrice: initialData.originalPrice ? initialData.price : null,
         stock: initialData.stock || 0,
@@ -333,20 +374,42 @@ const DarazProductForm: React.FC<ProductFormProps> = ({
                   </div>
                 </div>
 
-                {/* Category */}
-                <div>
-                  <label className="block text-[13px] font-bold text-gray-800 mb-1">
-                    <span className="text-red-500 mr-1">*</span>Category
-                  </label>
-                  <select 
-                    required
-                    value={formData.category}
-                    onChange={e => setFormData({...formData, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-[13px] bg-white cursor-pointer"
-                  >
-                    <option value="" disabled>Select a Category...</option>
-                    {categoryList.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                {/* Category + Subcategory */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                      <span className="text-red-500 mr-1">*</span>Category
+                    </label>
+                    <select 
+                      required
+                      value={formData.category}
+                      onChange={e => setFormData({...formData, category: e.target.value, subcategory: ''})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-[13px] bg-white cursor-pointer"
+                    >
+                      <option value="" disabled>Select a Category...</option>
+                      {categoryList.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Subcategory — shows only when parent has subcategories */}
+                  {subcategoryOptions.length > 0 && (
+                    <div>
+                      <label className="block text-[13px] font-bold text-gray-800 mb-1">
+                        Subcategory
+                        <span className="ml-1 text-[11px] text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <select
+                        value={formData.subcategory}
+                        onChange={e => setFormData({...formData, subcategory: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-[13px] bg-white cursor-pointer"
+                      >
+                        <option value="">— No subcategory —</option>
+                        {subcategoryOptions.map(s => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Product Images */}

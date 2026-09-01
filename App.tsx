@@ -1,8 +1,10 @@
 
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Header from './components/Header';
+import CategoryBar from './components/CategoryBar';
 import Footer from './components/Footer';
 import MobileBottomNav from './components/MobileBottomNav';
+import CategorySidebar from './components/CategorySidebar';
 import Toast, { ToastType } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Product } from './types';
@@ -319,7 +321,8 @@ const AppContent: React.FC = () => {
         if (!document.hidden) {
           void syncLatestConfigRevision();
         }
-      }, 15000);
+      }, 60_000); // P4: Reduced poll frequency — realtime signals handle admin changes
+
 
       void syncLatestConfigRevision();
     }, 1200);
@@ -380,6 +383,7 @@ const AppContent: React.FC = () => {
 
   // Storefront State
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Notification State
   const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
@@ -427,6 +431,17 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // B5: Listen for wishlist-requires-login event from ProductCard
+  useEffect(() => {
+    const handleRequireLogin = (e: Event) => {
+      e.preventDefault();
+      showToast('Please sign in to save items to your wishlist.', 'error');
+      navigate('login');
+    };
+    window.addEventListener('noklity:require-login', handleRequireLogin);
+    return () => window.removeEventListener('noklity:require-login', handleRequireLogin);
+  }, []);
+
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to sign out?')) {
       await signOut();
@@ -441,6 +456,7 @@ const AppContent: React.FC = () => {
 
   const handleSelectCategory = (category: string) => {
     setActiveCategory(category === activeCategory ? null : category || null);
+    setSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -686,9 +702,34 @@ const AppContent: React.FC = () => {
             onWishlistClick={() => navigate('wishlist')}
             wishlistCount={wishlist.length}
             user={user}
+            onSelectCategory={(cat) => {
+              handleSelectCategory(cat || '');
+              navigate('home');
+            }}
+            onOpenSidebar={() => setSidebarOpen(true)}
+          />
+          {/* ── Category Bar — desktop only, below header ── */}
+          <CategoryBar
+            activeCategory={activeCategory}
+            onSelectCategory={(cat) => {
+              handleSelectCategory(cat || '');
+              if (currentView !== 'home') navigate('home');
+            }}
+            onOpenSidebar={() => setSidebarOpen(true)}
           />
         </div>
       )}
+
+      {/* ── Shared Category Sidebar (mobile + desktop All Categories) ── */}
+      <CategorySidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onSelectCategory={(cat, sub) => {
+          const target = sub || cat || '';
+          handleSelectCategory(target);
+          if (currentView !== 'home') navigate('home');
+        }}
+      />
       
       <div className={isMobileBottomNavVisible ? 'pb-[84px] md:pb-0' : ''}>
         <Suspense fallback={<RouteLoadingFallback />}>

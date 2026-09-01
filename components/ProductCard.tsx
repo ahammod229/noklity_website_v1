@@ -43,8 +43,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, horizontal, onAddToC
       }
     } catch (error: any) {
       if (error.message === 'Not logged in') {
-        // Ideally prompt login, for now alert or ignore if parent handles global auth events
-        alert('Please login to save items to your wishlist');
+        // B5 Fix: Dispatch a custom event instead of native alert().
+        // App.tsx (or any listener) can show a proper toast/modal.
+        const handled = window.dispatchEvent(
+          new CustomEvent('noklity:require-login', { bubbles: true, cancelable: true })
+        );
+        // If no listener handled it, navigate to login page
+        if (handled) {
+          window.history.pushState({}, '', '/login');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
       }
     }
   };

@@ -46,7 +46,12 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
   const { formatCurrency } = useCurrency();
   const isGuestCheckout = !user;
   const guestCheckoutEnabled = canUseFeature('checkout_guest');
-  const [guestEmail, setGuestEmail] = useState(() => localStorage.getItem('noklity_guest_email') || '');
+  // B1 Fix: Only restore guest email from localStorage if NOT logged in.
+  // Logged-in users should never see a pre-filled guest email from a previous session.
+  const [guestEmail, setGuestEmail] = useState(() => {
+    if (user) return '';
+    return localStorage.getItem('noklity_guest_email') || '';
+  });
   const isGuestEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim());
   
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -128,12 +133,15 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (user?.email) {
+      // Logged-in user: use their real email, never show/save guest email
       setGuestEmail(user.email);
       return;
     }
+    // Guest: restore saved email only
     const stored = localStorage.getItem('noklity_guest_email');
     if (stored) setGuestEmail(stored);
   }, [user?.email]);
+
 
   useEffect(() => {
     if (!checkoutMethods.includes(paymentMethod)) {
@@ -272,7 +280,11 @@ const Checkout: React.FC<CheckoutProps> = ({ onNavigate }) => {
       if (!checkoutEmail) {
         throw new Error('A valid email is required to place the order.');
       }
-      localStorage.setItem('noklity_guest_email', checkoutEmail);
+      // B3 Fix: Only persist guest email for actual guests. After order, clear it
+      // so next visitor to this browser doesn't see a pre-filled email.
+      if (!user) {
+        localStorage.setItem('noklity_guest_email', checkoutEmail);
+      }
 
       const result = await createOrder({
         items: cart,

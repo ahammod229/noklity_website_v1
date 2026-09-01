@@ -56,13 +56,58 @@ const Home: React.FC<HomeProps> = ({
     fetchData();
   }, [activeCategory]);
 
+  // Re-apply config when admin updates settings in real-time
   useEffect(() => {
     let mounted = true;
 
-    const loadConfig = async () => {
+    const applyConfig = (cfg: ReturnType<typeof getPublicSiteConfigSnapshot>) => {
+      if (!mounted) return;
+      setSupportEmail(cfg.supportEmail || tenantConfig.supportEmail || 'support@example.com');
+      setNewsletterEnabled(cfg.newsletterEnabled);
+      setNewsletterBadgeText(cfg.newsletterBadgeText || 'Exclusive Club');
+      setNewsletterTitle(cfg.newsletterTitle || `Join the ${tenantConfig.brandName || 'Store'} Club`);
+      setNewsletterDescription(
+        cfg.newsletterDescription || 'Get exclusive access to limited edition drops, installation guides, and 10% off your first order.'
+      );
+      setNewsletterInputPlaceholder(cfg.newsletterInputPlaceholder || 'Enter your email');
+      setNewsletterButtonText(cfg.newsletterButtonText || 'Join');
+      setNewsletterBackgroundImageUrl(cfg.newsletterBackgroundImageUrl || '');
+    };
+
+    const onUpdated = async () => {
       try {
         const cfg = await getPublicSiteConfig();
-        if (!mounted) return;
+        applyConfig(cfg);
+      } catch {
+        // Keep current values on config update failure
+      }
+    };
+
+    window.addEventListener('site-config-updated', onUpdated as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('site-config-updated', onUpdated as EventListener);
+    };
+  }, []);
+
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      // P2: Fetch products and site config in parallel to avoid sequential round-trips
+      const [productsResult, configResult] = await Promise.allSettled([
+        getProducts(activeCategory),
+        getPublicSiteConfig()
+      ]);
+
+      if (productsResult.status === 'fulfilled') {
+        setDisplayedProducts(productsResult.value);
+      } else {
+        console.error('Failed to load products', productsResult.reason);
+      }
+
+      if (configResult.status === 'fulfilled') {
+        const cfg = configResult.value;
         setSupportEmail(cfg.supportEmail || tenantConfig.supportEmail || 'support@example.com');
         setNewsletterEnabled(cfg.newsletterEnabled);
         setNewsletterBadgeText(cfg.newsletterBadgeText || 'Exclusive Club');
@@ -73,28 +118,7 @@ const Home: React.FC<HomeProps> = ({
         setNewsletterInputPlaceholder(cfg.newsletterInputPlaceholder || 'Enter your email');
         setNewsletterButtonText(cfg.newsletterButtonText || 'Join');
         setNewsletterBackgroundImageUrl(cfg.newsletterBackgroundImageUrl || '');
-      } catch {
-        // Keep defaults when config fetch fails.
       }
-    };
-
-    loadConfig();
-    const onUpdated = () => loadConfig();
-    window.addEventListener('site-config-updated', onUpdated as EventListener);
-    return () => {
-      mounted = false;
-      window.removeEventListener('site-config-updated', onUpdated as EventListener);
-    };
-  }, []);
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      // Fetch products based on category (or all)
-      const products = await getProducts(activeCategory);
-      setDisplayedProducts(products);
-    } catch (error) {
-      console.error("Failed to load products", error);
     } finally {
       setIsLoading(false);
     }

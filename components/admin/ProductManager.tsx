@@ -16,6 +16,12 @@ const normalizeImageUrls = (value: unknown) =>
     ? value.map((item) => String(item || '').trim()).filter(Boolean)
     : [];
 
+interface CategoryTreeItem {
+  id: string;
+  name: string;
+  children: { id: string; name: string }[];
+}
+
 const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,10 +29,31 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeItem[]>([]);
 
   useEffect(() => {
     fetchProducts();
+    fetchCategoryTree();
   }, []);
+
+  const fetchCategoryTree = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('id,name,parent_id')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (!data) return;
+    const allCats = (data as unknown as { id: string; name: string; parent_id: string | null }[]) || [];
+    const parents = allCats.filter(c => !c.parent_id);
+    const tree: CategoryTreeItem[] = parents.map(p => ({
+      id: p.id,
+      name: p.name,
+      children: allCats.filter(c => c.parent_id === p.id).map(c => ({ id: c.id, name: c.name }))
+    }));
+    setCategoryTree(tree);
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -48,6 +75,7 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
           id: row.id,
           name: row.title,
           category: row.category || 'Uncategorized',
+          subcategory: row.subcategory || '',
           price: row.discount_price || row.price,
           originalPrice: row.discount_price ? row.price : undefined,
           image: String(row.image_url || '').trim() || images[0] || 'https://via.placeholder.com/400x400?text=No+Image',
@@ -118,9 +146,10 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
   const handleSubmit = async (formData: ProductFormData) => {
     setIsSaving(true);
 
-    const payload = {
+    const payload: any = {
       title: formData.name,
       category: formData.category,
+      subcategory: (formData as any).subcategory || null,
       brand: formData.brand,
       price: formData.regularPrice,
       discount_price: formData.salePrice && formData.salePrice < formData.regularPrice ? formData.salePrice : null,
@@ -171,6 +200,8 @@ const ProductManager: React.FC<ProductManagerProps> = ({ showToast }) => {
         onSubmit={handleSubmit}
         onCancel={handleCloseModal}
         isSaving={isSaving}
+        categories={categoryTree.map(c => c.name)}
+        categoryTree={categoryTree}
       />
     );
   }

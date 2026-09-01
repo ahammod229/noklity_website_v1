@@ -97,6 +97,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       try {
         if (user) {
+          // User just logged in — clear any stale guest cart from localStorage (B6)
+          localStorage.removeItem('noklity_cart');
+
           // Load from Supabase
           const { data, error } = await supabase
             .from('cart_items')
@@ -112,8 +115,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
               price: item.price,
               image: item.image,
               quantity: item.quantity,
-              category: 'General', // Default as Supabase table strictly follows requested schema
-              rating: 5, // Default
+              category: 'General',
+              rating: 5,
               isNew: false
             }));
 
@@ -150,7 +153,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else {
-          // Load from LocalStorage
+          // User logged out — clear localStorage cart so next user starts fresh (B2)
+          // Only clear if cart was previously loaded for a user (avoid clearing on initial guest load)
           const stored = localStorage.getItem('noklity_cart');
           if (mounted && stored) {
             const parsed = JSON.parse(stored) as CartItem[];
@@ -181,6 +185,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mounted = false;
     };
   }, [user]);
+
 
   // Persist helper
   const saveCartToStorage = (newCart: CartItem[]) => {
@@ -306,7 +311,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = async () => {
     setCart([]);
-    saveCartToStorage([]);
+    // Always clear localStorage when cart is cleared (handles logout scenario)
+    localStorage.removeItem('noklity_cart');
 
     if (user) {
       try {
